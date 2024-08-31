@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"base/app/models"
+	"base/core/helper"
 )
 
 type {{.StructName}}Controller struct {
@@ -88,7 +89,6 @@ func (c *{{.StructName}}Controller) Get(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, item.ToResponse())
 }
-
 // List{{.StructName}} godoc
 // @Summary List {{.StructName}}
 // @Description Get a list of all {{.StructName}}
@@ -106,7 +106,7 @@ func (c *{{.StructName}}Controller) List(ctx *gin.Context) {
 		return
 	}
 
-	responses := models.ToResponseSlice(items)
+	responses := helper.ToResponseSlice(items).([]*models.{{.StructName}}Response)
 	ctx.JSON(http.StatusOK, responses)
 }
 

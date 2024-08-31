@@ -223,9 +223,17 @@ func generateModule(cmd *cobra.Command, args []string) {
 	pluralName := toLowerPlural(singularName)
 	fields := args[1:]
 
+	// Create core/helper directory if it doesn't exist
+	coreHelperDir := filepath.Join("core", "helper")
+	err := os.MkdirAll(coreHelperDir, os.ModePerm)
+	if err != nil {
+		fmt.Printf("Error creating core/helper directory: %v\n", err)
+		return
+	}
+
 	// Create models directory if it doesn't exist
 	modelsDir := filepath.Join("app", "models")
-	err := os.MkdirAll(modelsDir, os.ModePerm)
+	err = os.MkdirAll(modelsDir, os.ModePerm)
 	if err != nil {
 		fmt.Printf("Error creating models directory: %v\n", err)
 		return
@@ -244,6 +252,12 @@ func generateModule(cmd *cobra.Command, args []string) {
 	generateFileFromTemplate(moduleDir, "controller.go", "templates/controller.tmpl", singularName, pluralName, fields)
 	generateFileFromTemplate(moduleDir, "service.go", "templates/service.tmpl", singularName, pluralName, fields)
 	generateFileFromTemplate(moduleDir, "mod.go", "templates/mod.tmpl", singularName, pluralName, fields)
+
+	// Generate response.go in core/helper if it doesn't exist
+	responseHelperPath := filepath.Join(coreHelperDir, "response.go")
+	if _, err := os.Stat(responseHelperPath); os.IsNotExist(err) {
+		generateFileFromTemplate(coreHelperDir, "response.go", "templates/response_helper.tmpl", "", "", nil)
+	}
 
 	// Update app/init.go to register the new module
 	err = updateInitFile(singularName, pluralName)
