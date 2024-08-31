@@ -1,0 +1,112 @@
+package {{.PackageName}}
+
+import (
+	"gorm.io/gorm"
+	"time"
+	{{- range .Fields}}
+	{{- if or (eq .Type "belongs_to") (eq .Type "has_one")}}
+	"base/app/{{.PluralType}}"
+	{{- end}}
+	{{- end}}
+)
+
+type {{.StructName}} struct {
+	gorm.Model
+	{{- range .Fields}}
+	{{- if eq .Type "belongs_to"}}
+	{{.Name}}ID uint `json:"{{.JSONName}}Id" gorm:"column:{{.DBName}}_id"`
+	{{.Name}} *{{.PluralType}}.{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}ID"`
+	{{- else if eq .Type "has_one"}}
+	{{.Name}}ID uint `json:"{{.JSONName}}Id" gorm:"column:{{.DBName}}_id"`
+	{{.Name}} *{{.PluralType}}.{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}ID"`
+	{{- else if ne .Type "has_many"}}
+	{{.Name}} {{.Type}} `json:"{{.JSONName}}" gorm:"column:{{.DBName}}"`
+	{{- end}}
+	{{- end}}
+}
+
+type Create{{.StructName}}Request struct {
+	{{- range .Fields}}
+	{{- if eq .Type "belongs_to"}}
+	{{.Name}}ID uint `json:"{{.JSONName}}Id"`
+	{{- else if eq .Type "has_one"}}
+	{{.Name}}ID uint `json:"{{.JSONName}}Id"`
+	{{- else if ne .Type "has_many"}}
+	{{.Name}} {{.Type}} `json:"{{.JSONName}}"`
+	{{- end}}
+	{{- end}}
+}
+
+type Update{{.StructName}}Request struct {
+	{{- range .Fields}}
+	{{- if eq .Type "belongs_to"}}
+	{{.Name}}ID *uint `json:"{{.JSONName}}Id,omitempty"`
+	{{- else if eq .Type "has_one"}}
+	{{.Name}}ID *uint `json:"{{.JSONName}}Id,omitempty"`
+	{{- else if ne .Type "has_many"}}
+	{{.Name}} *{{.Type}} `json:"{{.JSONName}},omitempty"`
+	{{- end}}
+	{{- end}}
+}
+
+type {{.StructName}}Response struct {
+	ID        uint      `json:"id"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	{{- range .Fields}}
+	{{- if eq .Type "belongs_to"}}
+	{{.Name}}ID uint `json:"{{.JSONName}}Id"`
+	{{.Name}} *{{.PluralType}}.{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
+	{{- else if eq .Type "has_many"}}
+	{{.Name}} []{{.PluralType}}.{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
+	{{- else if eq .Type "has_one"}}
+	{{.Name}}ID uint `json:"{{.JSONName}}Id"`
+	{{.Name}} *{{.PluralType}}.{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
+	{{- else}}
+	{{.Name}} {{.Type}} `json:"{{.JSONName}}"`
+	{{- end}}
+	{{- end}}
+}
+
+func ({{.StructName}}) TableName() string {
+	return "{{.TableName}}"
+}
+
+func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
+	response := &{{.StructName}}Response{
+		ID:        item.ID,
+		CreatedAt: item.CreatedAt,
+		UpdatedAt: item.UpdatedAt,
+		{{- range .Fields}}
+		{{- if eq .Type "belongs_to"}}
+		{{.Name}}ID: item.{{.Name}}ID,
+		{{- else if eq .Type "has_one"}}
+		{{.Name}}ID: item.{{.Name}}ID,
+		{{- else if ne .Type "has_many"}}
+		{{.Name}}: item.{{.Name}},
+		{{- end}}
+		{{- end}}
+	}
+
+	{{- range .Fields}}
+	{{- if eq .Type "belongs_to"}}
+	if item.{{.Name}} != nil {
+		response.{{.Name}} = item.{{.Name}}.ToResponse()
+	}
+	{{- else if eq .Type "has_one"}}
+	if item.{{.Name}} != nil {
+		response.{{.Name}} = item.{{.Name}}.ToResponse()
+	}
+	{{- end}}
+	{{- end}}
+
+	return response
+}
+
+func ToResponseSlice(items []*{{.StructName}}) []*{{.StructName}}Response {
+	responses := make([]*{{.StructName}}Response, len(items))
+	for i, item := range items {
+		responses[i] = item.ToResponse()
+	}
+	return responses
+}

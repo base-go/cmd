@@ -1,0 +1,112 @@
+package {{.PackageName}}
+
+import (
+	"errors"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+
+)
+
+type {{.StructName}}Service struct {
+	DB *gorm.DB
+}
+
+func New{{.StructName}}Service(db *gorm.DB) *{{.StructName}}Service {
+	return &{{.StructName}}Service{
+		DB: db,
+	}
+}
+
+func (s *{{.StructName}}Service) Create(req *Create{{.StructName}}Request) (*{{.StructName}}, error) {
+	item := {{.StructName}}{
+		{{- range .Fields}}
+		{{- if eq .Type "belongs_to"}}
+		{{.Name}}ID: req.{{.Name}}ID,
+		{{- else if eq .Type "has_many"}}
+		// Has-many relationships are typically not set during creation
+		{{- else if eq .Type "has_one"}}
+		{{.Name}}ID: req.{{.Name}}ID,
+		{{- else}}
+		{{.Name}}: req.{{.Name}},
+		{{- end}}
+		{{- end}}
+	}
+
+	if err := s.DB.Create(&item).Error; err != nil {
+		return nil, err
+	}
+
+	return s.GetByID(item.ID)
+}
+
+func (s *{{.StructName}}Service) GetByID(id uint) (*{{.StructName}}, error) {
+	var item {{.StructName}}
+	if err := s.DB.Preload(clause.Associations).First(&item, id).Error; err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
+func (s *{{.StructName}}Service) GetAll() ([]{{.StructName}}, error) {
+	var items []{{.StructName}}
+	if err := s.DB.Preload(clause.Associations).Find(&items).Error; err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (s *{{.StructName}}Service) Update(id uint, req *Update{{.StructName}}Request) (*{{.StructName}}, error) {
+	item, err := s.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	{{- range .Fields}}
+	{{- if eq .Type "belongs_to"}}
+	if req.{{.Name}}ID != nil {
+		item.{{.Name}}ID = *req.{{.Name}}ID
+	}
+	{{- else if eq .Type "has_many"}}
+	// Has-many relationships are updated separately
+	{{- else if eq .Type "has_one"}}
+	if req.{{.Name}}ID != nil {
+		item.{{.Name}}ID = *req.{{.Name}}ID
+	}
+	{{- else}}
+	if req.{{.Name}} != nil {
+		item.{{.Name}} = *req.{{.Name}}
+	}
+	{{- end}}
+	{{- end}}
+
+	if err := s.DB.Save(item).Error; err != nil {
+		return nil, err
+	}
+
+	return s.GetByID(id)
+}
+
+func (s *{{.StructName}}Service) Delete(id uint) error {
+	result := s.DB.Delete(&{{.StructName}}{}, id)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("item not found")
+	}
+	return nil
+}
+
+func (s *{{.StructName}}Service) GetAssociated(id uint, associationName string) (interface{}, error) {
+	item, err := s.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	var associated interface{}
+	if err := s.DB.Model(item).Association(associationName).Find(&associated); err != nil {
+		return nil, err
+	}
+
+	return associated, nil
+}
