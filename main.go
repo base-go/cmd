@@ -1,9 +1,12 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"embed"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -39,6 +42,14 @@ var newCmd = &cobra.Command{
 	Run:   createNewProject,
 }
 
+var startCmd = &cobra.Command{
+	Use:     "start",
+	Aliases: []string{"s"},
+	Short:   "Start the application",
+	Long:    `Start the application by running 'go run main.go' in the current directory.`,
+	Run:     startApplication,
+}
+
 var generateCmd = &cobra.Command{
 	Use:   "g [name] [field:type...]",
 	Short: "Generate a new module",
@@ -57,33 +68,95 @@ var destroyCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(newCmd)
+	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(generateCmd)
 	rootCmd.AddCommand(destroyCmd)
 }
 
+func startApplication(cmd *cobra.Command, args []string) {
+	// Check if main.go exists in the current directory
+	if _, err := os.Stat("main.go"); os.IsNotExist(err) {
+		fmt.Println("Error: main.go not found in the current directory.")
+		fmt.Println("Make sure you are in the root directory of your Base project.")
+		return
+	}
+
+	// Run "go run main.go"
+	goCmd := exec.Command("go", "run", "main.go")
+	goCmd.Stdout = os.Stdout
+	goCmd.Stderr = os.Stderr
+
+	fmt.Println("Starting the application...")
+	err := goCmd.Run()
+	if err != nil {
+		fmt.Printf("Error starting the application: %v\n", err)
+		return
+	}
+}
+
 func createNewProject(cmd *cobra.Command, args []string) {
 	projectName := args[0]
-	repoURL := "https://github.com/base-go/base.git" // Replace with your actual base project repository
+	archiveURL := "https://github.com/base-go/base/archive/main.zip" // URL to the zip archive of your base project
 
-	// Clone the repository
-	cloneCmd := exec.Command("git", "clone", repoURL, projectName)
-	cloneCmd.Stdout = os.Stdout
-	cloneCmd.Stderr = os.Stderr
-	err := cloneCmd.Run()
+	// Create the project directory
+	err := os.Mkdir(projectName, 0755)
 	if err != nil {
-		fmt.Printf("Error cloning repository: %v\n", err)
+		fmt.Printf("Error creating project directory: %v\n", err)
 		return
 	}
 
-	// Change to the new project directory
-	err = os.Chdir(projectName)
+	// Download the archive
+	resp, err := http.Get(archiveURL)
 	if err != nil {
-		fmt.Printf("Error changing to project directory: %v\n", err)
+		fmt.Printf("Error downloading project template: %v\n", err)
 		return
 	}
+	defer resp.Body.Close()
+
+	// Create a temporary file to store the zip
+	tmpZip, err := os.CreateTemp("", "base-project-*.zip")
+	if err != nil {
+		fmt.Printf("Error creating temporary file: %v\n", err)
+		return
+	}
+	defer os.Remove(tmpZip.Name())
+
+	// Copy the zip content to the temporary file
+	_, err = io.Copy(tmpZip, resp.Body)
+	if err != nil {
+		fmt.Printf("Error saving project template: %v\n", err)
+		return
+	}
+	tmpZip.Close()
+
+	// Unzip the file
+	err = unzip(tmpZip.Name(), projectName)
+	if err != nil {
+		fmt.Printf("Error extracting project template: %v\n", err)
+		return
+	}
+
+	// Move contents from the subdirectory to the project root
+	files, err := os.ReadDir(filepath.Join(projectName, "base-main"))
+	if err != nil {
+		fmt.Printf("Error reading template directory: %v\n", err)
+		return
+	}
+
+	for _, f := range files {
+		oldPath := filepath.Join(projectName, "base-main", f.Name())
+		newPath := filepath.Join(projectName, f.Name())
+		err = os.Rename(oldPath, newPath)
+		if err != nil {
+			fmt.Printf("Error moving file %s: %v\n", f.Name(), err)
+		}
+	}
+
+	// Remove the now-empty subdirectory
+	os.RemoveAll(filepath.Join(projectName, "base-main"))
 
 	// Get the absolute path of the new project directory
-	absPath, err := filepath.Abs(".")
+	absPath, err := filepath.Abs(projectName)
 	if err != nil {
 		fmt.Printf("Error getting absolute path: %v\n", err)
 		return
@@ -91,6 +164,51 @@ func createNewProject(cmd *cobra.Command, args []string) {
 
 	fmt.Printf("New project '%s' created successfully at %s\n", projectName, absPath)
 	fmt.Println("You can now start working on your new project!")
+}
+
+func unzip(src, dest string) error {
+	r, err := zip.OpenReader(src)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	for _, f := range r.File {
+		fpath := filepath.Join(dest, f.Name)
+
+		if !strings.HasPrefix(fpath, filepath.Clean(dest)+string(os.PathSeparator)) {
+			return fmt.Errorf("invalid file path: %s", fpath)
+		}
+
+		if f.FileInfo().IsDir() {
+			os.MkdirAll(fpath, os.ModePerm)
+			continue
+		}
+
+		if err = os.MkdirAll(filepath.Dir(fpath), os.ModePerm); err != nil {
+			return err
+		}
+
+		outFile, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		if err != nil {
+			return err
+		}
+
+		rc, err := f.Open()
+		if err != nil {
+			outFile.Close()
+			return err
+		}
+
+		_, err = io.Copy(outFile, rc)
+		outFile.Close()
+		rc.Close()
+
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func generateModule(cmd *cobra.Command, args []string) {
