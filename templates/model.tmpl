@@ -12,7 +12,9 @@ type {{.StructName}} struct {
 	{{.Name}}ID uint `json:"{{.JSONName}}Id" gorm:"column:{{.DBName}}_id"`
 	{{- else if eq .Type "has_one"}}
 	{{.Name}}ID uint `json:"{{.JSONName}}Id" gorm:"column:{{.DBName}}_id"`
-	{{- else if ne .Type "has_many"}}
+	{{- else if eq .Type "has_many"}}
+	{{.Name}} []{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}ID"`
+	{{- else}}
 	{{.Name}} {{.Type}} `json:"{{.JSONName}}" gorm:"column:{{.DBName}}"`
 	{{- end}}
 	{{- end}}
@@ -49,9 +51,13 @@ type {{.StructName}}Response struct {
 	{{- range .Fields}}
 	{{- if eq .Type "belongs_to"}}
 	{{.Name}}ID uint `json:"{{.JSONName}}Id"`
+	{{.Name}} *{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
 	{{- else if eq .Type "has_one"}}
 	{{.Name}}ID uint `json:"{{.JSONName}}Id"`
-	{{- else if ne .Type "has_many"}}
+	{{.Name}} *{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
+	{{- else if eq .Type "has_many"}}
+	{{.Name}} []{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
+	{{- else}}
 	{{.Name}} {{.Type}} `json:"{{.JSONName}}"`
 	{{- end}}
 	{{- end}}
@@ -66,7 +72,7 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
 		return nil
 	}
 	
-	return &{{.StructName}}Response{
+	response := &{{.StructName}}Response{
 		ID:        item.ID,
 		CreatedAt: item.CreatedAt,
 		UpdatedAt: item.UpdatedAt,
@@ -75,9 +81,39 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
 		{{.Name}}ID: item.{{.Name}}ID,
 		{{- else if eq .Type "has_one"}}
 		{{.Name}}ID: item.{{.Name}}ID,
-		{{- else if ne .type "has_many"}}
+		{{- else if ne .Type "has_many"}}
 		{{.Name}}: item.{{.Name}},
 		{{- end}}
 		{{- end}}
 	}
+
+	{{- range .Fields}}
+	{{- if eq .Type "belongs_to"}}
+	if item.{{.Name}} != nil {
+		response.{{.Name}} = item.{{.Name}}.ToResponse()
+	}
+	{{- else if eq .Type "has_one"}}
+	if item.{{.Name}} != nil {
+		response.{{.Name}} = item.{{.Name}}.ToResponse()
+	}
+	{{- else if eq .Type "has_many"}}
+	if len(item.{{.Name}}) > 0 {
+		response.{{.Name}} = make([]{{.AssociatedType}}Response, len(item.{{.Name}}))
+		for i, v := range item.{{.Name}} {
+			response.{{.Name}}[i] = *v.ToResponse()
+		}
+	}
+	{{- end}}
+	{{- end}}
+
+	return response
+}
+
+func (item *{{.StructName}}) Preload(db *gorm.DB) *gorm.DB {
+	{{- range .Fields}}
+	{{- if or (eq .Type "belongs_to") (eq .Type "has_one") (eq .Type "has_many")}}
+	db = db.Preload("{{.Name}}")
+	{{- end}}
+	{{- end}}
+	return db
 }
