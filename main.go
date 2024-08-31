@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -30,6 +31,14 @@ var rootCmd = &cobra.Command{
 	Long:  `A command-line tool to generate new modules with predefined structure or destroy existing modules for the application.`,
 }
 
+var newCmd = &cobra.Command{
+	Use:   "new [project_name]",
+	Short: "Create a new project",
+	Long:  `Create a new project by cloning the base repository and changing to the new directory.`,
+	Args:  cobra.ExactArgs(1),
+	Run:   createNewProject,
+}
+
 var generateCmd = &cobra.Command{
 	Use:   "g [name] [field:type...]",
 	Short: "Generate a new module",
@@ -47,8 +56,41 @@ var destroyCmd = &cobra.Command{
 }
 
 func init() {
+	rootCmd.AddCommand(newCmd)
 	rootCmd.AddCommand(generateCmd)
 	rootCmd.AddCommand(destroyCmd)
+}
+
+func createNewProject(cmd *cobra.Command, args []string) {
+	projectName := args[0]
+	repoURL := "https://github.com/base-go/base.git" // Replace with your actual base project repository
+
+	// Clone the repository
+	cloneCmd := exec.Command("git", "clone", repoURL, projectName)
+	cloneCmd.Stdout = os.Stdout
+	cloneCmd.Stderr = os.Stderr
+	err := cloneCmd.Run()
+	if err != nil {
+		fmt.Printf("Error cloning repository: %v\n", err)
+		return
+	}
+
+	// Change to the new project directory
+	err = os.Chdir(projectName)
+	if err != nil {
+		fmt.Printf("Error changing to project directory: %v\n", err)
+		return
+	}
+
+	// Get the absolute path of the new project directory
+	absPath, err := filepath.Abs(".")
+	if err != nil {
+		fmt.Printf("Error getting absolute path: %v\n", err)
+		return
+	}
+
+	fmt.Printf("New project '%s' created successfully at %s\n", projectName, absPath)
+	fmt.Println("You can now start working on your new project!")
 }
 
 func generateModule(cmd *cobra.Command, args []string) {
@@ -249,12 +291,6 @@ func generateFieldStructs(fields []string) []struct {
 				PluralType:     pluralType,
 			})
 		}
-	}
-
-	// Debug logging
-	for _, field := range fieldStructs {
-		fmt.Printf("Field: Name=%s, Type=%s, JSONName=%s, DBName=%s, AssociatedType=%s, PluralType=%s\n",
-			field.Name, field.Type, field.JSONName, field.DBName, field.AssociatedType, field.PluralType)
 	}
 
 	return fieldStructs
