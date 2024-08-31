@@ -51,10 +51,8 @@ type {{.StructName}}Response struct {
 	{{- range .Fields}}
 	{{- if eq .Type "belongs_to"}}
 	{{.Name}}ID uint `json:"{{.JSONName}}Id"`
-	{{.Name}} *{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
 	{{- else if eq .Type "has_one"}}
 	{{.Name}}ID uint `json:"{{.JSONName}}Id"`
-	{{.Name}} *{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
 	{{- else if eq .Type "has_many"}}
 	{{.Name}} []{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
 	{{- else}}
@@ -88,15 +86,7 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
 	}
 
 	{{- range .Fields}}
-	{{- if eq .Type "belongs_to"}}
-	if item.{{.Name}} != nil {
-		response.{{.Name}} = item.{{.Name}}.ToResponse()
-	}
-	{{- else if eq .Type "has_one"}}
-	if item.{{.Name}} != nil {
-		response.{{.Name}} = item.{{.Name}}.ToResponse()
-	}
-	{{- else if eq .Type "has_many"}}
+	{{- if eq .Type "has_many"}}
 	if len(item.{{.Name}}) > 0 {
 		response.{{.Name}} = make([]{{.AssociatedType}}Response, len(item.{{.Name}}))
 		for i, v := range item.{{.Name}} {
