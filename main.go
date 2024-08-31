@@ -218,22 +218,29 @@ func unzip(src, dest string) error {
 	}
 	return nil
 }
-
 func generateModule(cmd *cobra.Command, args []string) {
 	singularName := args[0]
 	pluralName := toLowerPlural(singularName)
 	fields := args[1:]
 
+	// Create models directory if it doesn't exist
+	modelsDir := filepath.Join("app", "models")
+	err := os.MkdirAll(modelsDir, os.ModePerm)
+	if err != nil {
+		fmt.Printf("Error creating models directory: %v\n", err)
+		return
+	}
+
 	// Create module directory (lowercase plural)
 	moduleDir := filepath.Join("app", pluralName)
-	err := os.MkdirAll(moduleDir, os.ModePerm)
+	err = os.MkdirAll(moduleDir, os.ModePerm)
 	if err != nil {
 		fmt.Printf("Error creating directory %s: %v\n", moduleDir, err)
 		return
 	}
 
 	// Generate files using templates
-	generateFileFromTemplate(moduleDir, "model.go", "templates/model.tmpl", singularName, pluralName, fields)
+	generateFileFromTemplate(modelsDir, fmt.Sprintf("%s.go", toLower(singularName)), "templates/model.tmpl", singularName, pluralName, fields)
 	generateFileFromTemplate(moduleDir, "controller.go", "templates/controller.tmpl", singularName, pluralName, fields)
 	generateFileFromTemplate(moduleDir, "service.go", "templates/service.tmpl", singularName, pluralName, fields)
 	generateFileFromTemplate(moduleDir, "mod.go", "templates/mod.tmpl", singularName, pluralName, fields)
@@ -246,8 +253,51 @@ func generateModule(cmd *cobra.Command, args []string) {
 	}
 
 	fmt.Printf("Generating module %s with fields: %v\n", args[0], fields)
-	fmt.Printf("Module '%s' generated successfully in directory '%s'.\n", singularName, moduleDir)
+	fmt.Printf("Model generated in '%s' directory.\n", modelsDir)
+	fmt.Printf("Module generated in '%s' directory.\n", moduleDir)
 	fmt.Println("Module registered in app/init.go successfully!")
+}
+
+func generateFileFromTemplate(dir, filename, templateFile, singularName, pluralName string, fields []string) {
+	tmplContent, err := templateFS.ReadFile(templateFile)
+	if err != nil {
+		fmt.Printf("Error reading template %s: %v\n", templateFile, err)
+		return
+	}
+
+	funcMap := template.FuncMap{
+		"toLower": strings.ToLower,
+	}
+
+	tmpl, err := template.New(filepath.Base(templateFile)).Funcs(funcMap).Parse(string(tmplContent))
+	if err != nil {
+		fmt.Printf("Error parsing template %s: %v\n", templateFile, err)
+		return
+	}
+
+	fieldStructs := generateFieldStructs(fields)
+
+	data := map[string]interface{}{
+		"PackageName": pluralName,
+		"StructName":  toTitle(singularName),
+		"PluralName":  toTitle(pluralName),
+		"RouteName":   pluralName,
+		"Fields":      fieldStructs,
+		"TableName":   pluralName,
+	}
+
+	filePath := filepath.Join(dir, filename)
+	file, err := os.Create(filePath)
+	if err != nil {
+		fmt.Printf("Error creating file %s: %v\n", filePath, err)
+		return
+	}
+	defer file.Close()
+
+	err = tmpl.Execute(file, data)
+	if err != nil {
+		fmt.Printf("Error executing template for %s: %v\n", filename, err)
+	}
 }
 
 func updateInitFile(singularName, pluralName string) error {
@@ -321,48 +371,6 @@ func addModuleInitializer(content []byte, pluralName, singularName string) ([]by
 	updatedContent := contentStr[:markerIndex] + newInitializer + "\n        " + contentStr[markerIndex:]
 
 	return []byte(updatedContent), true
-}
-
-func generateFileFromTemplate(dir, filename, templateFile, singularName, pluralName string, fields []string) {
-	tmplContent, err := templateFS.ReadFile(templateFile)
-	if err != nil {
-		fmt.Printf("Error reading template %s: %v\n", templateFile, err)
-		return
-	}
-
-	funcMap := template.FuncMap{
-		"toLower": strings.ToLower,
-	}
-
-	tmpl, err := template.New(filepath.Base(templateFile)).Funcs(funcMap).Parse(string(tmplContent))
-	if err != nil {
-		fmt.Printf("Error parsing template %s: %v\n", templateFile, err)
-		return
-	}
-
-	fieldStructs := generateFieldStructs(fields)
-
-	data := map[string]interface{}{
-		"PackageName": pluralName,
-		"StructName":  toTitle(singularName),
-		"PluralName":  toTitle(pluralName),
-		"RouteName":   pluralName,
-		"Fields":      fieldStructs,
-		"TableName":   pluralName,
-	}
-
-	filePath := filepath.Join(dir, filename)
-	file, err := os.Create(filePath)
-	if err != nil {
-		fmt.Printf("Error creating file %s: %v\n", filePath, err)
-		return
-	}
-	defer file.Close()
-
-	err = tmpl.Execute(file, data)
-	if err != nil {
-		fmt.Printf("Error executing template for %s: %v\n", filename, err)
-	}
 }
 
 func generateFieldStructs(fields []string) []struct {

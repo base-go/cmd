@@ -1,13 +1,8 @@
-package {{.PackageName}}
+package models
 
 import (
 	"gorm.io/gorm"
 	"time"
-	{{- range .Fields}}
-	{{- if or (eq .Type "belongs_to") (eq .Type "has_one")}}
-	"base/app/{{.PluralType}}"
-	{{- end}}
-	{{- end}}
 )
 
 type {{.StructName}} struct {
@@ -15,10 +10,10 @@ type {{.StructName}} struct {
 	{{- range .Fields}}
 	{{- if eq .Type "belongs_to"}}
 	{{.Name}}ID uint `json:"{{.JSONName}}Id" gorm:"column:{{.DBName}}_id"`
-	{{.Name}} *{{.PluralType}}.{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}ID"`
+	{{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}ID"`
 	{{- else if eq .Type "has_one"}}
 	{{.Name}}ID uint `json:"{{.JSONName}}Id" gorm:"column:{{.DBName}}_id"`
-	{{.Name}} *{{.PluralType}}.{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}ID"`
+	{{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}ID"`
 	{{- else if ne .Type "has_many"}}
 	{{.Name}} {{.Type}} `json:"{{.JSONName}}" gorm:"column:{{.DBName}}"`
 	{{- end}}
@@ -56,12 +51,12 @@ type {{.StructName}}Response struct {
 	{{- range .Fields}}
 	{{- if eq .Type "belongs_to"}}
 	{{.Name}}ID uint `json:"{{.JSONName}}Id"`
-	{{.Name}} *{{.PluralType}}.{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
+	{{.Name}} *{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
 	{{- else if eq .Type "has_many"}}
-	{{.Name}} []{{.PluralType}}.{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
+	{{.Name}} []{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
 	{{- else if eq .Type "has_one"}}
 	{{.Name}}ID uint `json:"{{.JSONName}}Id"`
-	{{.Name}} *{{.PluralType}}.{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
+	{{.Name}} *{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
 	{{- else}}
 	{{.Name}} {{.Type}} `json:"{{.JSONName}}"`
 	{{- end}}
