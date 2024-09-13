@@ -481,10 +481,11 @@ func updateIndexFile(pluralName string) {
 	}
 
 	// Create the new case
-	newCase := fmt.Sprintf(`                    case '%s':
-                        $('#main-content').load('/admin/%s/index.html');
-                        break;
-                    `, pluralName, pluralName)
+	newCase := fmt.Sprintf(`
+						case '%s':
+						$('#main-content').load('/admin/%s/index.html');
+						break;
+						`, pluralName, pluralName)
 
 	// Insert the new case just before the marker comment
 	updatedContent := append(content[:insertPos], append([]byte(newCase), content[insertPos:]...)...)
