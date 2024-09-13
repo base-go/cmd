@@ -6,7 +6,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"base/app/models"
-	"base/core/helper"
 )
 
 type {{.StructName}}Controller struct {
@@ -74,21 +73,21 @@ func (c *{{.StructName}}Controller) Create(ctx *gin.Context) {
 // @Success 200 {object} models.{{.StructName}}Response
 // @Failure 404 {object} ErrorResponse
 // @Router /{{.RouteName}}/{id} [get]
-func (c *{{.StructName}}Controller) List(ctx *gin.Context) {
-	items, err := c.{{.StructName}}Service.GetAll()
+func (c *{{.StructName}}Controller) Get(ctx *gin.Context) {
+	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch items: " + err.Error()})
+		ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid ID format"})
 		return
 	}
 
-	responses := make([]*models.{{.StructName}}Response, len(items))
-	for i, item := range items {
-		responses[i] = item.ToResponse()
+	item, err := c.{{.StructName}}Service.GetByID(uint(id))
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, ErrorResponse{Error: "Item not found"})
+		return
 	}
 
-	ctx.JSON(http.StatusOK, responses)
+	ctx.JSON(http.StatusOK, item.ToResponse())
 }
-
 
 // List{{.StructName}} godoc
 // @Summary List {{.StructName}}
