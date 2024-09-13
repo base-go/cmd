@@ -80,7 +80,6 @@ func init() {
 	rootCmd.AddCommand(destroyCmd)
 	rootCmd.AddCommand(updateCmd)
 	generateCmd.Flags().Bool("admin", false, "Generate admin interface")
-
 }
 
 func startApplication(cmd *cobra.Command, args []string) {
@@ -220,50 +219,32 @@ func unzip(src, dest string) error {
 	}
 	return nil
 }
+
 func generateModule(cmd *cobra.Command, args []string) {
 	singularName := args[0]
 	pluralName := toLowerPlural(singularName)
 	fields := args[1:]
 
-	// Create core/helper directory if it doesn't exist
-	coreHelperDir := filepath.Join("core", "helper")
-	err := os.MkdirAll(coreHelperDir, os.ModePerm)
-	if err != nil {
-		fmt.Printf("Error creating core/helper directory: %v\n", err)
-		return
+	// Create directories
+	dirs := []string{
+		filepath.Join("app", "models"),
+		filepath.Join("app", pluralName),
 	}
-
-	// Create models directory if it doesn't exist
-	modelsDir := filepath.Join("app", "models")
-	err = os.MkdirAll(modelsDir, os.ModePerm)
-	if err != nil {
-		fmt.Printf("Error creating models directory: %v\n", err)
-		return
-	}
-
-	// Create module directory (lowercase plural)
-	moduleDir := filepath.Join("app", pluralName)
-	err = os.MkdirAll(moduleDir, os.ModePerm)
-	if err != nil {
-		fmt.Printf("Error creating directory %s: %v\n", moduleDir, err)
-		return
+	for _, dir := range dirs {
+		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+			fmt.Printf("Error creating directory %s: %v\n", dir, err)
+			return
+		}
 	}
 
 	// Generate files using templates
-	generateFileFromTemplate(modelsDir, fmt.Sprintf("%s.go", toLower(singularName)), "templates/model.tmpl", singularName, pluralName, fields)
-	generateFileFromTemplate(moduleDir, "controller.go", "templates/controller.tmpl", singularName, pluralName, fields)
-	generateFileFromTemplate(moduleDir, "service.go", "templates/service.tmpl", singularName, pluralName, fields)
-	generateFileFromTemplate(moduleDir, "mod.go", "templates/mod.tmpl", singularName, pluralName, fields)
-
-	// Generate response.go in core/helper if it doesn't exist
-	// responseHelperPath := filepath.Join(coreHelperDir, "response.go")
-	// if _, err := os.Stat(responseHelperPath); os.IsNotExist(err) {
-	// 	generateFileFromTemplate(coreHelperDir, "response.go", "templates/response_helper.tmpl", "", "", nil)
-	// }
+	generateFileFromTemplate(filepath.Join("app", "models"), fmt.Sprintf("%s.go", toLower(singularName)), "templates/model.tmpl", singularName, pluralName, fields)
+	generateFileFromTemplate(filepath.Join("app", pluralName), "controller.go", "templates/controller.tmpl", singularName, pluralName, fields)
+	generateFileFromTemplate(filepath.Join("app", pluralName), "service.go", "templates/service.tmpl", singularName, pluralName, fields)
+	generateFileFromTemplate(filepath.Join("app", pluralName), "mod.go", "templates/mod.tmpl", singularName, pluralName, fields)
 
 	// Update app/init.go to register the new module
-	err = updateInitFile(singularName, pluralName)
-	if err != nil {
+	if err := updateInitFile(singularName, pluralName); err != nil {
 		fmt.Printf("Error updating app/init.go: %v\n", err)
 		return
 	}
@@ -273,10 +254,67 @@ func generateModule(cmd *cobra.Command, args []string) {
 		generateAdminInterface(singularName, pluralName, fields)
 	}
 
-	fmt.Printf("Generating module %s with fields: %v\n", args[0], fields)
-	fmt.Printf("Model generated in '%s' directory.\n", modelsDir)
-	fmt.Printf("Module generated in '%s' directory.\n", moduleDir)
-	fmt.Println("Module registered in app/init.go successfully!")
+	fmt.Printf("Module %s generated successfully with fields: %v\n", singularName, fields)
+}
+
+func generateFieldStructs(fields []string) []struct {
+	Name           string
+	Type           string
+	JSONName       string
+	DBName         string
+	AssociatedType string
+	PluralType     string
+} {
+	var fieldStructs []struct {
+		Name           string
+		Type           string
+		JSONName       string
+		DBName         string
+		AssociatedType string
+		PluralType     string
+	}
+
+	for _, field := range fields {
+		parts := strings.Split(field, ":")
+		if len(parts) >= 2 {
+			name := toTitle(parts[0])
+			fieldType := parts[1]
+			jsonName := toLower(parts[0])
+			dbName := toLower(parts[0])
+			var associatedType, pluralType string
+
+			// Convert fieldType to Go type
+			goType := getGoType(fieldType)
+
+			if fieldType == "belongs_to" || fieldType == "has_many" || fieldType == "has_one" {
+				if len(parts) >= 3 {
+					associatedType = toTitle(parts[2])
+					pluralType = pluralizeClient.Plural(toLower(parts[2]))
+				} else {
+					associatedType = "interface{}"
+					pluralType = "interfaces"
+				}
+			}
+
+			fieldStructs = append(fieldStructs, struct {
+				Name           string
+				Type           string
+				JSONName       string
+				DBName         string
+				AssociatedType string
+				PluralType     string
+			}{
+				Name:           name,
+				Type:           goType,
+				JSONName:       jsonName,
+				DBName:         dbName,
+				AssociatedType: associatedType,
+				PluralType:     pluralType,
+			})
+		}
+	}
+
+	return fieldStructs
 }
 
 func generateFileFromTemplate(dir, filename, templateFile, singularName, pluralName string, fields []string) {
@@ -318,6 +356,63 @@ func generateFileFromTemplate(dir, filename, templateFile, singularName, pluralN
 	err = tmpl.Execute(file, data)
 	if err != nil {
 		fmt.Printf("Error executing template for %s: %v\n", filename, err)
+	}
+}
+
+func generateAdminInterface(singularName, pluralName string, fields []string) {
+	adminDir := filepath.Join("admin", pluralName)
+	if err := os.MkdirAll(adminDir, os.ModePerm); err != nil {
+		fmt.Printf("Error creating admin directory %s: %v\n", adminDir, err)
+		return
+	}
+
+	adminTemplate := `admin_interface.tmpl`
+
+	fieldStructs := generateFieldStructs(fields)
+
+	data := map[string]interface{}{
+		"StructName": toTitle(singularName),
+		"PluralName": toTitle(pluralName),
+		"RouteName":  pluralName,
+		"Fields":     fieldStructs,
+	}
+
+	tmpl, err := template.New(adminTemplate).Funcs(template.FuncMap{
+		"getInputType": getInputType,
+	}).ParseFiles(filepath.Join("templates", adminTemplate))
+	if err != nil {
+		fmt.Printf("Error parsing admin template: %v\n", err)
+		return
+	}
+
+	filePath := filepath.Join(adminDir, "index.html")
+	file, err := os.Create(filePath)
+	if err != nil {
+		fmt.Printf("Error creating file %s: %v\n", filePath, err)
+		return
+	}
+	defer file.Close()
+
+	if err := tmpl.Execute(file, data); err != nil {
+		fmt.Printf("Error executing template for index.html: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Admin interface for %s generated in %s\n", singularName, adminDir)
+}
+
+func getInputType(goType string) string {
+	switch goType {
+	case "int", "int64", "uint", "uint64":
+		return "number"
+	case "float64":
+		return "number"
+	case "bool":
+		return "checkbox"
+	case "time.Time":
+		return "datetime-local"
+	default:
+		return "text"
 	}
 }
 
@@ -392,75 +487,6 @@ func addModuleInitializer(content []byte, pluralName, singularName string) ([]by
 	updatedContent := contentStr[:markerIndex] + newInitializer + "\n        " + contentStr[markerIndex:]
 
 	return []byte(updatedContent), true
-}
-
-func generateAdminInterface(singularName, pluralName string, fields []string) {
-	adminDir := filepath.Join("admin", pluralName)
-	if err := os.MkdirAll(adminDir, os.ModePerm); err != nil {
-		fmt.Printf("Error creating admin directory %s: %v\n", adminDir, err)
-		return
-	}
-
-	adminTemplate := `templates/admin_interface.tmpl` // We'll create this template
-	generateFileFromTemplate(adminDir, "index.html", adminTemplate, singularName, pluralName, fields)
-
-	fmt.Printf("Admin interface for %s generated in %s\n", singularName, adminDir)
-}
-func generateFieldStructs(fields []string) []struct {
-	Name           string
-	Type           string
-	JSONName       string
-	DBName         string
-	AssociatedType string
-	PluralType     string
-} {
-	var fieldStructs []struct {
-		Name           string
-		Type           string
-		JSONName       string
-		DBName         string
-		AssociatedType string
-		PluralType     string
-	}
-
-	for _, field := range fields {
-		parts := strings.Split(field, ":")
-		if len(parts) >= 2 {
-			name := toTitle(parts[0])
-			fieldType := parts[1]
-			jsonName := toLower(parts[0])
-			dbName := toLower(parts[0])
-			var associatedType, pluralType string
-
-			if fieldType == "belongs_to" || fieldType == "has_many" || fieldType == "has_one" {
-				if len(parts) >= 3 {
-					associatedType = toTitle(parts[2])
-					pluralType = pluralizeClient.Plural(toLower(parts[2]))
-				} else {
-					associatedType = "interface{}"
-					pluralType = "interfaces"
-				}
-			}
-
-			fieldStructs = append(fieldStructs, struct {
-				Name           string
-				Type           string
-				JSONName       string
-				DBName         string
-				AssociatedType string
-				PluralType     string
-			}{
-				Name:           name,
-				Type:           fieldType,
-				JSONName:       jsonName,
-				DBName:         dbName,
-				AssociatedType: associatedType,
-				PluralType:     pluralType,
-			})
-		}
-	}
-
-	return fieldStructs
 }
 
 // destroyModule destroys an existing module
@@ -576,11 +602,9 @@ func getGoType(t string) string {
 			goType = "*interface{}" // Generic pointer if no specific type is provided
 		}
 	default:
-		fmt.Printf("Warning: Unexpected field type '%s'. Defaulting to string.\n", baseType)
 		goType = "string" // Default to string for unknown types
 	}
 
-	fmt.Printf("Field type '%s' mapped to Go type '%s'\n", t, goType)
 	return goType
 }
 

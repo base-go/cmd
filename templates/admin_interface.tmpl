@@ -33,7 +33,7 @@
                 <label class="label" for="create-{{.JSONName}}">
                     <span class="label-text">{{.Name}}</span>
                 </label>
-                <input type="{{.InputType}}" id="create-{{.JSONName}}" name="{{.JSONName}}" class="input input-bordered" required>
+                <input type="{{getInputType .Type}}" id="create-{{.JSONName}}" name="{{.JSONName}}" class="input input-bordered" required>
             </div>
             {{end}}
             <div class="modal-action">
@@ -55,7 +55,7 @@
                 <label class="label" for="edit-{{.JSONName}}">
                     <span class="label-text">{{.Name}}</span>
                 </label>
-                <input type="{{.InputType}}" id="edit-{{.JSONName}}" name="{{.JSONName}}" class="input input-bordered" required>
+                <input type="{{getInputType .Type}}" id="edit-{{.JSONName}}" name="{{.JSONName}}" class="input input-bordered" required>
             </div>
             {{end}}
             <div class="modal-action">
@@ -109,11 +109,10 @@
 
         $('#createForm').submit(function (e) {
             e.preventDefault();
-            const formData = {
-                {{range .Fields}}
-                {{.JSONName}}: $('#create-{{.JSONName}}').val(),
-                {{end}}
-            };
+            const formData = {};
+            {{range .Fields}}
+            formData.{{.JSONName}} = $('#create-{{.JSONName}}').val();
+            {{end}}
 
             $.ajax({
                 url: apiUrl,
@@ -156,11 +155,10 @@
         $('#editForm').submit(function (e) {
             e.preventDefault();
             const itemId = $('#edit-id').val();
-            const formData = {
-                {{range .Fields}}
-                {{.JSONName}}: $('#edit-{{.JSONName}}').val(),
-                {{end}}
-            };
+            const formData = {};
+            {{range .Fields}}
+            formData.{{.JSONName}} = $('#edit-{{.JSONName}}').val();
+            {{end}}
 
             $.ajax({
                 url: `${apiUrl}/${itemId}`,
