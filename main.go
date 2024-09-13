@@ -380,6 +380,8 @@ func generateFileFromTemplate(dir, filename, templateFile, singularName, pluralN
 		fmt.Printf("Error executing template for %s: %v\n", filename, err)
 	}
 }
+
+// generateAdminInterface generates the admin interface for the module
 func generateAdminInterface(singularName, pluralName string, fields []string) {
 	adminDir := filepath.Join("admin", pluralName)
 	if err := os.MkdirAll(adminDir, os.ModePerm); err != nil {
@@ -387,23 +389,7 @@ func generateAdminInterface(singularName, pluralName string, fields []string) {
 		return
 	}
 
-	adminTemplate := "templates/admin_interface.tmpl"
-
-	tmplContent, err := templateFS.ReadFile(adminTemplate)
-	if err != nil {
-		fmt.Printf("Error reading admin template %s: %v\n", adminTemplate, err)
-		return
-	}
-
-	funcMap := template.FuncMap{
-		"getInputType": getInputType,
-	}
-
-	tmpl, err := template.New(filepath.Base(adminTemplate)).Funcs(funcMap).Parse(string(tmplContent))
-	if err != nil {
-		fmt.Printf("Error parsing admin template: %v\n", err)
-		return
-	}
+	adminTemplate := `admin_interface.tmpl`
 
 	fieldStructs := generateFieldStructs(fields)
 
@@ -412,6 +398,14 @@ func generateAdminInterface(singularName, pluralName string, fields []string) {
 		"PluralName": toTitle(pluralName),
 		"RouteName":  pluralName,
 		"Fields":     fieldStructs,
+	}
+
+	tmpl, err := template.New(adminTemplate).Funcs(template.FuncMap{
+		"getInputType": getInputType,
+	}).ParseFiles(filepath.Join("templates", adminTemplate))
+	if err != nil {
+		fmt.Printf("Error parsing admin template: %v\n", err)
+		return
 	}
 
 	filePath := filepath.Join(adminDir, "index.html")
@@ -427,7 +421,76 @@ func generateAdminInterface(singularName, pluralName string, fields []string) {
 		return
 	}
 
+	// Update admin/partials/nav.html
+	updateNavFile(pluralName)
+
+	// Update admin/index.html
+	updateIndexFile(pluralName)
+
 	fmt.Printf("Admin interface for %s generated in %s\n", singularName, adminDir)
+}
+
+func updateNavFile(pluralName string) {
+	navFilePath := "admin/partials/nav.html"
+	content, err := os.ReadFile(navFilePath)
+	if err != nil {
+		fmt.Printf("Error reading nav file: %v\n", err)
+		return
+	}
+
+	// Find the position to insert the new menu item
+	insertPos := bytes.Index(content, []byte(`<li class="auth-only"><a href="#" data-page="dashboard">Dashboard</a></li>`))
+	if insertPos == -1 {
+		fmt.Println("Could not find the correct position to insert the new menu item")
+		return
+	}
+
+	// Move to the end of the line
+	insertPos = bytes.IndexByte(content[insertPos:], '\n') + insertPos + 1
+
+	// Create the new menu item
+	newMenuItem := fmt.Sprintf(`		<li class="auth-only"><a href="#" data-page="%s">%s</a></li>`, pluralName, toTitle(pluralName))
+
+	// Insert the new menu item
+	updatedContent := append(content[:insertPos], append([]byte(newMenuItem+"\n"), content[insertPos:]...)...)
+
+	// Write the updated content back to the file
+	if err := os.WriteFile(navFilePath, updatedContent, 0644); err != nil {
+		fmt.Printf("Error writing updated nav file: %v\n", err)
+	}
+}
+
+func updateIndexFile(pluralName string) {
+	indexFilePath := "admin/index.html"
+	content, err := os.ReadFile(indexFilePath)
+	if err != nil {
+		fmt.Printf("Error reading index file: %v\n", err)
+		return
+	}
+
+	// Find the position to insert the new case
+	insertPos := bytes.Index(content, []byte(`case 'dashboard':`))
+	if insertPos == -1 {
+		fmt.Println("Could not find the correct position to insert the new case")
+		return
+	}
+
+	// Move to the end of the case block
+	insertPos = bytes.Index(content[insertPos:], []byte("break;")) + insertPos
+	insertPos = bytes.IndexByte(content[insertPos:], '\n') + insertPos + 1
+
+	// Create the new case
+	newCase := fmt.Sprintf(`                    case '%s':
+                        $('#main-content').load('/admin/%s/index.html');
+                        break;`, pluralName, pluralName)
+
+	// Insert the new case
+	updatedContent := append(content[:insertPos], append([]byte(newCase+"\n"), content[insertPos:]...)...)
+
+	// Write the updated content back to the file
+	if err := os.WriteFile(indexFilePath, updatedContent, 0644); err != nil {
+		fmt.Printf("Error writing updated index file: %v\n", err)
+	}
 }
 
 func getInputType(goType string) string {
