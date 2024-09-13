@@ -74,21 +74,22 @@ func (c *{{.StructName}}Controller) Create(ctx *gin.Context) {
 // @Success 200 {object} models.{{.StructName}}Response
 // @Failure 404 {object} ErrorResponse
 // @Router /{{.RouteName}}/{id} [get]
-func (c *{{.StructName}}Controller) Get(ctx *gin.Context) {
-	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
+func (c *{{.StructName}}Controller) List(ctx *gin.Context) {
+	items, err := c.{{.StructName}}Service.GetAll()
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid ID format"})
+		ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch items: " + err.Error()})
 		return
 	}
 
-	item, err := c.{{.StructName}}Service.GetByID(uint(id))
-	if err != nil {
-		ctx.JSON(http.StatusNotFound, ErrorResponse{Error: "Item not found"})
-		return
+	responses := make([]*models.{{.StructName}}Response, len(items))
+	for i, item := range items {
+		responses[i] = item.ToResponse()
 	}
 
-	ctx.JSON(http.StatusOK, item.ToResponse())
+	ctx.JSON(http.StatusOK, responses)
 }
+
+
 // List{{.StructName}} godoc
 // @Summary List {{.StructName}}
 // @Description Get a list of all {{.StructName}}
@@ -106,7 +107,11 @@ func (c *{{.StructName}}Controller) List(ctx *gin.Context) {
 		return
 	}
 
-	responses := helper.ToResponseSlice(items).([]*models.{{.StructName}}Response)
+	responses := make([]*models.{{.StructName}}Response, len(items))
+	for i, item := range items {
+		responses[i] = item.ToResponse()
+	}
+
 	ctx.JSON(http.StatusOK, responses)
 }
 
