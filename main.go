@@ -256,6 +256,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 
 	fmt.Printf("Module %s generated successfully with fields: %v\n", singularName, fields)
 }
+
 func generateFieldStructs(fields []string) []struct {
 	Name           string
 	Type           string
@@ -284,7 +285,7 @@ func generateFieldStructs(fields []string) []struct {
 
 			goType := getGoType(field) // Pass the entire field string to getGoType
 
-			if fieldType == "belongs_to" || fieldType == "has_one" {
+			if fieldType == "belongs_to" {
 				if len(parts) > 2 {
 					associatedType = toTitle(parts[2])
 					// Add ID field for belongs_to relationships
@@ -306,6 +307,10 @@ func generateFieldStructs(fields []string) []struct {
 				if len(parts) > 2 {
 					associatedType = toTitle(parts[2])
 					pluralType = pluralizeClient.Plural(toLower(parts[2]))
+				}
+			} else if fieldType == "has_one" {
+				if len(parts) > 2 {
+					associatedType = toTitle(parts[2])
 				}
 			}
 
@@ -586,6 +591,7 @@ func removeModuleInitializer(content []byte, pluralName string) []byte {
 
 	return bytes.Join(newLines, []byte("\n"))
 }
+
 func getGoType(t string) string {
 	parts := strings.Split(t, ":")
 	baseType := parts[0]
@@ -602,26 +608,25 @@ func getGoType(t string) string {
 	case "bool":
 		goType = "bool"
 	case "belongs_to":
-		if len(parts) > 1 {
-			goType = toTitle(parts[1]) // Associated type without pointer
+		if len(parts) > 2 {
+			goType = toTitle(parts[2]) // Associated type without pointer
 		} else {
 			goType = "interface{}" // Generic type if no specific type is provided
 		}
 	case "has_many":
-		if len(parts) > 1 {
-			goType = "[]" + toTitle(parts[1]) // Slice of the associated type
+		if len(parts) > 2 {
+			goType = "[]" + toTitle(parts[2]) // Slice of the associated type
 		} else {
 			goType = "[]interface{}" // Generic slice if no specific type is provided
 		}
 	case "has_one":
-		if len(parts) > 1 {
-			goType = toTitle(parts[1]) // Associated type without pointer
+		if len(parts) > 2 {
+			goType = toTitle(parts[2]) // Associated type without pointer
 		} else {
 			goType = "interface{}" // Generic type if no specific type is provided
 		}
 	default:
-		fmt.Printf("Warning: Unexpected field type '%s'. Defaulting to string.\n", baseType)
-		goType = "string" // Default to string for unknown types
+		goType = baseType // Use the provided type as-is
 	}
 	return goType
 }
