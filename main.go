@@ -283,7 +283,7 @@ func generateFieldStructs(fields []string) []struct {
 			dbName := toLower(parts[0])
 			var associatedType, pluralType string
 
-			goType := getGoType(field) // Pass the entire field string to getGoType
+			goType := getGoType(fieldType) // Use only the type part
 
 			if fieldType == "belongs_to" {
 				if len(parts) > 2 {
@@ -302,15 +302,19 @@ func generateFieldStructs(fields []string) []struct {
 						JSONName: jsonName + "Id",
 						DBName:   dbName + "_id",
 					})
+					// Set the type for the association field
+					goType = associatedType
 				}
 			} else if fieldType == "has_many" {
 				if len(parts) > 2 {
 					associatedType = toTitle(parts[2])
 					pluralType = pluralizeClient.Plural(toLower(parts[2]))
+					goType = "[]" + associatedType
 				}
 			} else if fieldType == "has_one" {
 				if len(parts) > 2 {
 					associatedType = toTitle(parts[2])
+					goType = associatedType
 				}
 			}
 
@@ -591,44 +595,21 @@ func removeModuleInitializer(content []byte, pluralName string) []byte {
 
 	return bytes.Join(newLines, []byte("\n"))
 }
-
 func getGoType(t string) string {
-	parts := strings.Split(t, ":")
-	baseType := parts[0]
-	goType := ""
-	switch baseType {
+	switch t {
 	case "int":
-		goType = "int"
+		return "int"
 	case "string", "text":
-		goType = "string"
+		return "string"
 	case "datetime", "time":
-		goType = "time.Time"
+		return "time.Time"
 	case "float":
-		goType = "float64"
+		return "float64"
 	case "bool":
-		goType = "bool"
-	case "belongs_to":
-		if len(parts) > 2 {
-			goType = toTitle(parts[2]) // Associated type without pointer
-		} else {
-			goType = "interface{}" // Generic type if no specific type is provided
-		}
-	case "has_many":
-		if len(parts) > 2 {
-			goType = "[]" + toTitle(parts[2]) // Slice of the associated type
-		} else {
-			goType = "[]interface{}" // Generic slice if no specific type is provided
-		}
-	case "has_one":
-		if len(parts) > 2 {
-			goType = toTitle(parts[2]) // Associated type without pointer
-		} else {
-			goType = "interface{}" // Generic type if no specific type is provided
-		}
+		return "bool"
 	default:
-		goType = baseType // Use the provided type as-is
+		return t // Return the type as-is for custom types
 	}
-	return goType
 }
 
 func toLower(s string) string {
