@@ -389,7 +389,11 @@ func generateAdminInterface(singularName, pluralName string, fields []string) {
 		return
 	}
 
-	adminTemplate := `admin_interface.tmpl`
+	adminTemplateContent, err := templateFS.ReadFile("templates/admin_interface.tmpl")
+	if err != nil {
+		fmt.Printf("Error reading admin template: %v\n", err)
+		return
+	}
 
 	fieldStructs := generateFieldStructs(fields)
 
@@ -400,9 +404,9 @@ func generateAdminInterface(singularName, pluralName string, fields []string) {
 		"Fields":     fieldStructs,
 	}
 
-	tmpl, err := template.New(adminTemplate).Funcs(template.FuncMap{
+	tmpl, err := template.New("admin_interface").Funcs(template.FuncMap{
 		"getInputType": getInputType,
-	}).ParseFiles(filepath.Join("templates", adminTemplate))
+	}).Parse(string(adminTemplateContent))
 	if err != nil {
 		fmt.Printf("Error parsing admin template: %v\n", err)
 		return
