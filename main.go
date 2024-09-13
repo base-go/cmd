@@ -473,23 +473,21 @@ func updateIndexFile(pluralName string) {
 	}
 
 	// Find the position to insert the new case
-	insertPos := bytes.Index(content, []byte(`case 'dashboard':`))
+	markerComment := []byte("//LoadGeneratedPage")
+	insertPos := bytes.Index(content, markerComment)
 	if insertPos == -1 {
-		fmt.Println("Could not find the correct position to insert the new case")
+		fmt.Println("Could not find the marker comment to insert the new case")
 		return
 	}
-
-	// Move to the end of the case block
-	insertPos = bytes.Index(content[insertPos:], []byte("break;")) + insertPos
-	insertPos = bytes.IndexByte(content[insertPos:], '\n') + insertPos + 1
 
 	// Create the new case
 	newCase := fmt.Sprintf(`                    case '%s':
                         $('#main-content').load('/admin/%s/index.html');
-                        break;`, pluralName, pluralName)
+                        break;
+                    `, pluralName, pluralName)
 
-	// Insert the new case
-	updatedContent := append(content[:insertPos], append([]byte(newCase+"\n"), content[insertPos:]...)...)
+	// Insert the new case just before the marker comment
+	updatedContent := append(content[:insertPos], append([]byte(newCase), content[insertPos:]...)...)
 
 	// Write the updated content back to the file
 	if err := os.WriteFile(indexFilePath, updatedContent, 0644); err != nil {
