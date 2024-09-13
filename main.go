@@ -358,7 +358,6 @@ func generateFileFromTemplate(dir, filename, templateFile, singularName, pluralN
 		fmt.Printf("Error executing template for %s: %v\n", filename, err)
 	}
 }
-
 func generateAdminInterface(singularName, pluralName string, fields []string) {
 	adminDir := filepath.Join("admin", pluralName)
 	if err := os.MkdirAll(adminDir, os.ModePerm); err != nil {
@@ -366,7 +365,23 @@ func generateAdminInterface(singularName, pluralName string, fields []string) {
 		return
 	}
 
-	adminTemplate := `admin_interface.tmpl`
+	adminTemplate := "templates/admin_interface.tmpl"
+
+	tmplContent, err := templateFS.ReadFile(adminTemplate)
+	if err != nil {
+		fmt.Printf("Error reading admin template %s: %v\n", adminTemplate, err)
+		return
+	}
+
+	funcMap := template.FuncMap{
+		"getInputType": getInputType,
+	}
+
+	tmpl, err := template.New(filepath.Base(adminTemplate)).Funcs(funcMap).Parse(string(tmplContent))
+	if err != nil {
+		fmt.Printf("Error parsing admin template: %v\n", err)
+		return
+	}
 
 	fieldStructs := generateFieldStructs(fields)
 
@@ -375,14 +390,6 @@ func generateAdminInterface(singularName, pluralName string, fields []string) {
 		"PluralName": toTitle(pluralName),
 		"RouteName":  pluralName,
 		"Fields":     fieldStructs,
-	}
-
-	tmpl, err := template.New(adminTemplate).Funcs(template.FuncMap{
-		"getInputType": getInputType,
-	}).ParseFiles(filepath.Join("templates", adminTemplate))
-	if err != nil {
-		fmt.Printf("Error parsing admin template: %v\n", err)
-		return
 	}
 
 	filePath := filepath.Join(adminDir, "index.html")
