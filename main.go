@@ -256,7 +256,6 @@ func generateModule(cmd *cobra.Command, args []string) {
 
 	fmt.Printf("Module %s generated successfully with fields: %v\n", singularName, fields)
 }
-
 func generateFieldStructs(fields []string) []struct {
 	Name           string
 	Type           string
@@ -283,16 +282,30 @@ func generateFieldStructs(fields []string) []struct {
 			dbName := toLower(parts[0])
 			var associatedType, pluralType string
 
-			// Convert fieldType to Go type
-			goType := getGoType(fieldType)
+			goType := getGoType(field) // Pass the entire field string to getGoType
 
-			if fieldType == "belongs_to" || fieldType == "has_many" || fieldType == "has_one" {
-				if len(parts) >= 3 {
+			if fieldType == "belongs_to" || fieldType == "has_one" {
+				if len(parts) > 2 {
+					associatedType = toTitle(parts[2])
+					// Add ID field for belongs_to relationships
+					fieldStructs = append(fieldStructs, struct {
+						Name           string
+						Type           string
+						JSONName       string
+						DBName         string
+						AssociatedType string
+						PluralType     string
+					}{
+						Name:     name + "ID",
+						Type:     "uint",
+						JSONName: jsonName + "Id",
+						DBName:   dbName + "_id",
+					})
+				}
+			} else if fieldType == "has_many" {
+				if len(parts) > 2 {
 					associatedType = toTitle(parts[2])
 					pluralType = pluralizeClient.Plural(toLower(parts[2]))
-				} else {
-					associatedType = "interface{}"
-					pluralType = "interfaces"
 				}
 			}
 
@@ -573,11 +586,9 @@ func removeModuleInitializer(content []byte, pluralName string) []byte {
 
 	return bytes.Join(newLines, []byte("\n"))
 }
-
 func getGoType(t string) string {
 	parts := strings.Split(t, ":")
 	baseType := parts[0]
-
 	goType := ""
 	switch baseType {
 	case "int":
@@ -592,9 +603,9 @@ func getGoType(t string) string {
 		goType = "bool"
 	case "belongs_to":
 		if len(parts) > 1 {
-			goType = "*" + toTitle(parts[1]) // Pointer to the associated type
+			goType = toTitle(parts[1]) // Associated type without pointer
 		} else {
-			goType = "*interface{}" // Generic pointer if no specific type is provided
+			goType = "interface{}" // Generic type if no specific type is provided
 		}
 	case "has_many":
 		if len(parts) > 1 {
@@ -604,14 +615,14 @@ func getGoType(t string) string {
 		}
 	case "has_one":
 		if len(parts) > 1 {
-			goType = "*" + toTitle(parts[1]) // Pointer to the associated type
+			goType = toTitle(parts[1]) // Associated type without pointer
 		} else {
-			goType = "*interface{}" // Generic pointer if no specific type is provided
+			goType = "interface{}" // Generic type if no specific type is provided
 		}
 	default:
+		fmt.Printf("Warning: Unexpected field type '%s'. Defaulting to string.\n", baseType)
 		goType = "string" // Default to string for unknown types
 	}
-
 	return goType
 }
 
