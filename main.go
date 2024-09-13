@@ -51,9 +51,9 @@ var startCmd = &cobra.Command{
 }
 
 var generateCmd = &cobra.Command{
-	Use:   "g [name] [field:type...]",
+	Use:   "g [name] [field:type...] [--admin]",
 	Short: "Generate a new module",
-	Long:  `Generate a new module with the specified name and fields.`,
+	Long:  `Generate a new module with the specified name and fields. Use --admin flag to generate admin interface.`,
 	Args:  cobra.MinimumNArgs(1),
 	Run:   generateModule,
 }
@@ -79,6 +79,8 @@ func init() {
 	rootCmd.AddCommand(generateCmd)
 	rootCmd.AddCommand(destroyCmd)
 	rootCmd.AddCommand(updateCmd)
+	generateCmd.Flags().Bool("admin", false, "Generate admin interface")
+
 }
 
 func startApplication(cmd *cobra.Command, args []string) {
@@ -254,16 +256,21 @@ func generateModule(cmd *cobra.Command, args []string) {
 	generateFileFromTemplate(moduleDir, "mod.go", "templates/mod.tmpl", singularName, pluralName, fields)
 
 	// Generate response.go in core/helper if it doesn't exist
-	responseHelperPath := filepath.Join(coreHelperDir, "response.go")
-	if _, err := os.Stat(responseHelperPath); os.IsNotExist(err) {
-		generateFileFromTemplate(coreHelperDir, "response.go", "templates/response_helper.tmpl", "", "", nil)
-	}
+	// responseHelperPath := filepath.Join(coreHelperDir, "response.go")
+	// if _, err := os.Stat(responseHelperPath); os.IsNotExist(err) {
+	// 	generateFileFromTemplate(coreHelperDir, "response.go", "templates/response_helper.tmpl", "", "", nil)
+	// }
 
 	// Update app/init.go to register the new module
 	err = updateInitFile(singularName, pluralName)
 	if err != nil {
 		fmt.Printf("Error updating app/init.go: %v\n", err)
 		return
+	}
+
+	adminFlag, _ := cmd.Flags().GetBool("admin")
+	if adminFlag {
+		generateAdminInterface(singularName, pluralName, fields)
 	}
 
 	fmt.Printf("Generating module %s with fields: %v\n", args[0], fields)
@@ -387,6 +394,18 @@ func addModuleInitializer(content []byte, pluralName, singularName string) ([]by
 	return []byte(updatedContent), true
 }
 
+func generateAdminInterface(singularName, pluralName string, fields []string) {
+	adminDir := filepath.Join("admin", pluralName)
+	if err := os.MkdirAll(adminDir, os.ModePerm); err != nil {
+		fmt.Printf("Error creating admin directory %s: %v\n", adminDir, err)
+		return
+	}
+
+	adminTemplate := `templates/admin_interface.tmpl` // We'll create this template
+	generateFileFromTemplate(adminDir, "index.html", adminTemplate, singularName, pluralName, fields)
+
+	fmt.Printf("Admin interface for %s generated in %s\n", singularName, adminDir)
+}
 func generateFieldStructs(fields []string) []struct {
 	Name           string
 	Type           string
