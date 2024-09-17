@@ -63,38 +63,37 @@ func ({{.StructName}}) TableName() string {
 }
 
 func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
-	if item == nil {
-		return nil
-	}
+    if item == nil {
+        return nil
+    }
 
-	response := &{{.StructName}}Response{
-		ID:        item.ID,
-		CreatedAt: item.CreatedAt,
-		UpdatedAt: item.UpdatedAt,
-		{{- range .Fields}}
-		{{- if or (eq .Relationship "belongs_to") (eq .Relationship "has_one")}}
-		{{.Name}}ID: item.{{.Name}}ID,
-		{{- if ne .Name ""}}
-		{{.Name}}: item.{{.Name}}.ToResponse(),
-		{{- end}}
-		{{- else if eq .Relationship "has_many"}}
-		{{.Name}}: make([]{{.Type}}Response, len(item.{{.Name}})),
-		{{- else}}
-		{{.Name}}: item.{{.Name}},
-		{{- end}}
-		{{- end}}
-	}
+    response := &{{.StructName}}Response{
+        ID:        item.ID,
+        CreatedAt: item.CreatedAt,
+        UpdatedAt: item.UpdatedAt,
+        {{- range .Fields}}
+        {{- if or (eq .Relationship "belongs_to") (eq .Relationship "has_one")}}
+        {{.Name}}ID: item.{{.Name}}ID,
+        {{.Name}}: item.{{.Name}}.ToResponse(),
+        {{- else if eq .Relationship "has_many"}}
+        {{.Name}}: make([]{{.Type}}Response, len(item.{{.Name}})),
+        {{- else}}
+        {{.Name}}: item.{{.Name}},
+        {{- end}}
+        {{- end}}
+    }
 
-	{{- range .Fields}}
-	{{- if eq .Relationship "has_many"}}
-	for i, v := range item.{{.Name}} {
-		response.{{.Name}}[i] = *v.ToResponse()
-	}
-	{{- end}}
-	{{- end}}
+    {{- range .Fields}}
+    {{- if eq .Relationship "has_many"}}
+    for i, v := range item.{{.Name}} {
+        response.{{.Name}}[i] = *v.ToResponse()
+    }
+    {{- end}}
+    {{- end}}
 
-	return response
+    return response
 }
+
 
 func (item *{{.StructName}}) Preload(db *gorm.DB) *gorm.DB {
 	{{- range .Fields}}
