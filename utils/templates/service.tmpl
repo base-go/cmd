@@ -16,27 +16,42 @@ func New{{.StructName}}Service(db *gorm.DB) *{{.StructName}}Service {
 		DB: db,
 	}
 }
-
 func (s *{{.StructName}}Service) Create(req *models.Create{{.StructName}}Request) (*models.{{.StructName}}, error) {
-	item := models.{{.StructName}}{
-		{{- range .Fields}}
-		{{- if eq .Type "belongs_to"}}
-		{{.Name}}ID: req.{{.Name}}ID,
-		{{- else if eq .Type "has_many"}}
-		// Has-many relationships are typically not set during creation
-		{{- else if eq .Type "has_one"}}
-		{{.Name}}ID: req.{{.Name}}ID,
-		{{- else}}
-		{{.Name}}: req.{{.Name}},
-		{{- end}}
-		{{- end}}
-	}
+    item := models.{{.StructName}}{
+        {{- range .Fields}}
+        {{- if or (eq .Relationship "belongs_to") (eq .Relationship "has_one")}}
+        {{.Name}}ID: req.{{.Name}}ID,
+        {{- else if ne .Relationship "has_many"}}
+        {{.Name}}: req.{{.Name}},
+        {{- end}}
+        {{- end}}
+    }
+    if err := s.DB.Create(&item).Error; err != nil {
+        return nil, err
+    }
+    return s.GetByID(item.ID)
+}
 
-	if err := s.DB.Create(&item).Error; err != nil {
-		return nil, err
-	}
-
-	return s.GetByID(item.ID)
+func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName}}Request) (*models.{{.StructName}}, error) {
+    item, err := s.GetByID(id)
+    if err != nil {
+        return nil, err
+    }
+    {{- range .Fields}}
+    {{- if or (eq .Relationship "belongs_to") (eq .Relationship "has_one")}}
+    if req.{{.Name}}ID != nil {
+        item.{{.Name}}ID = *req.{{.Name}}ID
+    }
+    {{- else if ne .Relationship "has_many"}}
+    if req.{{.Name}} != nil {
+        item.{{.Name}} = *req.{{.Name}}
+    }
+    {{- end}}
+    {{- end}}
+    if err := s.DB.Save(item).Error; err != nil {
+        return nil, err
+    }
+    return s.GetByID(id)
 }
 
 func (s *{{.StructName}}Service) GetByID(id uint) (*models.{{.StructName}}, error) {
@@ -55,36 +70,6 @@ func (s *{{.StructName}}Service) GetAll() ([]*models.{{.StructName}}, error) {
 	return items, nil
 }
 
-func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName}}Request) (*models.{{.StructName}}, error) {
-	item, err := s.GetByID(id)
-	if err != nil {
-		return nil, err
-	}
-
-	{{- range .Fields}}
-	{{- if eq .Type "belongs_to"}}
-	if req.{{.Name}}ID != nil {
-		item.{{.Name}}ID = *req.{{.Name}}ID
-	}
-	{{- else if eq .Type "has_many"}}
-	// Has-many relationships are updated separately
-	{{- else if eq .Type "has_one"}}
-	if req.{{.Name}}ID != nil {
-		item.{{.Name}}ID = *req.{{.Name}}ID
-	}
-	{{- else}}
-	if req.{{.Name}} != nil {
-		item.{{.Name}} = *req.{{.Name}}
-	}
-	{{- end}}
-	{{- end}}
-
-	if err := s.DB.Save(item).Error; err != nil {
-		return nil, err
-	}
-
-	return s.GetByID(id)
-}
 
 func (s *{{.StructName}}Service) Delete(id uint) error {
 	result := s.DB.Delete(&models.{{.StructName}}{}, id)
