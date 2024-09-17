@@ -1,8 +1,8 @@
 package models
 
 import (
-	"gorm.io/gorm"
-	"time"
+    "gorm.io/gorm"
+    "time"
 )
 
 type {{.StructName}} struct {
@@ -15,7 +15,7 @@ type {{.StructName}} struct {
     {{.Name}}ID uint `json:"{{.JSONName}}Id" gorm:"column:{{.DBName}}_id"`
     {{.Name}} {{.Type}} `json:"{{.JSONName}}" gorm:"foreignKey:{{.Name}}ID"`
     {{- else if eq .Relationship "has_many"}}
-    {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}ID"`
+    {{.Name}} []{{.Type}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}ID"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}" gorm:"column:{{.DBName}}"`
     {{- end}}
@@ -24,9 +24,7 @@ type {{.StructName}} struct {
 
 type Create{{.StructName}}Request struct {
     {{- range .Fields}}
-    {{- if eq .Relationship "belongs_to" }}
-    {{.Name}}ID uint `json:"{{.JSONName}}Id"`
-    {{- else if eq .Relationship "has_one" }}
+    {{- if or (eq .Relationship "belongs_to") (eq .Relationship "has_one")}}
     {{.Name}}ID uint `json:"{{.JSONName}}Id"`
     {{- else if ne .Relationship "has_many"}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
@@ -36,9 +34,7 @@ type Create{{.StructName}}Request struct {
 
 type Update{{.StructName}}Request struct {
     {{- range .Fields}}
-    {{- if eq .Relationship "belongs_to" }}
-    {{.Name}}ID *uint `json:"{{.JSONName}}Id,omitempty"`
-    {{- else if eq .Relationship "has_one" }}
+    {{- if or (eq .Relationship "belongs_to") (eq .Relationship "has_one")}}
     {{.Name}}ID *uint `json:"{{.JSONName}}Id,omitempty"`
     {{- else if ne .Relationship "has_many"}}
     {{.Name}} *{{.Type}} `json:"{{.JSONName}},omitempty"`
@@ -51,12 +47,11 @@ type {{.StructName}}Response struct {
     CreatedAt time.Time `json:"createdAt"`
     UpdatedAt time.Time `json:"updatedAt"`
     {{- range .Fields}}
-    {{- if eq .Relationship "belongs_to"}}
+    {{- if or (eq .Relationship "belongs_to") (eq .Relationship "has_one")}}
     {{.Name}}ID uint `json:"{{.JSONName}}Id"`
-    {{- else if eq .Relationship "has_one"}}
-    {{.Name}}ID uint `json:"{{.JSONName}}Id"`
+    {{.Name}} {{.Type}}Response `json:"{{.JSONName}}"`
     {{- else if eq .Relationship "has_many"}}
-    {{.Name}} []{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
+    {{.Name}} []{{.Type}}Response `json:"{{.JSONName}},omitempty"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end}}
@@ -77,11 +72,12 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
         CreatedAt: item.CreatedAt,
         UpdatedAt: item.UpdatedAt,
         {{- range .Fields}}
-        {{- if eq .Relationship "belongs_to"}}
+        {{- if or (eq .Relationship "belongs_to") (eq .Relationship "has_one")}}
         {{.Name}}ID: item.{{.Name}}ID,
-        {{- else if eq .Relationship "has_one"}}
-        {{.Name}}ID: item.{{.Name}}ID,
-        {{- else if ne .Relationship "has_many"}}
+        {{.Name}}: *item.{{.Name}}.ToResponse(),
+        {{- else if eq .Relationship "has_many"}}
+        {{.Name}}: make([]{{.Type}}Response, len(item.{{.Name}})),
+        {{- else}}
         {{.Name}}: item.{{.Name}},
         {{- end}}
         {{- end}}
@@ -89,11 +85,8 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
 
     {{- range .Fields}}
     {{- if eq .Relationship "has_many"}}
-    if len(item.{{.Name}}) > 0 {
-        response.{{.Name}} = make([]{{.AssociatedType}}Response, len(item.{{.Name}}))
-        for i, v := range item.{{.Name}} {
-            response.{{.Name}}[i] = *v.ToResponse()
-        }
+    for i, v := range item.{{.Name}} {
+        response.{{.Name}}[i] = *v.ToResponse()
     }
     {{- end}}
     {{- end}}
@@ -108,4 +101,4 @@ func (item *{{.StructName}}) Preload(db *gorm.DB) *gorm.DB {
     {{- end}}
     {{- end}}
     return db
-} 
+}
