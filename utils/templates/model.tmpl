@@ -9,14 +9,16 @@ import (
 type {{.StructName}} struct {
     gorm.Model
     {{- range .Fields}}
-    {{- if eq .Type "belongs_to"}}
-    {{.Name}}ID uint `json:"{{.JSONName}}Id" gorm:"column:{{.DBName}}_id"`
-    {{.Name}} {{.AssociatedType}} `json:"{{.JSONName}}" gorm:"foreignKey:{{.Name}}ID"`
-    {{- else if eq .Type "has_one"}}
-    {{.Name}}ID uint `json:"{{.JSONName}}Id" gorm:"column:{{.DBName}}_id"`
-    {{.Name}} {{.AssociatedType}} `json:"{{.JSONName}}" gorm:"foreignKey:{{.Name}}ID"`
-    {{- else if eq .Type "has_many"}}
-    {{.Name}} []{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}ID"`
+    {{- if eq .Relationship "belongs_to"}}
+    {{.Name}} {{.Type}} `json:"{{.JSONName}}" gorm:"foreignKey:{{.Name}}ID"`
+    {{- else if eq .Relationship "has_one"}}
+    {{.Name}} {{.Type}} `json:"{{.JSONName}}" gorm:"foreignKey:{{.Name}}ID"`
+    {{- else if eq .Relationship "has_many"}}
+    {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}ID"`
+    {{- else if eq .Relationship "belongs_to_id" }}
+    {{.Name}} {{.Type}} `json:"{{.JSONName}}" gorm:"column:{{.DBName}}"`
+    {{- else if eq .Relationship "has_one_id" }}
+    {{.Name}} {{.Type}} `json:"{{.JSONName}}" gorm:"column:{{.DBName}}"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}" gorm:"column:{{.DBName}}"`
     {{- end}}

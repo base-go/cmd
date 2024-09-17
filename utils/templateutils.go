@@ -75,6 +75,7 @@ type FieldStruct struct {
 	DBName         string
 	AssociatedType string
 	PluralType     string
+	Relationship   string
 }
 
 // GenerateFieldStructs processes the fields and returns a slice of FieldStruct
@@ -88,33 +89,45 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 			fieldType := parts[1]
 			jsonName := ToLower(parts[0])
 			dbName := ToLower(parts[0])
-			var associatedType, pluralType string
+			var associatedType, pluralType, relationship string
 
 			goType := GetGoType(fieldType)
 
 			switch fieldType {
 			case "belongs_to":
+				relationship = "belongs_to"
 				if len(parts) > 2 {
 					associatedType = ToTitle(parts[2])
 					// Add ID field for belongs_to relationships
 					fieldStructs = append(fieldStructs, FieldStruct{
-						Name:     name + "ID",
-						Type:     "uint",
-						JSONName: jsonName + "Id",
-						DBName:   dbName + "_id",
+						Name:         name + "ID",
+						Type:         "uint",
+						JSONName:     jsonName + "Id",
+						DBName:       dbName + "_id",
+						Relationship: "belongs_to_id",
+					})
+					goType = associatedType
+				}
+			case "has_one":
+				relationship = "has_one"
+				if len(parts) > 2 {
+					associatedType = ToTitle(parts[2])
+					// Add ID field for has_one relationships
+					fieldStructs = append(fieldStructs, FieldStruct{
+						Name:         name + "ID",
+						Type:         "uint",
+						JSONName:     jsonName + "Id",
+						DBName:       dbName + "_id",
+						Relationship: "has_one_id",
 					})
 					goType = associatedType
 				}
 			case "has_many":
+				relationship = "has_many"
 				if len(parts) > 2 {
 					associatedType = ToTitle(parts[2])
 					pluralType = PluralizeClient.Plural(ToLower(parts[2]))
 					goType = "[]" + associatedType
-				}
-			case "has_one":
-				if len(parts) > 2 {
-					associatedType = ToTitle(parts[2])
-					goType = associatedType
 				}
 			}
 
@@ -125,6 +138,7 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 				DBName:         dbName,
 				AssociatedType: associatedType,
 				PluralType:     pluralType,
+				Relationship:   relationship,
 			})
 		}
 	}
