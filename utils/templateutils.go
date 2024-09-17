@@ -98,28 +98,12 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 				relationship = "belongs_to"
 				if len(parts) > 2 {
 					associatedType = ToTitle(parts[2])
-					// Add ID field for belongs_to relationships
-					fieldStructs = append(fieldStructs, FieldStruct{
-						Name:         name + "ID",
-						Type:         "uint",
-						JSONName:     jsonName + "Id",
-						DBName:       dbName + "_id",
-						Relationship: "belongs_to_id",
-					})
 					goType = associatedType
 				}
 			case "has_one":
 				relationship = "has_one"
 				if len(parts) > 2 {
 					associatedType = ToTitle(parts[2])
-					// Add ID field for has_one relationships
-					fieldStructs = append(fieldStructs, FieldStruct{
-						Name:         name + "ID",
-						Type:         "uint",
-						JSONName:     jsonName + "Id",
-						DBName:       dbName + "_id",
-						Relationship: "has_one_id",
-					})
 					goType = associatedType
 				}
 			case "has_many":
