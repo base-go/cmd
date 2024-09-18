@@ -1,9 +1,8 @@
-// package models
-
 package models
 
 import (
     "time"
+    "gorm.io/gorm"
 )
 
 type Pagination struct {
@@ -25,9 +24,9 @@ type {{.StructName}} struct {
     {{.Name}}ID uint `json:"{{.JSONName}}" gorm:"column:{{.DBName}}"`
     {{.AssociatedType}} *{{.AssociatedType}} `json:"{{.Name | toLower}},omitempty" gorm:"foreignKey:{{.Name}}ID"`
     {{- else if eq .Relationship "has_one"}}
-    {{.AssociatedType}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.StructName}}ID"`
+    {{.AssociatedType}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}ID"`
     {{- else if eq .Relationship "has_many"}}
-    {{.AssociatedType}} []{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.StructName}}ID"`
+    {{.AssociatedType}} []{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}ID"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}" gorm:"column:{{.DBName}}"`
     {{- end}}

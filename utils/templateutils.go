@@ -26,7 +26,6 @@ func init() {
 var TemplateFS embed.FS
 
 // GenerateFileFromTemplate generates a file from a template
-// In your generate.go or wherever you handle template generation
 func GenerateFileFromTemplate(dir, filename, templateFile, singularName, pluralName, packageName string, fields []FieldStruct) {
 	tmplContent, err := TemplateFS.ReadFile(templateFile)
 	if err != nil {
