@@ -61,6 +61,7 @@ func ToSnakeCase(s string) string {
 	}
 	return result.String()
 }
+
 func ToCamelCase(s string) string {
 	s = ToPascalCase(s)
 	if len(s) == 0 {
