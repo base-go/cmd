@@ -12,11 +12,12 @@ import (
 )
 
 var generateCmd = &cobra.Command{
-	Use:   "g [name] [field:type...] [--admin]",
-	Short: "Generate a new module",
-	Long:  `Generate a new module with the specified name and fields. Use --admin flag to generate admin interface.`,
-	Args:  cobra.MinimumNArgs(1),
-	Run:   generateModule,
+	Use:     "generate [name] [field:type...] [--admin]",
+	Aliases: []string{"g"},
+	Short:   "Generate a new module",
+	Long:    `Generate a new module with the specified name and fields. Use --admin flag to generate admin interface.`,
+	Args:    cobra.MinimumNArgs(1),
+	Run:     generateModule,
 }
 
 func init() {
@@ -29,8 +30,8 @@ func generateModule(cmd *cobra.Command, args []string) {
 	fields := args[1:]
 
 	// Convert singular name to snake_case for directory naming
-	dirName := utils.ToSnakeCase(singularName)                                      // Ensure snake_case is used
-	pluralDirName := utils.ToSnakeCase(utils.ToPlural(utils.ToLower(singularName))) // Use plural in snake_case
+	dirName := utils.ToSnakeCase(singularName)
+	pluralDirName := utils.ToSnakeCase(utils.ToPlural(utils.ToLower(singularName)))
 
 	// Use PascalCase for struct naming
 	structName := utils.ToPascalCase(singularName)
@@ -50,15 +51,18 @@ func generateModule(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	// Generate model file
+	// Process fields into FieldStruct
+	processedFields := utils.GenerateFieldStructs(fields)
+
+	// Generate model file with processed fields
 	utils.GenerateFileFromTemplate(
 		filepath.Join("app", "models"),
 		dirName+".go",
 		"templates/model.tmpl",
 		structName,
-		dirName, // Changed to snake_case singular
+		dirName, // snake_case singular
 		"models",
-		fields,
+		processedFields, // Passes []FieldStruct
 	)
 
 	// Generate other files (in singular directory with snake_case)
@@ -71,7 +75,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 			structName,
 			pluralDirName, // Use plural snake_case for templates
 			packageName,
-			fields,
+			processedFields, // Passes []FieldStruct
 		)
 	}
 

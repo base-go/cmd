@@ -9,8 +9,8 @@ Base is a powerful command-line tool designed to streamline development with the
 - [Getting Started](#getting-started)
 - [Commands](#commands)
   - [`base new`](#base-new)
-  - [`base generate` or `base g`](#base-generate-or-base-g)
-  - [`base server` or `base s`](#base-server-or-base-s)
+  - [`base g`](#base-generate-or-base-g)
+  - [`base start` or `base s`](#base-server-or-base-s)
   - [`base update`](#base-update)
 - [Examples](#examples)
   - [Generating a New Project](#generating-a-new-project)
@@ -106,7 +106,7 @@ base g User name:string email:string password:string profile:hasOne:Profile
 
 ---
 
-### `base server` or `base s`
+### `base start` or `base s`
 
 Starts the development server.
 

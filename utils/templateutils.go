@@ -26,7 +26,8 @@ func init() {
 var TemplateFS embed.FS
 
 // GenerateFileFromTemplate generates a file from a template
-func GenerateFileFromTemplate(dir, filename, templateFile, singularName, pluralName, packageName string, fields []string) {
+// In your generate.go or wherever you handle template generation
+func GenerateFileFromTemplate(dir, filename, templateFile, singularName, pluralName, packageName string, fields []FieldStruct) {
 	tmplContent, err := TemplateFS.ReadFile(templateFile)
 	if err != nil {
 		fmt.Printf("Error reading template %s: %v\n", templateFile, err)
@@ -44,15 +45,13 @@ func GenerateFileFromTemplate(dir, filename, templateFile, singularName, pluralN
 		return
 	}
 
-	fieldStructs := GenerateFieldStructs(fields)
-
 	data := map[string]interface{}{
 		"PackageName":     packageName,
-		"StructName":      ToPascalCase(singularName),
+		"StructName":      singularName,
 		"LowerStructName": strings.ToLower(singularName[:1]) + singularName[1:],
-		"PluralName":      ToPascalCase(pluralName),
-		"RouteName":       ToSnakeCase(singularName),
-		"Fields":          fieldStructs,
+		"PluralName":      pluralName,
+		"RouteName":       ToSnakeCase(pluralName),
+		"Fields":          fields,
 		"TableName":       ToSnakeCase(pluralName),
 	}
 
@@ -88,16 +87,16 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 	for _, field := range fields {
 		parts := strings.Split(field, ":")
 		if len(parts) >= 2 {
-			name := ToTitle(parts[0])
+			name := ToPascalCase(parts[0]) // Ensure PascalCase
 			fieldType := parts[1]
-			jsonName := ToLower(parts[0])
-			dbName := ToLower(parts[0])
+			jsonName := ToSnakeCase(parts[0]) // Keep JSON names in snake_case
+			dbName := ToSnakeCase(parts[0])
 			var associatedType, pluralType, relationship string
 
 			goType := GetGoType(fieldType)
 
-			switch fieldType {
-			case "belongsTo", "belongs_to":
+			switch strings.ToLower(fieldType) {
+			case "belongsto", "belongs_to":
 				relationship = "belongs_to"
 				if len(parts) > 2 {
 					associatedType = ToPascalCase(parts[2])
@@ -105,14 +104,14 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 					jsonName += "_id"
 					dbName += "_id"
 				}
-			case "hasOne", "has_one":
+			case "hasone", "has_one":
 				relationship = "has_one"
 				if len(parts) > 2 {
 					associatedType = ToPascalCase(parts[2])
 					goType = "*" + associatedType
 					jsonName += ",omitempty"
 				}
-			case "hasMany", "has_many":
+			case "hasmany", "has_many":
 				relationship = "has_many"
 				if len(parts) > 2 {
 					associatedType = ToPascalCase(parts[2])
