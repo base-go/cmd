@@ -76,7 +76,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 	}
 
 	// Update app/init.go to register the new module
-	if err := utils.UpdateInitFile(singularName, structName); err != nil {
+	if err := utils.UpdateInitFile(singularName, utils.ToLower(structName)); err != nil {
 		fmt.Printf("Error updating app/init.go: %v\n", err)
 		return
 	}
