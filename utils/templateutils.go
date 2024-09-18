@@ -9,6 +9,8 @@ import (
 	"text/template"
 
 	"github.com/gertd/go-pluralize"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // Initialize the pluralize client
@@ -24,7 +26,7 @@ func init() {
 var TemplateFS embed.FS
 
 // GenerateFileFromTemplate generates a file from a template
-func GenerateFileFromTemplate(dir, filename, templateFile, singularName, pluralName string, fields []string) {
+func GenerateFileFromTemplate(dir, filename, templateFile, singularName, pluralName, packageName string, fields []string) {
 	tmplContent, err := TemplateFS.ReadFile(templateFile)
 	if err != nil {
 		fmt.Printf("Error reading template %s: %v\n", templateFile, err)
@@ -33,7 +35,7 @@ func GenerateFileFromTemplate(dir, filename, templateFile, singularName, pluralN
 
 	funcMap := template.FuncMap{
 		"toLower": strings.ToLower,
-		"toTitle": strings.Title,
+		"toTitle": cases.Title(language.Und).String,
 	}
 
 	tmpl, err := template.New(filepath.Base(templateFile)).Funcs(funcMap).Parse(string(tmplContent))
@@ -45,12 +47,13 @@ func GenerateFileFromTemplate(dir, filename, templateFile, singularName, pluralN
 	fieldStructs := GenerateFieldStructs(fields)
 
 	data := map[string]interface{}{
-		"PackageName": pluralName,
-		"StructName":  ToTitle(singularName),
-		"PluralName":  ToTitle(pluralName),
-		"RouteName":   pluralName,
-		"Fields":      fieldStructs,
-		"TableName":   pluralName,
+		"PackageName":     packageName,
+		"StructName":      ToPascalCase(singularName),
+		"LowerStructName": strings.ToLower(singularName[:1]) + singularName[1:],
+		"PluralName":      ToPascalCase(pluralName),
+		"RouteName":       ToSnakeCase(pluralName),
+		"Fields":          fieldStructs,
+		"TableName":       ToSnakeCase(pluralName),
 	}
 
 	filePath := filepath.Join(dir, filename)
@@ -94,24 +97,28 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 			goType := GetGoType(fieldType)
 
 			switch fieldType {
-			case "belongs_to":
+			case "belongsTo", "belongs_to":
 				relationship = "belongs_to"
 				if len(parts) > 2 {
-					associatedType = ToTitle(parts[2])
-					goType = associatedType
+					associatedType = ToPascalCase(parts[2])
+					goType = "*" + associatedType
+					jsonName += "_id"
+					dbName += "_id"
 				}
-			case "has_one":
+			case "hasOne", "has_one":
 				relationship = "has_one"
 				if len(parts) > 2 {
-					associatedType = ToTitle(parts[2])
-					goType = associatedType
+					associatedType = ToPascalCase(parts[2])
+					goType = "*" + associatedType
+					jsonName += ",omitempty"
 				}
-			case "has_many":
+			case "hasMany", "has_many":
 				relationship = "has_many"
 				if len(parts) > 2 {
-					associatedType = ToTitle(parts[2])
+					associatedType = ToPascalCase(parts[2])
 					pluralType = PluralizeClient.Plural(ToLower(parts[2]))
-					goType = associatedType
+					goType = "[]" + associatedType
+					jsonName += ",omitempty"
 				}
 			}
 
@@ -135,20 +142,4 @@ func ParseTemplate(name, content string) (*template.Template, error) {
 	return template.New(name).Funcs(template.FuncMap{
 		"getInputType": GetInputType,
 	}).Parse(content)
-}
-
-// GetInputType maps Go types to HTML input types
-func GetInputType(goType string) string {
-	switch goType {
-	case "int", "int64", "uint", "uint64":
-		return "number"
-	case "float64":
-		return "number"
-	case "bool":
-		return "checkbox"
-	case "time.Time":
-		return "datetime-local"
-	default:
-		return "text"
-	}
 }

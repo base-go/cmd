@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"base/utils"
 
@@ -25,13 +26,22 @@ func init() {
 
 func generateModule(cmd *cobra.Command, args []string) {
 	singularName := args[0]
-	pluralName := utils.ToLowerPlural(singularName)
 	fields := args[1:]
+
+	// Convert singular name to snake_case for directory naming
+	dirName := utils.ToSnakeCase(singularName)
+	pluralDirName := utils.ToSnakeCase(utils.ToPlural(singularName))
+
+	// Use PascalCase for struct naming
+	structName := utils.ToPascalCase(singularName)
+
+	// Use the singular name in snake_case for package naming
+	packageName := utils.ToSnakeCase(singularName)
 
 	// Create directories
 	dirs := []string{
 		filepath.Join("app", "models"),
-		filepath.Join("app", pluralName),
+		filepath.Join("app", pluralDirName),
 	}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
@@ -40,49 +50,40 @@ func generateModule(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	// Generate files using templates
+	// Generate model file
 	utils.GenerateFileFromTemplate(
 		filepath.Join("app", "models"),
-		fmt.Sprintf("%s.go", utils.ToLower(singularName)),
+		dirName+".go",
 		"templates/model.tmpl",
-		singularName,
-		pluralName,
-		fields,
-	)
-	utils.GenerateFileFromTemplate(
-		filepath.Join("app", pluralName),
-		"controller.go",
-		"templates/controller.tmpl",
-		singularName,
-		pluralName,
-		fields,
-	)
-	utils.GenerateFileFromTemplate(
-		filepath.Join("app", pluralName),
-		"service.go",
-		"templates/service.tmpl",
-		singularName,
-		pluralName,
-		fields,
-	)
-	utils.GenerateFileFromTemplate(
-		filepath.Join("app", pluralName),
-		"mod.go",
-		"templates/mod.tmpl",
-		singularName,
-		pluralName,
+		structName,
+		pluralDirName,
+		"models",
 		fields,
 	)
 
+	// Generate other files
+	files := []string{"controller.go", "service.go", "mod.go"}
+	for _, file := range files {
+		utils.GenerateFileFromTemplate(
+			filepath.Join("app", pluralDirName),
+			file,
+			"templates/"+strings.TrimSuffix(file, ".go")+".tmpl",
+			structName,
+			pluralDirName,
+			packageName,
+			fields,
+		)
+	}
+
 	// Update app/init.go to register the new module
-	if err := utils.UpdateInitFile(singularName, pluralName); err != nil {
+	if err := utils.UpdateInitFile(singularName, structName); err != nil {
 		fmt.Printf("Error updating app/init.go: %v\n", err)
 		return
 	}
 
 	adminFlag, _ := cmd.Flags().GetBool("admin")
 	if adminFlag {
-		generateAdminInterface(singularName, pluralName, fields)
+		generateAdminInterface(singularName, structName, fields)
 	}
 
 	fmt.Printf("Module %s generated successfully with fields: %v\n", singularName, fields)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"unicode"
 
 	"github.com/gertd/go-pluralize"
 	"golang.org/x/text/cases"
@@ -48,6 +49,76 @@ func ToTitle(s string) string {
 // ToLowerPlural converts a string to its plural form in lowercase.
 func ToLowerPlural(s string) string {
 	return strings.ToLower(pluralizeClient.Plural(s))
+}
+
+func ToSnakeCase(s string) string {
+	var result strings.Builder
+	for i, r := range s {
+		if i > 0 && unicode.IsUpper(r) {
+			result.WriteRune('_')
+		}
+		result.WriteRune(unicode.ToLower(r))
+	}
+	return result.String()
+}
+func ToCamelCase(s string) string {
+	s = ToPascalCase(s)
+	if len(s) == 0 {
+		return s
+	}
+	return strings.ToLower(s[:1]) + s[1:]
+}
+
+func ToPascalCase(s string) string {
+	words := splitIntoWords(s)
+	for i, word := range words {
+		words[i] = cases.Title(language.Und).String(word)
+	}
+	return strings.Join(words, "")
+}
+
+func splitIntoWords(s string) []string {
+	var words []string
+	var currentWord strings.Builder
+	for i, r := range s {
+		if i > 0 && unicode.IsUpper(r) && (unicode.IsLower(rune(s[i-1])) || unicode.IsLower(r)) {
+			// Start of a new word
+			words = append(words, currentWord.String())
+			currentWord.Reset()
+		}
+		if r == '_' || r == ' ' || r == '-' {
+			if currentWord.Len() > 0 {
+				words = append(words, currentWord.String())
+				currentWord.Reset()
+			}
+		} else {
+			currentWord.WriteRune(r)
+		}
+	}
+	if currentWord.Len() > 0 {
+		words = append(words, currentWord.String())
+	}
+	return words
+}
+
+func ToPlural(s string) string {
+	return PluralizeClient.Plural(s)
+}
+
+// GetInputType maps Go types to HTML input types
+func GetInputType(goType string) string {
+	switch goType {
+	case "int", "int64", "uint", "uint64":
+		return "number"
+	case "float64":
+		return "number"
+	case "bool":
+		return "checkbox"
+	case "time.Time":
+		return "datetime-local"
+	default:
+		return "text"
+	}
 }
 
 // UpdateInitFile updates the app/init.go file to register a new module.

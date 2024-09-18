@@ -1,35 +1,37 @@
-package {{.RouteName}}
+package {{.PackageName}}
 
 import (
-	"base/core/module"
-	"base/app/models"
+    "base/core/module"
+    "base/app/models"
 
-	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
+    "github.com/gin-gonic/gin"
+    "gorm.io/gorm"
 )
 
 type {{.StructName}}Module struct {
-	module.DefaultModule
-	DB         *gorm.DB
-	Controller *{{.StructName}}Controller
-	Service    *{{.StructName}}Service
+    module.DefaultModule
+    DB         *gorm.DB
+    Controller *{{.StructName}}Controller
+    Service    *{{.StructName}}Service
 }
 
 func New{{.StructName}}Module(db *gorm.DB, router *gin.RouterGroup) module.Module {
-	service := New{{.StructName}}Service(db)
-	controller := New{{.StructName}}Controller(service)
+    service := New{{.StructName}}Service(db)
+    controller := New{{.StructName}}Controller(service)
 
-	{{.RouteName}}Module := &{{.StructName}}Module{
-		DB:         db,
-		Controller: controller,
-		Service:    service,
-	}
+    {{.LowerStructName}}Module := &{{.StructName}}Module{
+        DB:         db,
+        Controller: controller,
+        Service:    service,
+    }
 
-	{{.RouteName}}Module.Routes(router)
-	{{.RouteName}}Module.Migrate()
+    {{.LowerStructName}}Module.Routes(router)
+    {{.LowerStructName}}Module.Migrate()
 
-	return {{.RouteName}}Module
+    return {{.LowerStructName}}Module
 }
+ 
+
 
 func (m *{{.StructName}}Module) Routes(router *gin.RouterGroup) {
 	m.Controller.Routes(router)

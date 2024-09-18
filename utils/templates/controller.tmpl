@@ -8,14 +8,15 @@ import (
 	"base/app/models"
 )
 
+
 type {{.StructName}}Controller struct {
-	{{.StructName}}Service *{{.StructName}}Service
+    {{.StructName}}Service *{{.StructName}}Service
 }
 
 func New{{.StructName}}Controller(service *{{.StructName}}Service) *{{.StructName}}Controller {
-	return &{{.StructName}}Controller{
-		{{.StructName}}Service: service,
-	}
+    return &{{.StructName}}Controller{
+        {{.StructName}}Service: service,
+    }
 }
 
 func (c *{{.StructName}}Controller) Routes(router *gin.RouterGroup) {
