@@ -222,7 +222,7 @@ func (c *{{.StructName}}Controller) Delete(ctx *gin.Context) {
 }
 
 {{- range .Fields}}
-{{- if (eq .Type "has_many")}}
+{{- if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
 // GetAssociated{{.Name}} godoc
 // @Summary Get associated {{.Name}} for a {{$.StructName}}
 // @Description Get all associated {{.Name}} for a specific {{$.StructName}}
@@ -235,7 +235,7 @@ func (c *{{.StructName}}Controller) Delete(ctx *gin.Context) {
 // @Failure 400 {object} ErrorResponse
 // @Failure 404 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /{{$.RouteName}}/{id}/{{.PluralType}} [get]
+// @Router /{{$.RouteName}}/{id}/{{.JSONName}} [get]
 func (c *{{$.StructName}}Controller) GetAssociated{{.Name}}(ctx *gin.Context) {
 	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
 	if err != nil {
@@ -252,7 +252,7 @@ func (c *{{$.StructName}}Controller) GetAssociated{{.Name}}(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, associated)
 }
 {{- end}}
-{{- if (eq .Type "has_one")}}
+{{- if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
 // GetAssociated{{.Name}} godoc
 // @Summary Get associated {{.Name}} for a {{$.StructName}}
 // @Description Get associated {{.Name}} for a specific {{$.StructName}}
