@@ -65,7 +65,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 	files := []string{"controller.go", "service.go", "mod.go"}
 	for _, file := range files {
 		utils.GenerateFileFromTemplate(
-			filepath.Join("app", pluralDirName),
+			filepath.Join("app", singularName),
 			file,
 			"templates/"+strings.TrimSuffix(file, ".go")+".tmpl",
 			structName,
@@ -76,7 +76,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 	}
 
 	// Update app/init.go to register the new module
-	if err := utils.UpdateInitFile(singularName, utils.ToLower(structName)); err != nil {
+	if err := utils.UpdateInitFile(singularName, utils.ToLowerPlural(structName)); err != nil {
 		fmt.Printf("Error updating app/init.go: %v\n", err)
 		return
 	}

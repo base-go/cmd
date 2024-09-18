@@ -51,7 +51,7 @@ func GenerateFileFromTemplate(dir, filename, templateFile, singularName, pluralN
 		"StructName":      ToPascalCase(singularName),
 		"LowerStructName": strings.ToLower(singularName[:1]) + singularName[1:],
 		"PluralName":      ToPascalCase(pluralName),
-		"RouteName":       ToSnakeCase(pluralName),
+		"RouteName":       ToSnakeCase(singularName),
 		"Fields":          fieldStructs,
 		"TableName":       ToSnakeCase(pluralName),
 	}
