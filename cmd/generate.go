@@ -29,8 +29,8 @@ func generateModule(cmd *cobra.Command, args []string) {
 	fields := args[1:]
 
 	// Convert singular name to snake_case for directory naming
-	dirName := utils.ToSnakeCase(singularName)
-	pluralDirName := utils.ToSnakeCase(utils.ToPlural(singularName))
+	dirName := utils.ToSnakeCase(singularName)                                      // Ensure snake_case is used
+	pluralDirName := utils.ToSnakeCase(utils.ToPlural(utils.ToLower(singularName))) // Use plural in snake_case
 
 	// Use PascalCase for struct naming
 	structName := utils.ToPascalCase(singularName)
@@ -38,10 +38,10 @@ func generateModule(cmd *cobra.Command, args []string) {
 	// Use the singular name in snake_case for package naming
 	packageName := utils.ToSnakeCase(singularName)
 
-	// Create directories
+	// Create directories (singular names in snake_case)
 	dirs := []string{
 		filepath.Join("app", "models"),
-		filepath.Join("app", pluralDirName),
+		filepath.Join("app", dirName), // Changed to snake_case singular directory
 	}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
@@ -56,27 +56,27 @@ func generateModule(cmd *cobra.Command, args []string) {
 		dirName+".go",
 		"templates/model.tmpl",
 		structName,
-		pluralDirName,
+		dirName, // Changed to snake_case singular
 		"models",
 		fields,
 	)
 
-	// Generate other files
+	// Generate other files (in singular directory with snake_case)
 	files := []string{"controller.go", "service.go", "mod.go"}
 	for _, file := range files {
 		utils.GenerateFileFromTemplate(
-			filepath.Join("app", singularName),
+			filepath.Join("app", dirName), // Use singular directory in snake_case
 			file,
 			"templates/"+strings.TrimSuffix(file, ".go")+".tmpl",
 			structName,
-			pluralDirName,
+			pluralDirName, // Use plural snake_case for templates
 			packageName,
 			fields,
 		)
 	}
 
-	// Update app/init.go to register the new module
-	if err := utils.UpdateInitFile(singularName, utils.ToLowerPlural(structName)); err != nil {
+	// Update app/init.go to register the new module (ensure correct plural form)
+	if err := utils.UpdateInitFile(utils.ToSnakeCase(singularName), utils.ToSnakeCase(utils.ToPlural(singularName))); err != nil {
 		fmt.Printf("Error updating app/init.go: %v\n", err)
 		return
 	}
