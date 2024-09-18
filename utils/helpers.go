@@ -131,12 +131,15 @@ func UpdateInitFile(singularName, pluralName string) error {
 		return err
 	}
 
+	// Use the correct package name (lowercase)
+	packageName := ToSnakeCase(singularName)
+
 	// Add import for the new module if it doesn't exist
-	importStr := fmt.Sprintf("\"base/app/%s\"", pluralName)
+	importStr := fmt.Sprintf("\"base/app/%s\"", packageName)
 	content, importAdded := AddImport(content, importStr)
 
 	// Add module initializer if it doesn't exist
-	content, initializerAdded := AddModuleInitializer(content, pluralName, singularName)
+	content, initializerAdded := AddModuleInitializer(content, packageName, singularName)
 
 	// Write the updated content back to init.go only if changes were made
 	if importAdded || initializerAdded {
@@ -173,7 +176,7 @@ func AddImport(content []byte, importStr string) ([]byte, bool) {
 }
 
 // AddModuleInitializer adds a module initializer to the app/init.go content.
-func AddModuleInitializer(content []byte, pluralName, singularName string) ([]byte, bool) {
+func AddModuleInitializer(content []byte, packageName, singularName string) ([]byte, bool) {
 	contentStr := string(content)
 
 	// Find the module initializer marker
@@ -183,13 +186,15 @@ func AddModuleInitializer(content []byte, pluralName, singularName string) ([]by
 	}
 
 	// Check if the module already exists
-	if strings.Contains(contentStr[:markerIndex], fmt.Sprintf(`"%s":`, pluralName)) {
+	if strings.Contains(contentStr[:markerIndex], fmt.Sprintf(`"%s":`, packageName)) {
 		return content, false
 	}
 
+	structName := ToPascalCase(singularName)
+
 	// Create the new initializer
 	newInitializer := fmt.Sprintf(`        "%s": func(db *gorm.DB, router *gin.RouterGroup) module.Module { return %s.New%sModule(db, router) },`,
-		pluralName, pluralName, ToTitle(singularName))
+		packageName, packageName, structName)
 
 	// Insert the new initializer before the marker
 	updatedContent := contentStr[:markerIndex] + newInitializer + "\n        " + contentStr[markerIndex:]
