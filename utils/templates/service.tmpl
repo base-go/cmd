@@ -7,9 +7,9 @@ import (
     "gorm.io/gorm"
     "gorm.io/gorm/clause"
     "base/app/models"
-	"base/core/types"
-
+    "base/core/types"
 )
+
 type {{.StructName}}Service struct {
     DB *gorm.DB
 }
@@ -23,9 +23,14 @@ func New{{.StructName}}Service(db *gorm.DB) *{{.StructName}}Service {
 func (s *{{.StructName}}Service) Create(req *models.Create{{.StructName}}Request) (*models.{{.StructName}}, error) {
     item := models.{{.StructName}}{
         {{- range .Fields}}
-        {{- if or (eq .Relationship "belongs_to") (eq .Relationship "has_one")}}
+        {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
         {{.Name}}ID: req.{{.Name}}ID,
-        {{- else if ne .Relationship "has_many"}}
+        {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
+        {{.Name}}: req.{{.Name}},
+        {{- else if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
+        // Handle has_many/hasMany separately, if needed
+        {{.Name}}: req.{{.Name}},
+        {{- else}}
         {{.Name}}: req.{{.Name}},
         {{- end}}
         {{- end}}
@@ -42,11 +47,17 @@ func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName
         return nil, err
     }
     {{- range .Fields}}
-    {{- if or (eq .Relationship "belongs_to") (eq .Relationship "has_one")}}
+    {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
     if req.{{.Name}}ID != nil {
         item.{{.Name}}ID = *req.{{.Name}}ID
     }
-    {{- else if ne .Relationship "has_many"}}
+    {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
+    if req.{{.Name}} != nil {
+        item.{{.Name}} = *req.{{.Name}}
+    }
+    {{- else if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
+    // Handle has_many/hasMany updates here, if needed
+    {{- else}}
     if req.{{.Name}} != nil {
         item.{{.Name}} = *req.{{.Name}}
     }
@@ -66,7 +77,6 @@ func (s *{{.StructName}}Service) GetByID(id uint) (*models.{{.StructName}}, erro
     return &item, nil
 }
 
-
 func (s *{{.StructName}}Service) GetAll(page *int, limit *int) (*types.PaginatedResponse, error) {
     if page != nil && limit != nil {
         var items []*models.{{.StructName}}
@@ -77,13 +87,11 @@ func (s *{{.StructName}}Service) GetAll(page *int, limit *int) (*types.Paginated
         return &paginatedResponse, nil
     }
 
-    // If pagination parameters are not provided, return all items
     var allItems []*models.{{.StructName}}
     if err := s.DB.Preload(clause.Associations).Find(&allItems).Error; err != nil {
         return nil, err
     }
 
-    // Create a PaginatedResponse without pagination metadata
     response := types.PaginatedResponse{
         Data: allItems,
         Pagination: types.Pagination{
