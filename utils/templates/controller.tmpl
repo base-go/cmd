@@ -235,7 +235,7 @@ func (c *{{.StructName}}Controller) Delete(ctx *gin.Context) {
 // @Failure 400 {object} ErrorResponse
 // @Failure 404 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /{{$.RouteName}}/{id}/{{.JSONName}} [get]
+// @Router /{{$.RouteName}}/{id}/{{.Name | toLower }}  [get]
 func (c *{{$.StructName}}Controller) GetAssociated{{.Name}}(ctx *gin.Context) {
 	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
 	if err != nil {
