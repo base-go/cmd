@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"base/app/models"
-	"base/core/models"
+	"base/core/types"
 )
 
 
@@ -101,7 +101,7 @@ func (c *{{.StructName}}Controller) Get(ctx *gin.Context) {
 // @Produce json
 // @Param page query int false "Page number" default(1)
 // @Param limit query int false "Number of items per page" default(10)
-// @Success 200 {object} models.PaginatedResponse
+// @Success 200 {object} types.PaginatedResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 // @Router /{{.RouteName}} [get]
@@ -143,7 +143,7 @@ func (c *{{.StructName}}Controller) List(ctx *gin.Context) {
 // @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Success 200 {object} models.PaginatedResponse
+// @Success 200 {object} types.PaginatedResponse
 // @Failure 500 {object} ErrorResponse
 // @Router /{{.RouteName}}/all [get]
 func (c *{{.StructName}}Controller) ListAll(ctx *gin.Context) {
