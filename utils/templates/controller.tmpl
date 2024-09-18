@@ -18,22 +18,23 @@ func New{{.StructName}}Controller(service *{{.StructName}}Service) *{{.StructNam
         {{.StructName}}Service: service,
     }
 }
-
 func (c *{{.StructName}}Controller) Routes(router *gin.RouterGroup) {
-	router.GET("/{{.RouteName}}", c.List)
-	router.GET("/{{.RouteName}}/:id", c.Get)
-	router.POST("/{{.RouteName}}", c.Create)
-	router.PUT("/{{.RouteName}}/:id", c.Update)
-	router.DELETE("/{{.RouteName}}/:id", c.Delete)
-	{{- range .Fields}}
-	{{- if  (eq .Type "has_many")}}
-	router.GET("/{{$.RouteName}}/:id/{{.PluralType}}", c.GetAssociated{{.Name}})
-	{{- end}}
-	{{- if  (eq .Type "has_one")}}
-	router.GET("/{{$.RouteName}}/:id/{{.JSONName}}", c.GetAssociated{{.Name}})
-	{{- end}}
-	{{- end}}
+    router.GET("/{{.RouteName}}", c.List)       // Paginated list
+    router.GET("/{{.RouteName}}/all", c.ListAll) // Unpaginated list
+    router.GET("/{{.RouteName}}/:id", c.Get)
+    router.POST("/{{.RouteName}}", c.Create)
+    router.PUT("/{{.RouteName}}/:id", c.Update)
+    router.DELETE("/{{.RouteName}}/:id", c.Delete)
+    {{- range .Fields}}
+    {{- if  (eq .Type "has_many")}}
+    router.GET("/{{$.RouteName}}/:id/{{.PluralType}}", c.GetAssociated{{.Name}})
+    {{- end}}
+    {{- if  (eq .Type "has_one")}}
+    router.GET("/{{$.RouteName}}/:id/{{.JSONName}}", c.GetAssociated{{.Name}})
+    {{- end}}
+    {{- end}}
 }
+
 
 // Create{{.StructName}} godoc
 // @Summary Create a new {{.StructName}}
@@ -91,28 +92,68 @@ func (c *{{.StructName}}Controller) Get(ctx *gin.Context) {
 }
 
 // List{{.StructName}} godoc
-// @Summary List {{.StructName}}
-// @Description Get a list of all {{.StructName}}
+// @Summary List {{.StructName}} (Paginated)
+// @Description Get a paginated list of all {{.StructName}}
 // @Tags App/{{.StructName}}
 // @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Success 200 {array} models.{{.StructName}}Response
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Number of items per page" default(10)
+// @Success 200 {object} models.PaginatedResponse
+// @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 // @Router /{{.RouteName}} [get]
 func (c *{{.StructName}}Controller) List(ctx *gin.Context) {
-	items, err := c.{{.StructName}}Service.GetAll()
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch items: " + err.Error()})
-		return
-	}
+    // Default pagination parameters
+    page := 1
+    limit := 10
 
-	responses := make([]*models.{{.StructName}}Response, len(items))
-	for i, item := range items {
-		responses[i] = item.ToResponse()
-	}
+    // Parse 'page' query parameter
+    if p, err := strconv.Atoi(ctx.DefaultQuery("page", "1")); err == nil && p > 0 {
+        page = p
+    } else if err != nil {
+        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid 'page' parameter"})
+        return
+    }
 
-	ctx.JSON(http.StatusOK, responses)
+    // Parse 'limit' query parameter
+    if l, err := strconv.Atoi(ctx.DefaultQuery("limit", "10")); err == nil && l > 0 && l <= 100 {
+        limit = l
+    } else if err != nil {
+        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid 'limit' parameter"})
+        return
+    }
+
+    // Fetch paginated data
+    paginatedResponse, err := c.{{.StructName}}Service.GetAll(&page, &limit)
+    if err != nil {
+        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch items: " + err.Error()})
+        return
+    }
+
+    ctx.JSON(http.StatusOK, paginatedResponse)
+}
+
+// ListAll{{.StructName}} godoc
+// @Summary List All {{.StructName}}
+// @Description Get a list of all {{.StructName}} without pagination
+// @Tags App/{{.StructName}}
+// @Security ApiKeyAuth
+// @Accept json
+// @Produce json
+// @Success 200 {object} models.PaginatedResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /{{.RouteName}}/all [get]
+func (c *{{.StructName}}Controller) ListAll(ctx *gin.Context) {
+    // Fetch all items without pagination
+    paginatedResponse, err := c.{{.StructName}}Service.GetAll(nil, nil)
+    if err != nil {
+        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch all items: " + err.Error()})
+        return
+    }
+
+    ctx.JSON(http.StatusOK, paginatedResponse)
 }
 
 // Update{{.StructName}} godoc

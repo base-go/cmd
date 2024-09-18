@@ -62,12 +62,35 @@ func (s *{{.StructName}}Service) GetByID(id uint) (*models.{{.StructName}}, erro
     return &item, nil
 }
 
-func (s *{{.StructName}}Service) GetAll() ([]*models.{{.StructName}}, error) {
-    var items []*models.{{.StructName}}
-    if err := s.DB.Preload(clause.Associations).Find(&items).Error; err != nil {
+
+func (s *{{.StructName}}Service) GetAll(page *int, limit *int) (*models.PaginatedResponse, error) {
+    if page != nil && limit != nil {
+        var items []*models.{{.StructName}}
+        paginatedResponse, err := paginate(s.DB, *page, *limit, &items)
+        if err != nil {
+            return nil, err
+        }
+        return &paginatedResponse, nil
+    }
+
+    // If pagination parameters are not provided, return all items
+    var allItems []*models.{{.StructName}}
+    if err := s.DB.Preload(clause.Associations).Find(&allItems).Error; err != nil {
         return nil, err
     }
-    return items, nil
+
+    // Create a PaginatedResponse without pagination metadata
+    response := models.PaginatedResponse{
+        Data: allItems,
+        Pagination: models.Pagination{
+            Total:      int64(len(allItems)),
+            Page:       1,
+            PageSize:   len(allItems),
+            TotalPages: 1,
+        },
+    }
+
+    return &response, nil
 }
 
 func (s *{{.StructName}}Service) Delete(id uint) error {
@@ -93,4 +116,30 @@ func (s *{{.StructName}}Service) GetAssociated(id uint, associationName string) 
     }
 
     return associated, nil
+}
+
+func paginate(db *gorm.DB, page, limit int, out interface{}) (models.PaginatedResponse, error) {
+    var total int64
+    if err := db.Model(&models.{{.StructName}}{}).Count(&total).Error; err != nil {
+        return models.PaginatedResponse{}, err
+    }
+
+    totalPages := int(math.Ceil(float64(total) / float64(limit)))
+    offset := (page - 1) * limit
+
+    if err := db.Preload(clause.Associations).Limit(limit).Offset(offset).Find(out).Error; err != nil {
+        return models.PaginatedResponse{}, err
+    }
+
+    pagination := models.Pagination{
+        Total:      total,
+        Page:       page,
+        PageSize:   limit,
+        TotalPages: totalPages,
+    }
+
+    return models.PaginatedResponse{
+        Data:       out,
+        Pagination: pagination,
+    }, nil
 }
