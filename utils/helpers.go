@@ -315,3 +315,90 @@ func RemoveModuleInitializer(content []byte, pluralName string) []byte {
 
 	return bytes.Join(newLines, []byte("\n"))
 }
+
+// UpdateSeedersFile updates the app/init.go file to register a new seeder.
+func UpdateSeedersFile(singularName, packageName string) error {
+	initFilePath := "app/init.go"
+
+	// Read the current content of init.go
+	content, err := os.ReadFile(initFilePath)
+	if err != nil {
+		return err
+	}
+
+	// Add import for the new seeder if it doesn't exist
+	importStr := fmt.Sprintf("\"base/app/%s\"", packageName)
+	content, importAdded := AddImport(content, importStr)
+
+	// Add seeder initializer if it doesn't exist
+	content, seederAdded := AddSeederInitializer(content, singularName, packageName)
+
+	// Write the updated content back to init.go only if changes were made
+	if importAdded || seederAdded {
+		return os.WriteFile(initFilePath, content, 0644)
+	}
+
+	return nil
+}
+
+// AddSeederInitializer adds a seeder to the InitializeSeeders function.
+func AddSeederInitializer(content []byte, structName, packageName string) ([]byte, bool) {
+
+	// Find the InitializeSeeders function
+	funcIndex := bytes.Index(content, []byte("func InitializeSeeders() []module.Seeder {"))
+	if funcIndex == -1 {
+		return content, false
+	}
+
+	// Find the position to insert the new seeder (before the closing bracket of the seeders slice)
+	seedersIndex := bytes.Index(content[funcIndex:], []byte("}"))
+	if seedersIndex == -1 {
+		return content, false
+	}
+	insertPos := funcIndex + seedersIndex
+
+	// Check if the seeder already exists
+	seederLine := fmt.Sprintf("&%s.%sSeeder{},", packageName, structName)
+	if bytes.Contains(content, []byte(seederLine)) {
+		return content, false
+	}
+
+	// Insert the new seeder
+	newSeeder := fmt.Sprintf("\t\t%s\n", seederLine)
+	updatedContent := append(content[:insertPos], append([]byte(newSeeder), content[insertPos:]...)...)
+
+	return updatedContent, true
+}
+
+// RemoveSeederInitializer removes a seeder from the InitializeSeeders function.
+func RemoveSeederInitializer(content []byte, structName, packageName string) []byte {
+	// Find the InitializeSeeders function
+	funcIndex := bytes.Index(content, []byte("func InitializeSeeders() []module.Seeder {"))
+	if funcIndex == -1 {
+		return content
+	}
+
+	// Find the position of the seeder to remove
+	seederLine := fmt.Sprintf("&%s.%sSeeder{},", packageName, structName)
+	seederIndex := bytes.Index(content[funcIndex:], []byte(seederLine))
+	if seederIndex == -1 {
+		return content
+	}
+
+	// Find the start of the line
+	startIndex := funcIndex + seederIndex
+	for startIndex > 0 && content[startIndex] != '\n' {
+		startIndex--
+	}
+
+	// Find the end of the line
+	endIndex := funcIndex + seederIndex
+	for endIndex < len(content) && content[endIndex] != '\n' {
+		endIndex++
+	}
+
+	// Remove the seeder line
+	updatedContent := append(content[:startIndex], content[endIndex+1:]...)
+
+	return updatedContent
+}

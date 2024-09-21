@@ -85,6 +85,11 @@ func generateModule(cmd *cobra.Command, args []string) {
 		fmt.Printf("Error updating app/init.go: %v\n", err)
 		return
 	}
+	// Update seeders in app/seed.go
+	if err := utils.UpdateSeedersFile(structName, packageName); err != nil {
+		fmt.Printf("Error updating seeders in app/seed.go: %v\n", err)
+		return
+	}
 
 	adminFlag, _ := cmd.Flags().GetBool("admin")
 	if adminFlag {
