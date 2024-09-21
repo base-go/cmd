@@ -13,15 +13,19 @@ func (s *{{.StructName}}Seeder) Seed(db *gorm.DB) error {
 	{{.LowerPluralStructName}} := []models.Create{{.StructName}}Request{
 		{
 			{{- range .SeederFields}}
-			{{- if ne .Relationship "has_many"}}
+			{{- if eq .Relationship "belongs_to"}}
 			{{.Name}}ID: {{.DefaultValue}},
+			{{- else if eq .Relationship ""}}
+			{{.Name}}: {{.DefaultValue}},
 			{{- end}}
 			{{- end}}
 		},
 		{
 			{{- range .SeederFields}}
-			{{- if ne .Relationship "has_many"}}
+			{{- if eq .Relationship "belongs_to"}}
 			{{.Name}}ID: {{.DefaultValue}},
+			{{- else if eq .Relationship ""}}
+			{{.Name}}: {{.DefaultValue}},
 			{{- end}}
 			{{- end}}
 		},
@@ -30,7 +34,9 @@ func (s *{{.StructName}}Seeder) Seed(db *gorm.DB) error {
 	for _, req := range {{.LowerPluralStructName}} {
 		{{.LowerStructName}} := models.{{.StructName}}{
 			{{- range .SeederFields}}
-			{{- if ne .Relationship "has_many"}}
+			{{- if eq .Relationship "belongs_to"}}
+			{{.Name}}ID: req.{{.Name}}ID,
+			{{- else if eq .Relationship ""}}
 			{{.Name}}: req.{{.Name}},
 			{{- end}}
 			{{- end}}

@@ -147,9 +147,17 @@ func GenerateSeederFieldStructs(fields []FieldStruct) []SeederFieldStruct {
 
 	for _, field := range fields {
 		seederField := SeederFieldStruct{
-			FieldStruct:  field,
-			DefaultValue: getDefaultValue(field.Type),
+			FieldStruct: field,
 		}
+
+		if field.Relationship == "belongs_to" {
+			seederField.DefaultValue = getDefaultValue("uint") // Use uint for ID fields
+		} else if field.Relationship == "" {
+			seederField.DefaultValue = getDefaultValue(field.Type)
+		} else {
+			seederField.DefaultValue = "nil" // For has_one and has_many relationships
+		}
+
 		seederFields = append(seederFields, seederField)
 	}
 
