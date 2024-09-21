@@ -14,14 +14,14 @@ func (s *{{.StructName}}Seeder) Seed(db *gorm.DB) error {
 		{
 			{{- range .SeederFields}}
 			{{- if ne .Relationship "has_many"}}
-			{{.Name}}: {{.DefaultValue}},
+			{{.Name}}ID: {{.DefaultValue}},
 			{{- end}}
 			{{- end}}
 		},
 		{
 			{{- range .SeederFields}}
 			{{- if ne .Relationship "has_many"}}
-			{{.Name}}: {{.DefaultValue}},
+			{{.Name}}ID: {{.DefaultValue}},
 			{{- end}}
 			{{- end}}
 		},
