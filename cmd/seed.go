@@ -28,7 +28,7 @@ func seedApplication(cmd *cobra.Command, args []string) {
 	}
 
 	// Run "go run main.go"
-	goCmd := exec.Command("go", "run", "main.go seed")
+	goCmd := exec.Command("go", "run", "main.go", "seed")
 	goCmd.Stdout = os.Stdout
 	goCmd.Stderr = os.Stderr
 
