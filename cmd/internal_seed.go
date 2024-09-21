@@ -3,11 +3,10 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"plugin"
 
 	"github.com/spf13/cobra"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
@@ -29,10 +28,10 @@ func runInternalSeed(cmd *cobra.Command, args []string) {
 
 	seedName := args[0]
 
-	// Try to load the database initialization plugin
-	db, err := loadDBPlugin()
+	// Initialize the database connection
+	db, err := initDB()
 	if err != nil {
-		fmt.Printf("Error loading database plugin: %v\n", err)
+		fmt.Printf("Error initializing database: %v\n", err)
 		return
 	}
 
@@ -46,40 +45,17 @@ func runInternalSeed(cmd *cobra.Command, args []string) {
 	fmt.Println("Seeds executed successfully.")
 }
 
-func loadDBPlugin() (*gorm.DB, error) {
-	// Build the plugin
-	cmd := exec.Command("go", "build", "-buildmode=plugin", "-o", "core/db_plugin.so", "core/db_plugin.go")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("failed to build db plugin: %w", err)
-	}
+func initDB() (*gorm.DB, error) {
+	dbHost := os.Getenv("DB_HOST")
+	dbPort := os.Getenv("DB_PORT")
+	dbUser := os.Getenv("DB_USER")
+	dbPassword := os.Getenv("DB_PASSWORD")
+	dbName := os.Getenv("DB_NAME")
 
-	// Load the plugin
-	p, err := plugin.Open("core/db_plugin.so")
-	if err != nil {
-		return nil, fmt.Errorf("failed to open db plugin: %w", err)
-	}
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+		dbUser, dbPassword, dbHost, dbPort, dbName)
 
-	// Look up the InitDB symbol
-	initDBSymbol, err := p.Lookup("InitDB")
-	if err != nil {
-		return nil, fmt.Errorf("failed to find InitDB symbol: %w", err)
-	}
-
-	// Assert that initDBSymbol is of the correct type
-	initDB, ok := initDBSymbol.(func() (*gorm.DB, error))
-	if !ok {
-		return nil, fmt.Errorf("unexpected type for InitDB")
-	}
-
-	// Call InitDB to get the database connection
-	db, err := initDB()
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize database: %w", err)
-	}
-
-	return db, nil
+	return gorm.Open(mysql.Open(dsn), &gorm.Config{})
 }
 
 func runSeeds(db *gorm.DB, seedName string) error {
@@ -111,31 +87,15 @@ func seedAllFiles(db *gorm.DB, seedsDir string) error {
 }
 
 func seedSingleFile(db *gorm.DB, seedsDir, seedName string) error {
-	pluginPath := filepath.Join(seedsDir, seedName+".so")
-
-	// Compile the Go file to a shared object
-	if err := compilePlugin(seedsDir, seedName); err != nil {
-		return fmt.Errorf("error compiling plugin: %w", err)
-	}
-
-	p, err := plugin.Open(pluginPath)
+	// Here, instead of compiling and loading a plugin, you would directly call
+	// the seeding function. You'll need to implement a way to map seed names
+	// to their respective functions.
+	seeder, err := getSeedFunction(seedName)
 	if err != nil {
-		return fmt.Errorf("error opening plugin: %w", err)
+		return fmt.Errorf("error getting seed function: %w", err)
 	}
 
-	symSeeder, err := p.Lookup("Seeder")
-	if err != nil {
-		return fmt.Errorf("error looking up Seeder symbol: %w", err)
-	}
-
-	seeder, ok := symSeeder.(interface {
-		Seed(db *gorm.DB) error
-	})
-	if !ok {
-		return fmt.Errorf("unexpected type from module symbol")
-	}
-
-	if err := seeder.Seed(db); err != nil {
+	if err := seeder(db); err != nil {
 		return fmt.Errorf("error running seeder: %w", err)
 	}
 
@@ -143,11 +103,17 @@ func seedSingleFile(db *gorm.DB, seedsDir, seedName string) error {
 	return nil
 }
 
-func compilePlugin(seedsDir, seedName string) error {
-	cmd := exec.Command("go", "build", "-buildmode=plugin", "-o",
-		filepath.Join(seedsDir, seedName+".so"),
-		filepath.Join(seedsDir, seedName+".go"))
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+// Implement this function to return the appropriate seeding function
+func getSeedFunction(seedName string) (func(*gorm.DB) error, error) {
+	// This is where you'll map seed names to their respective functions
+	// For example:
+	// switch seedName {
+	// case "users":
+	//     return seedUsers, nil
+	// case "posts":
+	//     return seedPosts, nil
+	// default:
+	//     return nil, fmt.Errorf("unknown seed: %s", seedName)
+	// }
+	return nil, fmt.Errorf("getSeedFunction not implemented")
 }
