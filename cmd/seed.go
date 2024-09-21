@@ -1,9 +1,9 @@
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/spf13/cobra"
 )
@@ -19,67 +19,23 @@ func init() {
 	rootCmd.AddCommand(seedCmd)
 }
 
-func UpdateSeedFile(packageName, structName string) error {
-	seedFilePath := "app/seed.go"
+func seedApplication(cmd *cobra.Command, args []string) {
+	// Check if main.go exists in the current directory
+	if _, err := os.Stat("main.go"); os.IsNotExist(err) {
+		fmt.Println("Error: main.go not found in the current directory.")
+		fmt.Println("Make sure you are in the root directory of your Base project.")
+		return
+	}
 
-	// Read the current content of seed.go
-	content, err := os.ReadFile(seedFilePath)
+	// Run "go run main.go"
+	goCmd := exec.Command("go", "run", "main.go", "seed")
+	goCmd.Stdout = os.Stdout
+	goCmd.Stderr = os.Stderr
+
+	fmt.Println("seeding the application...")
+	err := goCmd.Run()
 	if err != nil {
-		// If the file doesn't exist, create it with the initial structure
-		if os.IsNotExist(err) {
-			initialContent := `package app
-
-import (
-	"base/core/module"
-)
-
-func InitializeSeeders() []module.Seeder {
-	seeders := []module.Seeder{
-		// Add other seeders here
+		fmt.Printf("Error seeding the application: %v\n", err)
+		return
 	}
-	return seeders
-}
-`
-			err = os.WriteFile(seedFilePath, []byte(initialContent), 0644)
-			if err != nil {
-				return err
-			}
-			content = []byte(initialContent)
-		} else {
-			return err
-		}
-	}
-
-	// Add import for the new module if it doesn't exist
-	importStr := fmt.Sprintf("\"base/app/%s\"", packageName)
-	content, importAdded := AddImport(content, importStr)
-
-	// Add seeder to the InitializeSeeders function
-	seederStr := fmt.Sprintf("\t\t&%s.%sSeeder{},", packageName, structName)
-	content, seederAdded := AddSeeder(content, seederStr)
-
-	// Write the updated content back to seed.go only if changes were made
-	if importAdded || seederAdded {
-		return os.WriteFile(seedFilePath, content, 0644)
-	}
-
-	return nil
-}
-
-func AddSeeder(content []byte, seederStr string) ([]byte, bool) {
-	// Check if the seeder already exists
-	if bytes.Contains(content, []byte(seederStr)) {
-		return content, false
-	}
-
-	// Find the position of "// Add other seeders here"
-	markerIndex := bytes.LastIndex(content, []byte("// Add other seeders here"))
-	if markerIndex == -1 {
-		return content, false
-	}
-
-	// Insert the new seeder before the marker
-	updatedContent := append(content[:markerIndex], append([]byte(seederStr+"\n\t\t"), content[markerIndex:]...)...)
-
-	return updatedContent, true
 }
