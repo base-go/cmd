@@ -47,12 +47,12 @@ func runInternalSeed(cmd *cobra.Command, args []string) {
 }
 
 func loadDBPlugin() (*gorm.DB, error) {
-	// Compile the plugin
+	// Build the plugin
 	cmd := exec.Command("go", "build", "-buildmode=plugin", "-o", "core/db_plugin.so", "core/db_plugin.go")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("failed to compile db plugin: %w", err)
+		return nil, fmt.Errorf("failed to build db plugin: %w", err)
 	}
 
 	// Load the plugin
@@ -74,7 +74,12 @@ func loadDBPlugin() (*gorm.DB, error) {
 	}
 
 	// Call InitDB to get the database connection
-	return initDB()
+	db, err := initDB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize database: %w", err)
+	}
+
+	return db, nil
 }
 
 func runSeeds(db *gorm.DB, seedName string) error {
