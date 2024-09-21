@@ -66,12 +66,13 @@ func generateModule(cmd *cobra.Command, args []string) {
 	)
 
 	// Generate other files (in singular directory with snake_case)
-	files := []string{"controller.go", "service.go", "mod.go"}
+	files := []string{"controller.go", "service.go", "mod.go", "seed.go"}
 	for _, file := range files {
+		templateName := strings.TrimSuffix(file, ".go") + ".tmpl"
 		utils.GenerateFileFromTemplate(
 			filepath.Join("app", dirName), // Use singular directory in snake_case
 			file,
-			"templates/"+strings.TrimSuffix(file, ".go")+".tmpl",
+			"templates/"+templateName,
 			structName,
 			pluralDirName, // Use plural snake_case for templates
 			packageName,
@@ -92,7 +93,6 @@ func generateModule(cmd *cobra.Command, args []string) {
 
 	fmt.Printf("Module %s generated successfully with fields: %v\n", singularName, fields)
 }
-
 func generateAdminInterface(singularName, pluralName string, fields []string) {
 	adminDir := filepath.Join("admin", pluralName)
 	if err := os.MkdirAll(adminDir, os.ModePerm); err != nil {

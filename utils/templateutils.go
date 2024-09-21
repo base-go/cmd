@@ -20,10 +20,25 @@ func init() {
 	PluralizeClient = pluralize.NewClient()
 }
 
-// Embed the templates directory
-
 //go:embed templates/*
 var TemplateFS embed.FS
+
+// FieldStruct represents a field in the model
+type FieldStruct struct {
+	Name           string
+	Type           string
+	JSONName       string
+	DBName         string
+	AssociatedType string
+	PluralType     string
+	Relationship   string
+}
+
+// SeederFieldStruct extends FieldStruct with seeder-specific information
+type SeederFieldStruct struct {
+	FieldStruct
+	DefaultValue string
+}
 
 // GenerateFileFromTemplate generates a file from a template
 func GenerateFileFromTemplate(dir, filename, templateFile, singularName, pluralName, packageName string, fields []FieldStruct) {
@@ -45,13 +60,15 @@ func GenerateFileFromTemplate(dir, filename, templateFile, singularName, pluralN
 	}
 
 	data := map[string]interface{}{
-		"PackageName":     packageName,
-		"StructName":      singularName,
-		"LowerStructName": strings.ToLower(singularName[:1]) + singularName[1:],
-		"PluralName":      pluralName,
-		"RouteName":       ToSnakeCase(singularName),
-		"Fields":          fields,
-		"TableName":       ToSnakeCase(pluralName),
+		"PackageName":           packageName,
+		"StructName":            singularName,
+		"LowerStructName":       strings.ToLower(singularName[:1]) + singularName[1:],
+		"PluralName":            pluralName,
+		"RouteName":             ToSnakeCase(singularName),
+		"Fields":                fields,
+		"TableName":             ToSnakeCase(pluralName),
+		"LowerPluralStructName": strings.ToLower(pluralName),
+		"SeederFields":          GenerateSeederFieldStructs(fields),
 	}
 
 	filePath := filepath.Join(dir, filename)
@@ -66,17 +83,6 @@ func GenerateFileFromTemplate(dir, filename, templateFile, singularName, pluralN
 	if err != nil {
 		fmt.Printf("Error executing template for %s: %v\n", filename, err)
 	}
-}
-
-// FieldStruct represents a field in the model
-type FieldStruct struct {
-	Name           string
-	Type           string
-	JSONName       string
-	DBName         string
-	AssociatedType string
-	PluralType     string
-	Relationship   string
 }
 
 // GenerateFieldStructs processes the fields and returns a slice of FieldStruct
@@ -133,6 +139,39 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 	}
 
 	return fieldStructs
+}
+
+// GenerateSeederFieldStructs generates SeederFieldStruct slice from FieldStruct slice
+func GenerateSeederFieldStructs(fields []FieldStruct) []SeederFieldStruct {
+	var seederFields []SeederFieldStruct
+
+	for _, field := range fields {
+		seederField := SeederFieldStruct{
+			FieldStruct:  field,
+			DefaultValue: getDefaultValue(field.Type),
+		}
+		seederFields = append(seederFields, seederField)
+	}
+
+	return seederFields
+}
+
+// getDefaultValue returns a default value string based on the Go type
+func getDefaultValue(goType string) string {
+	switch goType {
+	case "string":
+		return `"example_value"`
+	case "int", "int64", "uint", "uint64":
+		return "1"
+	case "float64":
+		return "1.0"
+	case "bool":
+		return "false"
+	case "time.Time":
+		return "time.Now()"
+	default:
+		return "nil"
+	}
 }
 
 // ParseTemplate parses a template string with custom functions
