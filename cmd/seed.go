@@ -4,46 +4,53 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 )
 
 var seedCmd = &cobra.Command{
-	Use:     "seed [seedName]",
+	Use:     "seed",
 	Aliases: []string{"s"},
 	Short:   "Run database seeds",
-	Long:    `Run database seeds. Use 'all' to run all seeders or specify a seeder name.`,
+	Long:    `Run all database seeds.`,
 	Run:     runSeed,
 }
 
+var projectRoot string
+
 func init() {
 	rootCmd.AddCommand(seedCmd)
+	seedCmd.Flags().StringVarP(&projectRoot, "project-root", "p", "", "Path to the project root")
 }
 
 func runSeed(cmd *cobra.Command, args []string) {
-	if len(args) == 0 {
-		fmt.Println("Error: Seed name is required. Use 'all' to run all seeders or specify a seeder name.")
-		return
-	}
-
-	// Ensure we have the necessary environment variables
-	requiredEnvVars := []string{"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME"}
-	for _, envVar := range requiredEnvVars {
-		if os.Getenv(envVar) == "" {
-			fmt.Printf("Error: %s environment variable is not set.\n", envVar)
+	if projectRoot == "" {
+		var err error
+		projectRoot, err = os.Getwd()
+		if err != nil {
+			fmt.Printf("Error getting current directory: %v\n", err)
 			return
 		}
 	}
 
-	// Run the internal seed command
-	internalCmd := exec.Command(os.Args[0], append([]string{"internal-seed"}, args...)...)
-	internalCmd.Stdout = os.Stdout
-	internalCmd.Stderr = os.Stderr
-	internalCmd.Env = os.Environ()
+	seedsPath := filepath.Join(projectRoot, "app", "seeds")
+	if _, err := os.Stat(seedsPath); os.IsNotExist(err) {
+		fmt.Printf("Error: Seeds directory not found at %s\n", seedsPath)
+		return
+	}
 
-	err := internalCmd.Run()
+	// Run the go run command
+	goCmd := exec.Command("go", "run", filepath.Join(seedsPath, "all.go"))
+	goCmd.Stdout = cmd.OutOrStdout()
+	goCmd.Stderr = cmd.ErrOrStderr()
+	goCmd.Dir = projectRoot
+
+	err := goCmd.Run()
 	if err != nil {
 		fmt.Printf("Error running seeds: %v\n", err)
 		return
 	}
+
+	fmt.Println("Seeds executed successfully.")
 }
