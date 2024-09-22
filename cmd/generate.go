@@ -93,13 +93,14 @@ func generateModule(cmd *cobra.Command, args []string) {
 
 	adminFlag, _ := cmd.Flags().GetBool("admin")
 	if adminFlag {
-		generateAdminInterface(singularName, structName, fields)
+		generateAdminInterface(singularName, utils.ToPlural(singularName), fields)
 	}
 
 	fmt.Printf("Module %s generated successfully with fields: %v\n", singularName, fields)
 }
 func generateAdminInterface(singularName, pluralName string, fields []string) {
-	adminDir := filepath.Join("admin", pluralName)
+	pluralSnakeCase := utils.ToSnakeCase(pluralName)
+	adminDir := filepath.Join("admin", pluralSnakeCase)
 	if err := os.MkdirAll(adminDir, os.ModePerm); err != nil {
 		fmt.Printf("Error creating admin directory %s: %v\n", adminDir, err)
 		return
@@ -116,7 +117,7 @@ func generateAdminInterface(singularName, pluralName string, fields []string) {
 	data := map[string]interface{}{
 		"StructName": utils.ToTitle(singularName),
 		"PluralName": utils.ToTitle(pluralName),
-		"RouteName":  pluralName,
+		"RouteName":  pluralSnakeCase,
 		"Fields":     fieldStructs,
 	}
 
@@ -140,10 +141,10 @@ func generateAdminInterface(singularName, pluralName string, fields []string) {
 	}
 
 	// Update admin/partials/nav.html
-	utils.UpdateNavFile(pluralName)
+	utils.UpdateNavFile(pluralSnakeCase)
 
 	// Update admin/index.html
-	utils.UpdateIndexFile(pluralName)
+	utils.UpdateIndexFile(pluralSnakeCase)
 
 	fmt.Printf("Admin interface for %s generated in %s\n", singularName, adminDir)
 }
