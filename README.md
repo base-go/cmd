@@ -158,6 +158,12 @@ The Base CLI automatically generates seed files for each module. To seed your da
 base seed
 ```
 
+We also provide a `replant` command to reset the database and seed fresh data:
+
+```bash
+base replant
+```
+
 **Important Note on Seeding Relationships:**
 
 When seeding data for modules with relationships, ensure that the parent records exist before seeding the child records. This should be reflected in the order of seeders in your `app/seed.go` file.
