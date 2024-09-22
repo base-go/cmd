@@ -27,7 +27,7 @@ func (s *{{.StructName}}Service) Create(req *models.Create{{.StructName}}Request
         {{.Name}}ID: req.{{.Name}}ID,
         {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
         {{.Name}}: req.{{.Name}},
-        {{- else}}
+        {{- else if ne .Relationship "has_many"}}
         {{.Name}}: req.{{.Name}},
         {{- end}}
         {{- end}}
@@ -51,8 +51,8 @@ func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName
     {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
     if req.{{.Name}} != nil {
         item.{{.Name}} = *req.{{.Name}}
-    } 
-    {{- else}}
+    }
+    {{- else if ne .Relationship "has_many"}}
     if req.{{.Name}} != nil {
         item.{{.Name}} = *req.{{.Name}}
     }

@@ -86,15 +86,16 @@ func GenerateFileFromTemplate(dir, filename, templateFile, singularName, pluralN
 }
 
 // GenerateFieldStructs processes the fields and returns a slice of FieldStruct
+
 func GenerateFieldStructs(fields []string) []FieldStruct {
 	var fieldStructs []FieldStruct
 
 	for _, field := range fields {
 		parts := strings.Split(field, ":")
 		if len(parts) >= 2 {
-			name := ToPascalCase(parts[0]) // Ensure PascalCase
+			name := ToPascalCase(parts[0])
 			fieldType := parts[1]
-			jsonName := ToSnakeCase(parts[0]) // Keep JSON names in snake_case
+			jsonName := ToSnakeCase(parts[0])
 			dbName := ToSnakeCase(parts[0])
 			var associatedType, pluralType, relationship string
 
@@ -114,15 +115,15 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 				if len(parts) > 2 {
 					associatedType = ToPascalCase(parts[2])
 					goType = "*" + associatedType
-					jsonName += ",omitempty"
+					jsonName = ToSnakeCase(name)
 				}
 			case "hasmany", "has_many":
 				relationship = "has_many"
 				if len(parts) > 2 {
 					associatedType = ToPascalCase(parts[2])
 					pluralType = PluralizeClient.Plural(ToLower(parts[2]))
-					goType = "[]" + associatedType
-					jsonName += ",omitempty"
+					goType = "[]*" + associatedType
+					jsonName = ToSnakeCase(PluralizeClient.Plural(name))
 				}
 			}
 

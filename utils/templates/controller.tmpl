@@ -17,7 +17,6 @@ func New{{.StructName}}Controller(service *{{.StructName}}Service) *{{.StructNam
         {{.StructName}}Service: service,
     }
 }
-
 func (c *{{.StructName}}Controller) Routes(router *gin.RouterGroup) {
     router.GET("/{{.RouteName}}", c.List)       // Paginated list
     router.GET("/{{.RouteName}}/all", c.ListAll) // Unpaginated list
@@ -28,14 +27,13 @@ func (c *{{.StructName}}Controller) Routes(router *gin.RouterGroup) {
     
     {{- range .Fields}}
     {{- if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
-    router.GET("/{{$.RouteName}}/:id/{{.PluralType}}", c.GetAssociated{{.Name}})
+    router.GET("/{{$.RouteName}}/:id/{{.JSONName}}", c.GetAssociated{{.Name}})
     {{- end}}
     {{- if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
     router.GET("/{{$.RouteName}}/:id/{{.JSONName}}", c.GetAssociated{{.Name}})
     {{- end}}
     {{- end}}
 }
-
 // Create method
 func (c *{{.StructName}}Controller) Create(ctx *gin.Context) {
     var req models.Create{{.StructName}}Request
