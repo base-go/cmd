@@ -275,7 +275,7 @@ func RemoveModuleInitializer(content []byte, pluralName string) []byte {
 }
 
 func UpdateSeedersFile(structName, packageName string) error {
-	seedFilePath := "app/seed.go"
+	seedFilePath := "app/init.go"
 
 	content, err := os.ReadFile(seedFilePath)
 	if err != nil {
@@ -318,7 +318,7 @@ func AddSeederInitializer(content []byte, structName, packageName string) ([]byt
 }
 
 func RemoveSeederFromSeedFile(pluralName string) error {
-	seedFilePath := "app/seed.go"
+	seedFilePath := "app/init.go"
 
 	content, err := os.ReadFile(seedFilePath)
 	if err != nil {
