@@ -293,26 +293,26 @@ func UpdateSeedersFile(structName, packageName string) error {
 
 	return nil
 }
-
 func AddSeederInitializer(content []byte, structName, packageName string) ([]byte, bool) {
-	funcIndex := bytes.Index(content, []byte("func InitializeSeeders() []module.Seeder {"))
-	if funcIndex == -1 {
+	markerComment := []byte("// SEEDER_INITIALIZER_MARKER")
+	markerIndex := bytes.Index(content, markerComment)
+	if markerIndex == -1 {
 		return content, false
 	}
 
-	seedersIndex := bytes.LastIndex(content[funcIndex:], []byte("}"))
-	if seedersIndex == -1 {
-		return content, false
-	}
-	insertPos := funcIndex + seedersIndex
+	// Find the start of the line containing the marker
+	lineStart := bytes.LastIndex(content[:markerIndex], []byte("\n")) + 1
 
 	seederLine := fmt.Sprintf("&%s.%sSeeder{},", packageName, structName)
 	if bytes.Contains(content, []byte(seederLine)) {
 		return content, false
 	}
 
-	newSeeder := fmt.Sprintf("\t\t%s\n", seederLine)
-	updatedContent := append(content[:insertPos], append([]byte(newSeeder), content[insertPos:]...)...)
+	// Create the new seeder line with proper indentation
+	newSeeder := []byte(fmt.Sprintf("\t\t%s\n\t\t", seederLine))
+
+	// Insert the new seeder line just before the marker comment
+	updatedContent := append(content[:lineStart], append(newSeeder, content[lineStart:]...)...)
 
 	return updatedContent, true
 }
@@ -331,30 +331,15 @@ func RemoveSeederFromSeedFile(pluralName string) error {
 
 	return os.WriteFile(seedFilePath, content, 0644)
 }
-
 func RemoveSeederInitializer(content []byte, pluralName string) []byte {
-	funcStart := bytes.Index(content, []byte("func InitializeSeeders() []module.Seeder {"))
-	if funcStart == -1 {
-		return content
-	}
-
-	funcEnd := bytes.Index(content[funcStart:], []byte("}"))
-	if funcEnd == -1 {
-		return content
-	}
-	funcEnd += funcStart
-
-	functionContent := content[funcStart:funcEnd]
-
-	lines := bytes.Split(functionContent, []byte("\n"))
+	lines := bytes.Split(content, []byte("\n"))
 	var newLines [][]byte
+
 	for _, line := range lines {
 		if !bytes.Contains(line, []byte(fmt.Sprintf("&%s.", pluralName))) {
 			newLines = append(newLines, line)
 		}
 	}
 
-	updatedFunction := bytes.Join(newLines, []byte("\n"))
-
-	return append(content[:funcStart], append(updatedFunction, content[funcEnd:]...)...)
+	return bytes.Join(newLines, []byte("\n"))
 }
