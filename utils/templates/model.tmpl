@@ -9,7 +9,7 @@ type {{.StructName}} struct {
     {{- range .Fields}}
     {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
     {{.Name}}ID uint `json:"{{.JSONName}}" gorm:"column:{{.DBName}}"`
-    {{.AssociatedType}} *{{.AssociatedType}} `json:"{{.Name | toLower}},omitempty" gorm:"foreignKey:{{.Name}}ID"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.Name | toLower}},omitempty" gorm:"foreignKey:{{.Name}}ID"`
     {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
     {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}ID"`
     {{- else if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
