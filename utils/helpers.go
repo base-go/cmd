@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"unicode"
 
@@ -342,4 +343,28 @@ func RemoveSeederInitializer(content []byte, pluralName string) []byte {
 	}
 
 	return bytes.Join(newLines, []byte("\n"))
+}
+
+func runMainWithArgument(argument string) {
+	// Check if main.go exists in the current directory
+	if _, err := os.Stat("main.go"); os.IsNotExist(err) {
+		fmt.Println("Error: main.go not found in the current directory.")
+		fmt.Println("Make sure you are in the root directory of your Base project.")
+		return
+	}
+
+	// Split the argument string into separate arguments
+	args := append([]string{"run", "main.go"}, strings.Split(argument, " ")...)
+
+	// Run "go run main.go" with the given arguments
+	goCmd := exec.Command("go", args...)
+	goCmd.Stdout = os.Stdout
+	goCmd.Stderr = os.Stderr
+
+	fmt.Printf("Running %s operation...\n", strings.Split(argument, " ")[0])
+	err := goCmd.Run()
+	if err != nil {
+		fmt.Printf("Error running %s operation: %v\n", strings.Split(argument, " ")[0], err)
+		return
+	}
 }
