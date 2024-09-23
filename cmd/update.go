@@ -32,7 +32,7 @@ func updateBaseCore(cmd *cobra.Command, args []string) {
 
 func updateCore() error {
 	// Define the core repository URL
-	coreRepoURL := "https://github.com/your-org/base-core.git"
+	coreRepoURL := "https://github.com/base-go/base.git"
 
 	// Create a temporary directory
 	tempDir, err := os.MkdirTemp("", "base-core-update")
