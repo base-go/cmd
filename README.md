@@ -1,6 +1,9 @@
-# Base - Command Line Tool for Base Framework
 
-Base is a powerful command-line tool designed to streamline development with the Base framework. It provides scaffolding, module generation, and utilities to accelerate your Go application development.
+# Base - Command Line Tool for the Base Framework
+
+Base is a powerful command-line tool designed to streamline development with the Base framework.
+It offers scaffolding, module generation, and utilities to accelerate Go application development.
+You can to seed data, import JSON files, and more with a few simple commands.
 
 ## Table of Contents
 
@@ -18,25 +21,20 @@ Base is a powerful command-line tool designed to streamline development with the
 - [Contributing](#contributing)
 - [License](#license)
 
+---
+
 ## Installation
 
-Install the Base CLI tool by running:
+You can install the Base CLI tool using one of the following methods:
 
-```bash
-curl -sSL https://raw.githubusercontent.com/base-go/cmd/main/install.sh | bash
-```
-
-This script downloads and installs the latest version of the Base CLI.
-
-Alternatively, install via `go install`:
-
-```bash
-go install github.com/base-go/cmd@latest
-```
+1. **Using the install script**:
+   ```bash
+   curl -sSL https://raw.githubusercontent.com/base-go/cmd/main/install.sh | bash
+   ```
 
 ## Getting Started
 
-After installation, verify the CLI is working:
+Verify your installation by running:
 
 ```bash
 base --help
@@ -44,79 +42,78 @@ base --help
 
 This displays the help menu with all available commands and options.
 
+---
+
 ## Commands
 
 ### `base new`
 
-Creates a new Base framework project.
+Create a new project using the Base framework.
 
-**Usage:**
-
+**Usage**:
 ```bash
 base new <project-name>
 ```
 
-**Example:**
-
+**Example**:
 ```bash
 base new myapp
 ```
 
+---
+
 ### `base generate` or `base g`
 
-Generates a new module with the specified name and fields.
+Generate a new module with specified fields and options.
 
-**Usage:**
-
+**Usage**:
 ```bash
 base g <module-name> [field:type ...] [options]
 ```
 
-**Parameters:**
+- `<module-name>`: Name of the module (e.g., `User`, `Post`)
+- `[field:type ...]`: List of fields with types
+- `[options]`: Additional flags, such as `--admin` for generating an admin interface
 
-- `<module-name>`: Name of the module (e.g., `User`, `Post`).
-- `[field:type ...]`: List of fields with types.
-- `[options]`: Additional flags like `--admin` to generate admin interface.
+**Supported Field Types**:
+- **Primitive Types**: `string`, `text`, `int`, `bool`, `float`, `time`
+- **Relationships**: `belongsTo`, `hasOne`, `hasMany`
 
-**Supported Field Types:**
-
-- **Primitive Types:**
-  - `string`
-  - `text`
-  - `int`
-  - `bool`
-  - `float`
-  - `time`
-- **Relationships:**
-  - `belongsTo`: `user:belongsTo:User`
-  - `hasOne`: `profile:hasOne:Profile`
-  - `hasMany`: `posts:hasMany:Post`
-
-**Example:**
-
+**Example**:
 ```bash
 base g User name:string email:string password:string profile:hasOne:Profile
 ```
 
+### `base destroy` or `base d`
+
+Destroy a module and its associated files.
+---
+
 ### `base start` or `base s`
 
-Starts the development server.
+Start the development server.
 
-**Usage:**
-
+**Usage**:
 ```bash
 base s
 ```
 
+---
+
 ### `base update`
 
-Updates the Base CLI to the latest version.
+Update the Base Core package to the latest version.
 
-**Usage:**
-
+**Usage**:
 ```bash
 base update
 ```
+
+### `base upgrade`
+
+Upgrade the Base CLI tool to the latest version.
+
+---
 
 ## Examples
 
@@ -130,11 +127,11 @@ cd myapp
 go mod tidy
 ```
 
+---
+
 ### Generating Modules
 
-#### Example: Blog System
-
-Let's create a simple blog system with users, posts, and comments:
+#### Blog System Example:
 
 ```bash
 # Generate User module
@@ -150,25 +147,26 @@ base g Comment content:text user:belongsTo:User post:belongsTo:Post
 base g Category name:string description:text --admin
 ```
 
+---
+
 ### Seeding Data
 
-The Base CLI automatically generates seed files for each module. To seed your database with initial data, use the following command:
+Base CLI automatically generates seed files for each module. To seed your database with initial data, use:
 
 ```bash
 base seed
 ```
 
-We also provide a `replant` command to reset the database and seed fresh data:
+To reset and seed fresh data:
 
 ```bash
 base replant
 ```
 
-**Important Note on Seeding Relationships:**
+**Important Note on Seeding Relationships**:
+Ensure parent records are seeded before child records. Adjust the order in `app/seed.go` accordingly.
 
-When seeding data for modules with relationships, ensure that the parent records exist before seeding the child records. This should be reflected in the order of seeders in your `app/seed.go` file.
-
-Example of correct seeder initialization order in `app/seed.go`:
+Example:
 
 ```go
 func InitializeSeeders() []module.Seeder {
@@ -177,116 +175,82 @@ func InitializeSeeders() []module.Seeder {
         &category.CategorySeeder{},// Independent
         &post.PostSeeder{},        // Child of User
         &comment.CommentSeeder{},  // Child of User and Post
-        // Add other seeders in the correct order
-        // SEEDER_INITIALIZER_MARKER - Do not remove this comment
     }
 }
 ```
 
-This order ensures that:
-1. Users are seeded first (parent)
-2. Categories are seeded (independent)
-3. Posts are seeded (child of User)
-4. Comments are seeded last (child of both User and Post)
+---
+### Feeding Data
+Base CLI provides a flexible way to import JSON data into your database. You can map JSON fields to database columns using the `base feed` command.
 
-When customizing seed data, maintain this order to avoid foreign key constraint violations.
+## Base Feed Command
 
-# Base Feed Command
+The `base feed` command imports JSON data into your database with flexible field mapping options.
 
-The `base feed` command is a flexible tool for importing JSON data into your database tables. It offers various ways to map JSON fields to database columns.
+### Basic Syntax
 
-## Basic Syntax
-
-```
+```bash
 base feed <table_name>[:<json_path>] [field_mappings...]
 ```
 
-- `<table_name>`: The name of the database table to insert data into.
-- `<json_path>` (optional): The path to the JSON file. If omitted, it defaults to `data/<table_name>.json`.
-- `[field_mappings...]` (optional): Specifications for how to map JSON fields to database columns.
+- `<table_name>`: Database table to insert data into.
+- `<json_path>` (optional): Path to the JSON file.
+- `[field_mappings...]` (optional): Mappings for JSON fields to database columns.
 
-## Usage Examples
+### Usage Examples
 
-1. **Basic usage (no mappings)**
-
-   ```
+1. **Basic usage**:
+   ```bash
    base feed users
    ```
-   This will read from `data/users.json` and insert all fields into the `users` table as-is.
 
-2. **Specifying a custom JSON file**
-
-   ```
+2. **Using a custom JSON file**:
+   ```bash
    base feed users:custom_data/my_users.json
    ```
-   This will read from `custom_data/my_users.json` and insert all fields into the `users` table as-is.
 
-3. **Simple field mapping**
-
-   ```
+3. **Simple field mapping**:
+   ```bash
    base feed users name:full_name email:user_email
    ```
-   This will map the "name" field from JSON to the "full_name" column, and "email" to "user_email". Other fields will be inserted as-is.
 
-4. **Multiple mappings from one source**
-
-   ```
+4. **Mapping one source to multiple columns**:
+   ```bash
    base feed users username:full_name username:login_name
    ```
-   This will map the "username" field from JSON to both "full_name" and "login_name" columns in the database.
 
-5. **Concatenating multiple fields**
-
-   ```
+5. **Concatenating multiple fields**:
+   ```bash
    base feed users "first_name last_name":full_name email:contact_email
    ```
-   This will concatenate "first_name" and "last_name" from JSON (with a space between) and map to the "full_name" column. It will also map "email" to "contact_email".
 
-6. **Combining all types of mappings**
-
-   ```
+6. **Combining all types of mappings**:
+   ```bash
    base feed users "first_name last_name":full_name username:login username:display_name email:contact_email
    ```
-   This command demonstrates all types of mappings:
-   - Concatenation: "first_name" and "last_name" to "full_name"
-   - Multiple targets: "username" to both "login" and "display_name"
-   - Simple mapping: "email" to "contact_email"
 
-## Behavior Notes
+---
 
-- Unmapped fields: Any JSON fields not explicitly mapped will be inserted using their original field names.
-- Missing fields: If a JSON field specified in the mapping doesn't exist, it's silently ignored.
-- Data types: The command attempts to preserve the data types from JSON. Ensure your database schema can handle the incoming data types.
-- Concatenation: When concatenating fields, only string values are used. Non-string values in concatenation are silently ignored.
-
-## Error Handling
-
-- Invalid JSON: If the JSON file can't be parsed, an error is displayed and the operation is aborted.
-- Database errors: Any errors during database insertion are displayed, but the operation continues with the next record.
-- Invalid mappings: Mappings not in the format `source:target` are ignored with a warning message.
-
-This flexible command allows for a wide range of data import scenarios, from simple one-to-one mappings to complex field concatenations and duplications.
 ## Contributing
 
-Contributions are welcome! Please follow these steps:
+Contributions are welcome! Follow these steps:
 
-1. Fork the Repository
-2. Create a Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+1. Fork the repository.
+2. Create a branch (`git checkout -b feature/AmazingFeature`).
+3. Commit your changes (`git commit -m 'Add AmazingFeature'`).
+4. Push to the branch (`git push origin feature/AmazingFeature`).
+5. Open a pull request.
 
-**Reporting Issues:**
+To report issues, use the [GitHub Issues](https://github.com/base-go/cmd/issues) page, and provide detailed information to help us address the issue promptly.
 
-- Use the [GitHub Issues](https://github.com/base-go/cmd/issues) page to report bugs or request features.
-- Provide detailed information to help us understand and address the issue promptly.
+---
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
 
 ---
 
 © 2024 Basecode LLC. All rights reserved.
 
-For more detailed information on the Base framework and its capabilities, please refer to the official documentation.
+For more information on the Base framework, refer to the official documentation.
