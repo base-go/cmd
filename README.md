@@ -191,6 +191,81 @@ This order ensures that:
 
 When customizing seed data, maintain this order to avoid foreign key constraint violations.
 
+# Base Feed Command
+
+The `base feed` command is a flexible tool for importing JSON data into your database tables. It offers various ways to map JSON fields to database columns.
+
+## Basic Syntax
+
+```
+base feed <table_name>[:<json_path>] [field_mappings...]
+```
+
+- `<table_name>`: The name of the database table to insert data into.
+- `<json_path>` (optional): The path to the JSON file. If omitted, it defaults to `data/<table_name>.json`.
+- `[field_mappings...]` (optional): Specifications for how to map JSON fields to database columns.
+
+## Usage Examples
+
+1. **Basic usage (no mappings)**
+
+   ```
+   base feed users
+   ```
+   This will read from `data/users.json` and insert all fields into the `users` table as-is.
+
+2. **Specifying a custom JSON file**
+
+   ```
+   base feed users:custom_data/my_users.json
+   ```
+   This will read from `custom_data/my_users.json` and insert all fields into the `users` table as-is.
+
+3. **Simple field mapping**
+
+   ```
+   base feed users name:full_name email:user_email
+   ```
+   This will map the "name" field from JSON to the "full_name" column, and "email" to "user_email". Other fields will be inserted as-is.
+
+4. **Multiple mappings from one source**
+
+   ```
+   base feed users username:full_name username:login_name
+   ```
+   This will map the "username" field from JSON to both "full_name" and "login_name" columns in the database.
+
+5. **Concatenating multiple fields**
+
+   ```
+   base feed users "first_name last_name":full_name email:contact_email
+   ```
+   This will concatenate "first_name" and "last_name" from JSON (with a space between) and map to the "full_name" column. It will also map "email" to "contact_email".
+
+6. **Combining all types of mappings**
+
+   ```
+   base feed users "first_name last_name":full_name username:login username:display_name email:contact_email
+   ```
+   This command demonstrates all types of mappings:
+   - Concatenation: "first_name" and "last_name" to "full_name"
+   - Multiple targets: "username" to both "login" and "display_name"
+   - Simple mapping: "email" to "contact_email"
+
+## Behavior Notes
+
+- Unmapped fields: Any JSON fields not explicitly mapped will be inserted using their original field names.
+- Missing fields: If a JSON field specified in the mapping doesn't exist, it's silently ignored.
+- Data types: The command attempts to preserve the data types from JSON. Ensure your database schema can handle the incoming data types.
+- Concatenation: When concatenating fields, only string values are used. Non-string values in concatenation are silently ignored.
+
+## Error Handling
+
+- Invalid JSON: If the JSON file can't be parsed, an error is displayed and the operation is aborted.
+- Database errors: Any errors during database insertion are displayed, but the operation continues with the next record.
+- Invalid mappings: Mappings not in the format `source:target` are ignored with a warning message.
+
+This flexible command allows for a wide range of data import scenarios, from simple one-to-one mappings to complex field concatenations and duplications.
 ## Contributing
 
 Contributions are welcome! Please follow these steps:
