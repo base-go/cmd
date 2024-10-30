@@ -34,13 +34,7 @@ type FieldStruct struct {
 	Relationship   string
 }
 
-// SeederFieldStruct extends FieldStruct with seeder-specific information
-type SeederFieldStruct struct {
-	FieldStruct
-	DefaultValue string
-}
-
-// GenerateFileFromTemplate generates a file from a template
+// Update GenerateFileFromTemplate to include sort field information
 func GenerateFileFromTemplate(dir, filename, templateFile, singularName, pluralName, packageName string, fields []FieldStruct) {
 	tmplContent, err := TemplateFS.ReadFile(templateFile)
 	if err != nil {
@@ -68,7 +62,6 @@ func GenerateFileFromTemplate(dir, filename, templateFile, singularName, pluralN
 		"Fields":                fields,
 		"TableName":             ToSnakeCase(pluralName),
 		"LowerPluralStructName": strings.ToLower(pluralName),
-		"SeederFields":          GenerateSeederFieldStructs(fields),
 	}
 
 	filePath := filepath.Join(dir, filename)
@@ -86,7 +79,6 @@ func GenerateFileFromTemplate(dir, filename, templateFile, singularName, pluralN
 }
 
 // GenerateFieldStructs processes the fields and returns a slice of FieldStruct
-
 func GenerateFieldStructs(fields []string) []FieldStruct {
 	var fieldStructs []FieldStruct
 
@@ -125,6 +117,15 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 					goType = "[]*" + associatedType
 					jsonName = ToSnakeCase(PluralizeClient.Plural(name))
 				}
+			case "sort":
+				relationship = "sort"
+				goType = "int"
+				// Ensure the field name ends with Order if it doesn't already
+				if !strings.HasSuffix(name, "Order") {
+					name = name + "Order"
+					jsonName = ToSnakeCase(name)
+					dbName = ToSnakeCase(name)
+				}
 			}
 
 			fieldStructs = append(fieldStructs, FieldStruct{
@@ -140,52 +141,4 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 	}
 
 	return fieldStructs
-}
-
-// GenerateSeederFieldStructs generates SeederFieldStruct slice from FieldStruct slice
-func GenerateSeederFieldStructs(fields []FieldStruct) []SeederFieldStruct {
-	var seederFields []SeederFieldStruct
-
-	for _, field := range fields {
-		seederField := SeederFieldStruct{
-			FieldStruct: field,
-		}
-
-		if field.Relationship == "belongs_to" {
-			seederField.DefaultValue = getDefaultValue("uint") // Use uint for ID fields
-		} else if field.Relationship == "" {
-			seederField.DefaultValue = getDefaultValue(field.Type)
-		} else {
-			seederField.DefaultValue = "nil" // For has_one and has_many relationships
-		}
-
-		seederFields = append(seederFields, seederField)
-	}
-
-	return seederFields
-}
-
-// getDefaultValue returns a default value string based on the Go type
-func getDefaultValue(goType string) string {
-	switch goType {
-	case "string":
-		return `"example_value"`
-	case "int", "int64", "uint", "uint64":
-		return "1"
-	case "float64":
-		return "1.0"
-	case "bool":
-		return "false"
-	case "time.Time":
-		return "time.Now()"
-	default:
-		return "nil"
-	}
-}
-
-// ParseTemplate parses a template string with custom functions
-func ParseTemplate(name, content string) (*template.Template, error) {
-	return template.New(name).Funcs(template.FuncMap{
-		"getInputType": GetInputType,
-	}).Parse(content)
 }

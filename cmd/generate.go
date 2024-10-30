@@ -12,7 +12,7 @@ import (
 )
 
 var generateCmd = &cobra.Command{
-	Use:     "generate [name] [field:type...] [--admin]",
+	Use:     "generate [name] [field:type...]",
 	Aliases: []string{"g"},
 	Short:   "Generate a new module",
 	Long:    `Generate a new module with the specified name and fields. Use --admin flag to generate admin interface.`,
@@ -21,7 +21,7 @@ var generateCmd = &cobra.Command{
 }
 
 func init() {
-	generateCmd.Flags().Bool("admin", false, "Generate admin interface")
+
 	rootCmd.AddCommand(generateCmd)
 }
 
@@ -42,7 +42,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 	// Create directories (singular names in snake_case)
 	dirs := []string{
 		filepath.Join("app", "models"),
-		filepath.Join("app", dirName), // Changed to snake_case singular directory
+		filepath.Join("app", pluralDirName), // Changed to snake_case singular directory
 	}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
@@ -66,11 +66,11 @@ func generateModule(cmd *cobra.Command, args []string) {
 	)
 
 	// Generate other files (in singular directory with snake_case)
-	files := []string{"controller.go", "service.go", "mod.go", "seed.go"}
+	files := []string{"controller.go", "service.go", "mod.go"}
 	for _, file := range files {
 		templateName := strings.TrimSuffix(file, ".go") + ".tmpl"
 		utils.GenerateFileFromTemplate(
-			filepath.Join("app", dirName), // Use singular directory in snake_case
+			filepath.Join("app", pluralDirName), // Use singular directory in snake_case
 			file,
 			"templates/"+templateName,
 			structName,
@@ -85,66 +85,6 @@ func generateModule(cmd *cobra.Command, args []string) {
 		fmt.Printf("Error updating app/init.go: %v\n", err)
 		return
 	}
-	// Update seeders in app/seed.go
-	if err := utils.UpdateSeedersFile(structName, packageName); err != nil {
-		fmt.Printf("Error updating seeders in app/seed.go: %v\n", err)
-		return
-	}
-
-	adminFlag, _ := cmd.Flags().GetBool("admin")
-	if adminFlag {
-		generateAdminInterface(singularName, utils.ToPlural(singularName), fields)
-	}
 
 	fmt.Printf("Module %s generated successfully with fields: %v\n", singularName, fields)
-}
-func generateAdminInterface(singularName, pluralName string, fields []string) {
-	pluralSnakeCase := utils.ToSnakeCase(pluralName)
-	adminDir := filepath.Join("admin", pluralSnakeCase)
-	if err := os.MkdirAll(adminDir, os.ModePerm); err != nil {
-		fmt.Printf("Error creating admin directory %s: %v\n", adminDir, err)
-		return
-	}
-
-	adminTemplateContent, err := utils.TemplateFS.ReadFile("templates/admin_interface.tmpl")
-	if err != nil {
-		fmt.Printf("Error reading admin template: %v\n", err)
-		return
-	}
-
-	fieldStructs := utils.GenerateFieldStructs(fields)
-
-	data := map[string]interface{}{
-		"StructName": utils.ToTitle(singularName),
-		"PluralName": utils.ToTitle(pluralName),
-		"RouteName":  pluralSnakeCase,
-		"Fields":     fieldStructs,
-	}
-
-	tmpl, err := utils.ParseTemplate("admin_interface", string(adminTemplateContent))
-	if err != nil {
-		fmt.Printf("Error parsing admin template: %v\n", err)
-		return
-	}
-
-	filePath := filepath.Join(adminDir, "index.html")
-	file, err := os.Create(filePath)
-	if err != nil {
-		fmt.Printf("Error creating file %s: %v\n", filePath, err)
-		return
-	}
-	defer file.Close()
-
-	if err := tmpl.Execute(file, data); err != nil {
-		fmt.Printf("Error executing template for index.html: %v\n", err)
-		return
-	}
-
-	// Update admin/partials/nav.html
-	utils.UpdateNavFile(pluralSnakeCase)
-
-	// Update admin/index.html
-	utils.UpdateIndexFile(pluralSnakeCase)
-
-	fmt.Printf("Admin interface for %s generated in %s\n", singularName, adminDir)
 }
