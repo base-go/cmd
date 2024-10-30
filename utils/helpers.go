@@ -113,7 +113,7 @@ func UpdateInitFile(singularName, pluralName string) error {
 
 	packageName := ToSnakeCase(singularName)
 
-	importStr := fmt.Sprintf("\"base/app/%s\"", packageName)
+	importStr := fmt.Sprintf("\"base/app/%s\"", ToSnakeCase(pluralName))
 	content, importAdded := AddImport(content, importStr)
 
 	content, initializerAdded := AddModuleInitializer(content, packageName, singularName)

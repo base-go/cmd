@@ -24,7 +24,7 @@ func (s *{{.StructName}}Service) Create(req *models.Create{{.StructName}}Request
     item := models.{{.StructName}}{
         {{- range .Fields}}
         {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
-        {{.Name}}ID: req.{{.Name}}ID,
+        {{.Name}}Id: req.{{.Name}}Id,
         {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
         {{.Name}}: req.{{.Name}},
         {{- else if ne .Relationship "has_many"}}
@@ -32,21 +32,33 @@ func (s *{{.StructName}}Service) Create(req *models.Create{{.StructName}}Request
         {{- end}}
         {{- end}}
     }
+
+    {{range .Fields}}{{if eq .Relationship "sort"}}
+    // Set initial sort order if not set
+    if item.{{.Name}} == 0 {
+        var maxOrder int
+        if err := s.DB.Model(&models.{{$.StructName}}{}).Select("COALESCE(MAX({{.DBName}}), -1)").Scan(&maxOrder).Error; err != nil {
+            return nil, err
+        }
+        item.{{.Name}} = maxOrder + 1
+    }
+    {{end}}{{end}}
+
     if err := s.DB.Create(&item).Error; err != nil {
         return nil, err
     }
-    return s.GetByID(item.ID)
+    return s.GetById(item.Id)
 }
 
 func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName}}Request) (*models.{{.StructName}}, error) {
-    item, err := s.GetByID(id)
+    item, err := s.GetById(id)
     if err != nil {
         return nil, err
     }
     {{- range .Fields}}
     {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
-    if req.{{.Name}}ID != nil {
-        item.{{.Name}}ID = *req.{{.Name}}ID
+    if req.{{.Name}}Id != nil {
+        item.{{.Name}}Id = *req.{{.Name}}Id
     }
     {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
     if req.{{.Name}} != nil {
@@ -61,10 +73,10 @@ func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName
     if err := s.DB.Save(item).Error; err != nil {
         return nil, err
     }
-    return s.GetByID(id)
+    return s.GetById(id)
 }
 
-func (s *{{.StructName}}Service) GetByID(id uint) (*models.{{.StructName}}, error) {
+func (s *{{.StructName}}Service) GetById(id uint) (*models.{{.StructName}}, error) {
     var item models.{{.StructName}}
     if err := s.DB.Preload(clause.Associations).First(&item, id).Error; err != nil {
         return nil, err
@@ -72,12 +84,11 @@ func (s *{{.StructName}}Service) GetByID(id uint) (*models.{{.StructName}}, erro
     return &item, nil
 }
 
-
 func (s *{{.StructName}}Service) GetAll(page *int, limit *int) (*types.PaginatedResponse, error) {
     query := s.DB.Model(&models.{{.StructName}}{})
-    {{if .HasSort}}
-    query = query.Order("sort_order asc")
-    {{end}}
+    {{range .Fields}}{{if eq .Relationship "sort"}}
+    query = query.Order("{{.DBName}} asc")
+    {{end}}{{end}}
 
     if page != nil && limit != nil {
         var items []*models.{{.StructName}}
@@ -106,41 +117,6 @@ func (s *{{.StructName}}Service) GetAll(page *int, limit *int) (*types.Paginated
     return &response, nil
 }
 
-{{if .HasSort}}
-// GetSorted returns all items sorted by sort_order
-func (s *{{.StructName}}Service) GetSorted() ([]*models.{{.StructName}}, error) {
-    var items []*models.{{.StructName}}
-    if err := s.DB.Preload(clause.Associations).Order("sort_order asc").Find(&items).Error; err != nil {
-        return nil, err
-    }
-    return items, nil
-}
-
-// UpdateSort updates the sort order of items
-func (s *{{.StructName}}Service) UpdateSort(sortedIds []uint) error {
-    return s.DB.Transaction(func(tx *gorm.DB) error {
-        for order, id := range sortedIds {
-            if err := tx.Model(&models.{{.StructName}}{}).Where("id = ?", id).Update("sort_order", order).Error; err != nil {
-                return err
-            }
-        }
-        return nil
-    })
-}
-
-// BeforeCreate hook to set initial sort_order if not set
-func (s *{{.StructName}}Service) BeforeCreate(item *models.{{.StructName}}) error {
-    if item.SortOrder == 0 {
-        var maxOrder int
-        if err := s.DB.Model(&models.{{.StructName}}{}).Select("COALESCE(MAX(sort_order), -1)").Scan(&maxOrder).Error; err != nil {
-            return err
-        }
-        item.SortOrder = maxOrder + 1
-    }
-    return nil
-}
-{{end}}
-
 func (s *{{.StructName}}Service) Delete(id uint) error {
     result := s.DB.Delete(&models.{{.StructName}}{}, id)
     if result.Error != nil {
@@ -151,6 +127,7 @@ func (s *{{.StructName}}Service) Delete(id uint) error {
     }
     return nil
 }
+
 {{range .Fields}}
 {{if eq .Relationship "sort"}}
 // GetSorted returns all items sorted by {{.JSONName}}
@@ -161,6 +138,7 @@ func (s *{{$.StructName}}Service) GetSorted() ([]*models.{{$.StructName}}, error
     }
     return items, nil
 }
+
 // UpdateSort updates the sort order of items
 func (s *{{$.StructName}}Service) UpdateSort(sortedIds []uint) error {
     return s.DB.Transaction(func(tx *gorm.DB) error {
@@ -174,8 +152,9 @@ func (s *{{$.StructName}}Service) UpdateSort(sortedIds []uint) error {
 }
 {{end}}
 {{end}}
+
 func (s *{{.StructName}}Service) GetAssociated(id uint, associationName string) (interface{}, error) {
-    item, err := s.GetByID(id)
+    item, err := s.GetById(id)
     if err != nil {
         return nil, err
     }
