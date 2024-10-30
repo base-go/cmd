@@ -25,13 +25,15 @@ func init() {
 	rootCmd.AddCommand(generateCmd)
 }
 
+// generateModule generates a new module with the specified name and fields.
 func generateModule(cmd *cobra.Command, args []string) {
 	singularName := args[0]
 	fields := args[1:]
 
 	// Convert singular name to snake_case for directory naming
 	dirName := utils.ToSnakeCase(singularName)
-	pluralDirName := utils.ToSnakeCase(utils.ToPlural(utils.ToLower(singularName)))
+	pluralName := utils.ToPlural(singularName)
+	pluralDirName := utils.ToSnakeCase(pluralName)
 
 	// Use PascalCase for struct naming
 	structName := utils.ToPascalCase(singularName)
@@ -60,9 +62,9 @@ func generateModule(cmd *cobra.Command, args []string) {
 		dirName+".go",
 		"templates/model.tmpl",
 		structName,
-		dirName, // snake_case singular
+		dirName,
 		"models",
-		processedFields, // Passes []FieldStruct
+		processedFields,
 	)
 
 	// Generate other files (in singular directory with snake_case)
@@ -74,14 +76,14 @@ func generateModule(cmd *cobra.Command, args []string) {
 			file,
 			"templates/"+templateName,
 			structName,
-			pluralDirName, // Use plural snake_case for templates
+			pluralDirName,
 			packageName,
-			processedFields, // Passes []FieldStruct
+			processedFields,
 		)
 	}
 
-	// Update app/init.go to register the new module (ensure correct plural form)
-	if err := utils.UpdateInitFile(utils.ToSnakeCase(singularName), utils.ToSnakeCase(utils.ToPlural(singularName))); err != nil {
+	// Update app/init.go to register the new module
+	if err := utils.UpdateInitFile(singularName, pluralName); err != nil {
 		fmt.Printf("Error updating app/init.go: %v\n", err)
 		return
 	}

@@ -96,9 +96,9 @@ func (c *{{.StructName}}Controller) Get(ctx *gin.Context) {
     ctx.JSON(http.StatusOK, item.ToResponse())
 }
 
-// List{{.StructName}} godoc
-// @Summary List {{.StructName}}s
-// @Description Get a list of {{.StructName}}s
+// List{{.PluralName}} godoc
+// @Summary List {{.PluralName}}
+// @Description Get a list of {{.PluralName}}
 // @Tags {{.StructName}}
 // @Security ApiKeyAuth
 // @Accept json
@@ -136,9 +136,9 @@ func (c *{{.StructName}}Controller) List(ctx *gin.Context) {
     ctx.JSON(http.StatusOK, paginatedResponse)
 }
 
-// ListAll{{.StructName}} godoc
-// @Summary List all {{.StructName}}s
-// @Description Get a list of all {{.StructName}}s without pagination
+// ListAll{{.PluralName}} godoc
+// @Summary List all {{.PluralName}}
+// @Description Get a list of all {{.PluralName}} without pagination
 // @Tags {{.StructName}}
 // @Security ApiKeyAuth
 // @Accept json
