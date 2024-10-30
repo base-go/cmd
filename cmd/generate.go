@@ -62,7 +62,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 		dirName+".go",
 		"templates/model.tmpl",
 		structName,
-		dirName,
+		pluralDirName,
 		"models",
 		processedFields,
 	)
