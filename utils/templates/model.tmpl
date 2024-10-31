@@ -6,7 +6,7 @@ import (
 )
 
 type {{.StructName}} struct {
-    gorm.Model
+    Id        uint           `json:"id" gorm:"primaryKey"`
     {{- range .Fields}}
     {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
     {{.Name}}ID uint `json:"{{.JSONName}}_id" gorm:"column:{{.DBName}}_id"`
@@ -19,6 +19,9 @@ type {{.StructName}} struct {
     {{.Name}} {{.Type}} `json:"{{.JSONName}}" gorm:"column:{{.DBName}}{{if eq .Relationship "sort"}};default:0{{end}}"`
     {{- end}}
     {{- end}}
+    CreatedAt time.Time      `json:"created_at" gorm:"created_at"`
+    UpdatedAt time.Time      `json:"updated_at" gorm:"updated_at"`
+    DeletedAt gorm.DeletedAt `json:"deleted_at,omitempty" gorm:"deleted_at"`
 }
 
 type Create{{.StructName}}Request struct {
