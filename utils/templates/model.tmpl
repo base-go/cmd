@@ -45,10 +45,8 @@ type Update{{.StructName}}Request struct {
 }
 
 type {{.StructName}}Response struct {
-    ID        uint           `json:"id"`
-    CreatedAt time.Time      `json:"created_at"`
-    UpdatedAt time.Time      `json:"updated_at"`
-    DeletedAt gorm.DeletedAt `json:"deleted_at,omitempty"`
+    Id        uint           `json:"id"`
+
     {{- range .Fields}}
     {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
     {{.Name}}ID uint `json:"{{.JSONName}}_id"`
@@ -61,6 +59,9 @@ type {{.StructName}}Response struct {
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end}}
     {{- end}}
+    CreatedAt time.Time      `json:"created_at"`
+    UpdatedAt time.Time      `json:"updated_at"`
+    DeletedAt gorm.DeletedAt `json:"deleted_at,omitempty"`
 }
 
 func ({{.StructName}}) TableName() string {
@@ -73,10 +74,8 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
     }
 
     response := &{{.StructName}}Response{
-        ID:        item.ID,
-        CreatedAt: item.CreatedAt,
-        UpdatedAt: item.UpdatedAt,
-        DeletedAt: item.DeletedAt,
+        Id:        item.Id,
+
         {{- range .Fields}}
         {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
         {{.Name}}ID: item.{{.Name}}ID,
@@ -94,6 +93,9 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
         {{.Name}}: item.{{.Name}},
         {{- end}}
         {{- end}}
+         CreatedAt: item.CreatedAt,
+        UpdatedAt: item.UpdatedAt,
+        DeletedAt: item.DeletedAt,
     }
 
     {{- range .Fields}}
