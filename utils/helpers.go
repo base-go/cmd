@@ -60,6 +60,10 @@ func ToSnakeCase(s string) string {
 	return result.String()
 }
 
+func ToKebabCase(s string) string {
+	return strings.ReplaceAll(ToSnakeCase(s), "_", "-")
+}
+
 func ToCamelCase(s string) string {
 	s = ToPascalCase(s)
 	if len(s) == 0 {
