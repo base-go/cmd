@@ -153,7 +153,7 @@ func (c *{{.StructName}}Controller) ListAll(ctx *gin.Context) {
         return
     }
 
-    ctx.JSON(http.StatusOK, paginatedResponse)
+    ctx.JSON(http.StatusOctx.JSON(http.StatusOK, paginatedResponse)
 }
 
 // Update{{.StructName}} godoc
@@ -274,7 +274,7 @@ func (c *{{$.StructName}}Controller) UpdateSort(ctx *gin.Context) {
 }
 {{end}}
 
-{{- if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
+{{if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
 // GetAssociated{{.Name}} godoc
 // @Summary Get associated {{.Name}} for a {{$.StructName}}
 // @Description Get all associated {{.Name}} for a specific {{$.StructName}}
@@ -290,21 +290,29 @@ func (c *{{$.StructName}}Controller) UpdateSort(ctx *gin.Context) {
 func (c *{{$.StructName}}Controller) GetAssociated{{.Name}}(ctx *gin.Context) {
     id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
     if err != nil {
-        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid id format"})
+        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid ID format"})
         return
     }
 
-    associated, err := c.{{$.StructName}}Service.GetAssociated(uint(id), "{{.Name}}")
+    items, err := c.{{$.StructName}}Service.Get{{.Name}}(uint(id))
     if err != nil {
-        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch associated {{.Name}}: " + err.Error()})
+        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch {{.Name}}: " + err.Error()})
         return
     }
 
-    ctx.JSON(http.StatusOK, associated)
-}
-{{- end}}
+    // Convert to response type
+    responses := make([]models.{{.AssociatedType}}Response, len(items))
+    for i, item := range items {
+        if item != nil {
+            responses[i] = *item.ToResponse()
+        }
+    }
 
-{{- if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
+    ctx.JSON(http.StatusOK, responses)
+}
+{{end}}
+
+{{if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
 // GetAssociated{{.Name}} godoc
 // @Summary Get associated {{.Name}} for a {{$.StructName}}
 // @Description Get associated {{.Name}} for a specific {{$.StructName}}
@@ -320,20 +328,25 @@ func (c *{{$.StructName}}Controller) GetAssociated{{.Name}}(ctx *gin.Context) {
 func (c *{{$.StructName}}Controller) GetAssociated{{.Name}}(ctx *gin.Context) {
     id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
     if err != nil {
-        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid id format"})
+        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid ID format"})
         return
     }
 
-    associated, err := c.{{$.StructName}}Service.GetAssociated(uint(id), "{{.Name}}")
+    item, err := c.{{$.StructName}}Service.Get{{.Name}}(uint(id))
     if err != nil {
-        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch associated {{.Name}}: " + err.Error()})
+        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch {{.Name}}: " + err.Error()})
         return
     }
 
-    ctx.JSON(http.StatusOK, associated)
+    if item == nil {
+        ctx.JSON(http.StatusNotFound, ErrorResponse{Error: "Associated {{.Name}} not found"})
+        return
+    }
+
+    ctx.JSON(http.StatusOK, item.ToResponse())
 }
-{{- end}}
-{{- end}}
+{{end}}
+{{end}}
 
 type ErrorResponse struct {
     Error string `json:"error"`

@@ -151,21 +151,41 @@ func (s *{{$.StructName}}Service) UpdateSort(sortedIds []uint) error {
     })
 }
 {{end}}
-{{end}}
 
-func (s *{{.StructName}}Service) GetAssociated(id uint, associationName string) (interface{}, error) {
+{{if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
+// Get{{.Name}} returns all {{.Name}} for a {{$.StructName}}
+func (s *{{$.StructName}}Service) Get{{.Name}}(id uint) ([]*models.{{.AssociatedType}}, error) {
     item, err := s.GetById(id)
     if err != nil {
         return nil, err
     }
 
-    var associated interface{}
-    if err := s.DB.Model(item).Association(associationName).Find(&associated); err != nil {
+    var associated []*models.{{.AssociatedType}}
+    if err := s.DB.Model(item).Association("{{.Name}}").Find(&associated); err != nil {
         return nil, err
     }
 
     return associated, nil
 }
+{{end}}
+
+{{if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
+// Get{{.Name}} returns the {{.Name}} for a {{$.StructName}}
+func (s *{{$.StructName}}Service) Get{{.Name}}(id uint) (*models.{{.AssociatedType}}, error) {
+    item, err := s.GetById(id)
+    if err != nil {
+        return nil, err
+    }
+
+    var associated models.{{.AssociatedType}}
+    if err := s.DB.Model(item).Association("{{.Name}}").Find(&associated); err != nil {
+        return nil, err
+    }
+
+    return &associated, nil
+}
+{{end}}
+{{end}}
 
 func paginate(db *gorm.DB, page, limit int, out interface{}) (types.PaginatedResponse, error) {
     var total int64

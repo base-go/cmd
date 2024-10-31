@@ -1,52 +1,54 @@
 package models
+
 import (
     "time"
     "gorm.io/gorm"
 )
+
 type {{.StructName}} struct {
-    Id        uint           `json:"id" gorm:"primarykey"`
-    CreatedAt time.Time      `json:"created_at"`
-    UpdatedAt time.Time      `json:"updated_at"`
-    DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+    gorm.Model
     {{- range .Fields}}
     {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id" gorm:"column:{{.DBName}}_id"`
-    {{.Name}} *{{.AssociatedType}} `json:"{{.Name | toLower}},omitempty" gorm:"foreignKey:{{.Name}}Id"`
+    {{.Name}}ID uint `json:"{{.JSONName}}_id" gorm:"column:{{.DBName}}_id"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.Name | toLower}},omitempty" gorm:"foreignKey:{{.Name}}ID"`
     {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}ID"`
     {{- else if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
-    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id"`
+    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}ID"`
     {{- else}}
-    {{.Name}} {{.Type}} `json:"{{.JSONName}}" gorm:"column:{{.DBName}}"`
+    {{.Name}} {{.Type}} `json:"{{.JSONName}}" gorm:"column:{{.DBName}}{{if eq .Relationship "sort"}};default:0{{end}}"`
     {{- end}}
     {{- end}}
 }
+
 type Create{{.StructName}}Request struct {
     {{- range .Fields}}
     {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id"`
-    {{- else if ne (or (eq .Relationship "has_many") (eq .Relationship "hasMany")) true }}
-    {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
+    {{.Name}}ID uint `json:"{{.JSONName}}_id" binding:"required"`
+    {{- else if ne (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne")) true }}
+    {{.Name}} {{.Type}} `json:"{{.JSONName}}"{{if not (eq .Relationship "sort")}} binding:"required"{{end}}`
     {{- end}}
     {{- end}}
 }
+
 type Update{{.StructName}}Request struct {
     {{- range .Fields}}
     {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
-    {{.Name}}Id *uint `json:"{{.JSONName}}_id,omitempty"`
-    {{- else if ne (or (eq .Relationship "has_many") (eq .Relationship "hasMany")) true }}
+    {{.Name}}ID *uint `json:"{{.JSONName}}_id,omitempty"`
+    {{- else if ne (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne")) true }}
     {{.Name}} *{{.Type}} `json:"{{.JSONName}},omitempty"`
     {{- end}}
     {{- end}}
 }
+
 type {{.StructName}}Response struct {
-    Id        uint      `json:"id"`
-    CreatedAt time.Time `json:"created_at"`
-    UpdatedAt time.Time `json:"updated_at"`
-    DeletedAt time.Time `json:"deleted_at,omitempty"`
+    ID        uint           `json:"id"`
+    CreatedAt time.Time      `json:"created_at"`
+    UpdatedAt time.Time      `json:"updated_at"`
+    DeletedAt gorm.DeletedAt `json:"deleted_at,omitempty"`
     {{- range .Fields}}
     {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id"`
+    {{.Name}}ID uint `json:"{{.JSONName}}_id"`
     {{.Name}} *{{.AssociatedType}}Response `json:"{{.Name | toLower}},omitempty"`
     {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
     {{.Name}} *{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
@@ -57,42 +59,53 @@ type {{.StructName}}Response struct {
     {{- end}}
     {{- end}}
 }
+
 func ({{.StructName}}) TableName() string {
     return "{{.TableName}}"
 }
+
 func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
     if item == nil {
         return nil
     }
+
     response := &{{.StructName}}Response{
-        Id:        item.Id,
+        ID:        item.ID,
         CreatedAt: item.CreatedAt,
         UpdatedAt: item.UpdatedAt,
-        DeletedAt: item.DeletedAt.Time,
+        DeletedAt: item.DeletedAt,
         {{- range .Fields}}
         {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
-        {{.Name}}Id: item.{{.Name}}Id,
+        {{.Name}}ID: item.{{.Name}}ID,
         {{.Name}}: item.{{.Name}}.ToResponse(),
         {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
-        {{.Name}}: item.{{.Name}}.ToResponse(),
+        {{.Name}}: func() *{{.AssociatedType}}Response {
+            if item.{{.Name}} == nil {
+                return nil
+            }
+            return item.{{.Name}}.ToResponse()
+        }(),
         {{- else if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
-        {{.Name}}: make([]{{.AssociatedType}}Response, len(item.{{.Name}})),
+        {{.Name}}: make([]{{.AssociatedType}}Response, 0, len(item.{{.Name}})),
         {{- else}}
         {{.Name}}: item.{{.Name}},
         {{- end}}
         {{- end}}
     }
+
     {{- range .Fields}}
     {{- if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
-    for i, v := range item.{{.Name}} {
+    for _, v := range item.{{.Name}} {
         if v != nil {
-            response.{{.Name}}[i] = *v.ToResponse()
+            response.{{.Name}} = append(response.{{.Name}}, *v.ToResponse())
         }
     }
     {{- end}}
     {{- end}}
+
     return response
 }
+
 func (item *{{.StructName}}) Preload(db *gorm.DB) *gorm.DB {
     {{- range .Fields}}
     {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo") (eq .Relationship "has_one") (eq .Relationship "hasOne") (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
