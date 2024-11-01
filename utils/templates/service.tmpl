@@ -110,11 +110,9 @@ func (s *{{.StructName}}Service) GetAll(page *int, limit *int, search *string) (
         }
     }
 
-    {{- range .Fields}}
-    {{- if eq .Relationship "sort"}}
+    {{range .Fields}}{{if eq .Relationship "sort"}}
     query = query.Order("{{.DBName}} asc")
-    {{- end}}
-    {{- end}}
+    {{end}}{{end}}
 
     if page != nil && limit != nil {
         var items []*models.{{.StructName}}
