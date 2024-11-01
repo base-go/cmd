@@ -84,34 +84,42 @@ func (s *{{.StructName}}Service) GetById(id uint) (*models.{{.StructName}}, erro
     return &item, nil
 }
 
-
 func (s *{{.StructName}}Service) GetAll(page *int, limit *int, search *string) (*types.PaginatedResponse, error) {
     query := s.DB.Model(&models.{{.StructName}}{})
 
     // Add search condition if search parameter is provided
     if search != nil && *search != "" {
         searchQuery := "%" + *search + "%"
-        query = query.Where(
-            s.DB.Where(
-                {{- $first := true -}}
-                {{- range .Fields -}}
-                {{- if and (ne .Relationship "has_many") (ne .Relationship "has_one") (ne .Relationship "belongs_to") (eq .Type "string") -}}
-                    {{if $first}} "{{.DBName}} LIKE ?" {{$first = false}} {{else}} OR "{{.DBName}} LIKE ?" {{end}},
-                {{- end -}}
-                {{- end -}}
-                searchQuery,
-                {{- range .Fields -}}
-                {{- if and (ne .Relationship "has_many") (ne .Relationship "has_one") (ne .Relationship "belongs_to") (eq .Type "string") -}}
-                    searchQuery,
-                {{- end -}}
-                {{- end -}}
-            ),
-        )
+
+        // Build the WHERE clause for searching string fields
+        conditions := ""
+        searchParams := []interface{}{}
+
+        {{- $first := true -}}
+        {{- range .Fields -}}
+        {{- if and (ne .Relationship "has_many") (ne .Relationship "has_one") (ne .Relationship "belongs_to") (eq .Type "string") }}
+            {{if $first}}
+        conditions += "{{.DBName}} LIKE ?"
+            {{- else }}
+        conditions += " OR {{.DBName}} LIKE ?"
+            {{- end}}
+        searchParams = append(searchParams, searchQuery)
+            {{- $first = false -}}
+        {{- end -}}
+        {{- end}}
+
+        // Apply the search conditions if any string fields exist
+        if conditions != "" {
+            searchArgs := append([]interface{}{conditions}, searchParams...)
+            query = query.Where(searchArgs...)
+        }
     }
 
-    {{range .Fields}}{{if eq .Relationship "sort"}}
+    {{- range .Fields}}
+    {{- if eq .Relationship "sort"}}
     query = query.Order("{{.DBName}} asc")
-    {{end}}{{end}}
+    {{- end}}
+    {{- end}}
 
     if page != nil && limit != nil {
         var items []*models.{{.StructName}}
@@ -139,7 +147,6 @@ func (s *{{.StructName}}Service) GetAll(page *int, limit *int, search *string) (
 
     return &response, nil
 }
-
 
 func (s *{{.StructName}}Service) Delete(id uint) error {
     result := s.DB.Delete(&models.{{.StructName}}{}, id)

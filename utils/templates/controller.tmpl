@@ -153,7 +153,7 @@ func (c *{{.StructName}}Controller) List(ctx *gin.Context) {
 // @Failure 500 {object} ErrorResponse
 // @Router /{{.RouteName}}/all [get]
 func (c *{{.StructName}}Controller) ListAll(ctx *gin.Context) {
-    paginatedResponse, err := c.{{.StructName}}Service.GetAll(nil, nil)
+    paginatedResponse, err := c.{{.StructName}}Service.GetAll(nil, nil, nil)
     if err != nil {
         ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch all items: " + err.Error()})
         return
