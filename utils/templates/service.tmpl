@@ -3,6 +3,7 @@ package {{.PackageName}}
 import (
     "errors"
     "math"
+    "strings"
 
     "gorm.io/gorm"
     "gorm.io/gorm/clause"
@@ -92,26 +93,20 @@ func (s *{{.StructName}}Service) GetAll(page *int, limit *int, search *string) (
         searchQuery := "%" + *search + "%"
 
         // Build the WHERE clause for searching string fields
-        conditions := ""
-        searchParams := []interface{}{}
+        var conditions []string
+        var params []interface{}
 
-        {{- $first := true -}}
-        {{- range .Fields -}}
-        {{- if and (ne .Relationship "has_many") (ne .Relationship "has_one") (ne .Relationship "belongs_to") (eq .Type "string") }}
-            {{if $first}}
-        conditions += "{{.DBName}} LIKE ?"
-            {{- else }}
-        conditions += " OR {{.DBName}} LIKE ?"
-            {{- end}}
-        searchParams = append(searchParams, searchQuery)
-            {{- $first = false -}}
-        {{- end -}}
+        {{- range .Fields}}
+        {{- if and (ne .Relationship "has_many") (ne .Relationship "has_one") (ne .Relationship "belongs_to") (eq .Type "string")}}
+        conditions = append(conditions, "{{.DBName}} LIKE ?")
+        params = append(params, searchQuery)
+        {{- end}}
         {{- end}}
 
-        // Apply the search conditions if any string fields exist
-        if conditions != "" {
-            searchArgs := append([]interface{}{conditions}, searchParams...)
-            query = query.Where(searchArgs...)
+        // Apply the search conditions if any exist
+        if len(conditions) > 0 {
+            whereClause := strings.Join(conditions, " OR ")
+            query = query.Where(whereClause, params...)
         }
     }
 
