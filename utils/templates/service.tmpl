@@ -84,8 +84,31 @@ func (s *{{.StructName}}Service) GetById(id uint) (*models.{{.StructName}}, erro
     return &item, nil
 }
 
-func (s *{{.StructName}}Service) GetAll(page *int, limit *int) (*types.PaginatedResponse, error) {
+
+func (s *{{.StructName}}Service) GetAll(page *int, limit *int, search *string) (*types.PaginatedResponse, error) {
     query := s.DB.Model(&models.{{.StructName}}{})
+
+    // Add search condition if search parameter is provided
+    if search != nil && *search != "" {
+        searchQuery := "%" + *search + "%"
+        query = query.Where(
+            s.DB.Where(
+                {{- $first := true -}}
+                {{- range .Fields -}}
+                {{- if and (ne .Relationship "has_many") (ne .Relationship "has_one") (ne .Relationship "belongs_to") (eq .Type "string") -}}
+                    {{if $first}} "{{.DBName}} LIKE ?" {{$first = false}} {{else}} OR "{{.DBName}} LIKE ?" {{end}},
+                {{- end -}}
+                {{- end -}}
+                searchQuery,
+                {{- range .Fields -}}
+                {{- if and (ne .Relationship "has_many") (ne .Relationship "has_one") (ne .Relationship "belongs_to") (eq .Type "string") -}}
+                    searchQuery,
+                {{- end -}}
+                {{- end -}}
+            ),
+        )
+    }
+
     {{range .Fields}}{{if eq .Relationship "sort"}}
     query = query.Order("{{.DBName}} asc")
     {{end}}{{end}}
@@ -116,6 +139,7 @@ func (s *{{.StructName}}Service) GetAll(page *int, limit *int) (*types.Paginated
 
     return &response, nil
 }
+
 
 func (s *{{.StructName}}Service) Delete(id uint) error {
     result := s.DB.Delete(&models.{{.StructName}}{}, id)
@@ -189,7 +213,7 @@ func (s *{{$.StructName}}Service) Get{{.Name}}(id uint) (*models.{{.AssociatedTy
 
 func paginate(db *gorm.DB, page, limit int, out interface{}) (types.PaginatedResponse, error) {
     var total int64
-    if err := db.Model(&models.{{.StructName}}{}).Count(&total).Error; err != nil {
+    if err := db.Count(&total).Error; err != nil {
         return types.PaginatedResponse{}, err
     }
 

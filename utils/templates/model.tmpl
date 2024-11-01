@@ -46,7 +46,6 @@ type Update{{.StructName}}Request struct {
 
 type {{.StructName}}Response struct {
     Id        uint           `json:"id"`
-
     {{- range .Fields}}
     {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
     {{.Name}}ID uint `json:"{{.JSONName}}_id"`
@@ -93,7 +92,7 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
         {{.Name}}: item.{{.Name}},
         {{- end}}
         {{- end}}
-         CreatedAt: item.CreatedAt,
+        CreatedAt: item.CreatedAt,
         UpdatedAt: item.UpdatedAt,
         DeletedAt: item.DeletedAt,
     }

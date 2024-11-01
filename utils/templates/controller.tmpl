@@ -105,6 +105,7 @@ func (c *{{.StructName}}Controller) Get(ctx *gin.Context) {
 // @Produce json
 // @Param page query int false "Page number"
 // @Param limit query int false "Number of items per page"
+// @Param search query string false "Search term for filtering results"
 // @Success 200 {object} types.PaginatedResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
@@ -127,7 +128,12 @@ func (c *{{.StructName}}Controller) List(ctx *gin.Context) {
         return
     }
 
-    paginatedResponse, err := c.{{.StructName}}Service.GetAll(&page, &limit)
+    var search *string
+    if searchTerm := ctx.Query("search"); searchTerm != "" {
+        search = &searchTerm
+    }
+
+    paginatedResponse, err := c.{{.StructName}}Service.GetAll(&page, &limit, search)
     if err != nil {
         ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch items: " + err.Error()})
         return
