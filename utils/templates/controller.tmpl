@@ -34,9 +34,6 @@ func (c *{{.StructName}}Controller) Routes(router *gin.RouterGroup) {
     {{- if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
     router.GET("/{{$.RouteName}}/:id/{{.JSONName}}", c.GetAssociated{{.Name}})
     {{- end}}
-    {{- if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
-    router.GET("/{{$.RouteName}}/:id/{{.JSONName}}", c.GetAssociated{{.Name}})
-    {{- end}}
     {{- end}}
 }
 
@@ -244,9 +241,9 @@ func (c *{{$.StructName}}Controller) GetSorted(ctx *gin.Context) {
         return
     }
 
-    response := make([]*models.{{$.StructName}}Response, len(items))
+    response := make([]models.{{$.StructName}}Response, len(items))
     for i, item := range items {
-        response[i] = item.ToResponse()
+        response[i] = *item.ToResponse()
     }
 
     ctx.JSON(http.StatusOK, response)
@@ -315,41 +312,6 @@ func (c *{{$.StructName}}Controller) GetAssociated{{.Name}}(ctx *gin.Context) {
     }
 
     ctx.JSON(http.StatusOK, responses)
-}
-{{end}}
-
-{{if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
-// GetAssociated{{.Name}} godoc
-// @Summary Get associated {{.Name}} for a {{$.StructName}}
-// @Description Get associated {{.Name}} for a specific {{$.StructName}}
-// @Tags {{$.StructName}}
-// @Security ApiKeyAuth
-// @Accept json
-// @Produce json
-// @Param id path int true "{{$.StructName}} id"
-// @Success 200 {object} models.{{.AssociatedType}}Response
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-// @Router /{{$.RouteName}}/{id}/{{.JSONName}} [get]
-func (c *{{$.StructName}}Controller) GetAssociated{{.Name}}(ctx *gin.Context) {
-    id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
-    if err != nil {
-        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid ID format"})
-        return
-    }
-
-    item, err := c.{{$.StructName}}Service.Get{{.Name}}(uint(id))
-    if err != nil {
-        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch {{.Name}}: " + err.Error()})
-        return
-    }
-
-    if item == nil {
-        ctx.JSON(http.StatusNotFound, ErrorResponse{Error: "Associated {{.Name}} not found"})
-        return
-    }
-
-    ctx.JSON(http.StatusOK, item.ToResponse())
 }
 {{end}}
 {{end}}

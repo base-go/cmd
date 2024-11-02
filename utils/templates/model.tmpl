@@ -5,14 +5,15 @@ import (
     "gorm.io/gorm"
 )
 
+// Main model struct
 type {{.StructName}} struct {
     Id        uint           `json:"id" gorm:"primaryKey"`
     {{- range .Fields}}
     {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id" gorm:"column:{{.DBName}}_id"`
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}Id"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}Id;references:Id"`
     {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
     {{- else if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
     {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id"`
     {{- else}}
@@ -24,26 +25,22 @@ type {{.StructName}} struct {
     DeletedAt gorm.DeletedAt `json:"deleted_at,omitempty" gorm:"index"`
 }
 
-type Create{{.StructName}}Request struct {
+// Base response for list views
+type {{.StructName}}ListResponse struct {
+    Id        uint           `json:"id"`
     {{- range .Fields}}
-    {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id" binding:"required"`
-    {{- else if ne (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne")) true }}
-    {{.Name}} {{.Type}} `json:"{{.JSONName}}"{{if not (eq .Relationship "sort")}} binding:"required"{{end}}`
+    {{- if not (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne"))}}
+    {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
+    {{- end}}
+    {{- if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
+    {{.Name}}Count int64 `json:"{{.JSONName}}_count"`
     {{- end}}
     {{- end}}
+    CreatedAt time.Time      `json:"created_at"`
+    UpdatedAt time.Time      `json:"updated_at"`
 }
 
-type Update{{.StructName}}Request struct {
-    {{- range .Fields}}
-    {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
-    {{.Name}}Id *uint `json:"{{.JSONName}}_id,omitempty"`
-    {{- else if ne (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne")) true }}
-    {{.Name}} *{{.Type}} `json:"{{.JSONName}},omitempty"`
-    {{- end}}
-    {{- end}}
-}
-
+// Detailed response for single item views
 type {{.StructName}}Response struct {
     Id        uint           `json:"id"`
     {{- range .Fields}}
@@ -53,6 +50,7 @@ type {{.StructName}}Response struct {
     {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
     {{.Name}} *{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
     {{- else if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
+    {{.Name}}Count int64 `json:"{{.JSONName}}_count"`
     {{.Name}} []{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
@@ -63,30 +61,71 @@ type {{.StructName}}Response struct {
     DeletedAt gorm.DeletedAt `json:"deleted_at,omitempty"`
 }
 
+// Create request
+type Create{{.StructName}}Request struct {
+    {{- range .Fields}}
+    {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
+    {{.Name}}Id uint `json:"{{.JSONName}}_id" binding:"required"`
+    {{- else if ne (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne")) true }}
+    {{.Name}} {{.Type}} `json:"{{.JSONName}}"{{if not (eq .Relationship "sort")}} binding:"required"{{end}}`
+    {{- end}}
+    {{- end}}
+}
+
+// Update request
+type Update{{.StructName}}Request struct {
+    {{- range .Fields}}
+    {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
+    {{.Name}}Id *uint `json:"{{.JSONName}}_id,omitempty"`
+    {{- else if ne (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne")) true }}
+    {{.Name}} *{{.Type}} `json:"{{.JSONName}},omitempty"`
+    {{- end}}
+    {{- end}}
+}
+
 func ({{.StructName}}) TableName() string {
     return "{{.TableName}}"
 }
 
+// Convert to list response (used in list views)
+func (item *{{.StructName}}) ToListResponse() *{{.StructName}}ListResponse {
+    if item == nil {
+        return nil
+    }
+
+    response := &{{.StructName}}ListResponse{
+        Id: item.Id,
+        {{- range .Fields}}
+        {{- if not (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne"))}}
+        {{.Name}}: item.{{.Name}},
+        {{- end}}
+        {{- if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
+        {{.Name}}Count: int64(len(item.{{.Name}})),
+        {{- end}}
+        {{- end}}
+        CreatedAt: item.CreatedAt,
+        UpdatedAt: item.UpdatedAt,
+    }
+    return response
+}
+
+// Convert to detailed response (used in single item views)
 func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
     if item == nil {
         return nil
     }
 
     response := &{{.StructName}}Response{
-        Id:        item.Id,
+        Id: item.Id,
         {{- range .Fields}}
         {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
         {{.Name}}Id: item.{{.Name}}Id,
         {{.Name}}: item.{{.Name}}.ToResponse(),
         {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
-        {{.Name}}: func() *{{.AssociatedType}}Response {
-            if item.{{.Name}} == nil {
-                return nil
-            }
-            return item.{{.Name}}.ToResponse()
-        }(),
+        {{.Name}}: item.{{.Name}}.ToResponse(),
         {{- else if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
-        {{.Name}}: make([]{{.AssociatedType}}Response, 0, len(item.{{.Name}})),
+        {{.Name}}Count: int64(len(item.{{.Name}})),
+        {{.Name}}: make([]{{.AssociatedType}}Response, 0),
         {{- else}}
         {{.Name}}: item.{{.Name}},
         {{- end}}
@@ -98,9 +137,11 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
 
     {{- range .Fields}}
     {{- if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
-    for _, v := range item.{{.Name}} {
-        if v != nil {
-            response.{{.Name}} = append(response.{{.Name}}, *v.ToResponse())
+    if item.{{.Name}} != nil {
+        for _, v := range item.{{.Name}} {
+            if v != nil {
+                response.{{.Name}} = append(response.{{.Name}}, *v.ToResponse())
+            }
         }
     }
     {{- end}}

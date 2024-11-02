@@ -25,13 +25,14 @@ var TemplateFS embed.FS
 
 // FieldStruct represents a field in the model
 type FieldStruct struct {
-	Name           string
-	Type           string
-	JSONName       string
-	DBName         string
-	AssociatedType string
-	PluralType     string
-	Relationship   string
+	Name            string
+	Type            string
+	JSONName        string
+	DBName          string
+	AssociatedType  string
+	AssociatedTable string
+	PluralType      string
+	Relationship    string
 }
 
 // Update GenerateFileFromTemplate to include sort field information
@@ -81,7 +82,6 @@ func GenerateFileFromTemplate(dir, filename, templateFile, singularName, pluralN
 // GenerateFieldStructs processes the fields and returns a slice of FieldStruct
 func GenerateFieldStructs(fields []string) []FieldStruct {
 	var fieldStructs []FieldStruct
-
 	for _, field := range fields {
 		parts := strings.Split(field, ":")
 		if len(parts) >= 2 {
@@ -89,10 +89,8 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 			fieldType := parts[1]
 			jsonName := ToSnakeCase(parts[0])
 			dbName := ToSnakeCase(parts[0])
-			var associatedType, pluralType, relationship string
-
+			var associatedType, associatedTable, pluralType, relationship string
 			goType := GetGoType(fieldType)
-
 			switch strings.ToLower(fieldType) {
 			case "belongsto", "belongs_to":
 				relationship = "belongs_to"
@@ -116,6 +114,7 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 					pluralType = PluralizeClient.Plural(ToLower(parts[2]))
 					goType = "[]*" + associatedType
 					jsonName = ToSnakeCase(PluralizeClient.Plural(name))
+					associatedTable = ToSnakeCase(pluralType)
 				}
 			case "sort":
 				relationship = "sort"
@@ -127,18 +126,17 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 					dbName = ToSnakeCase(name)
 				}
 			}
-
 			fieldStructs = append(fieldStructs, FieldStruct{
-				Name:           name,
-				Type:           goType,
-				JSONName:       jsonName,
-				DBName:         dbName,
-				AssociatedType: associatedType,
-				PluralType:     pluralType,
-				Relationship:   relationship,
+				Name:            name,
+				Type:            goType,
+				JSONName:        jsonName,
+				DBName:          dbName,
+				AssociatedType:  associatedType,
+				AssociatedTable: associatedTable,
+				PluralType:      pluralType,
+				Relationship:    relationship,
 			})
 		}
 	}
-
 	return fieldStructs
 }

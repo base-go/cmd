@@ -52,28 +52,35 @@ func (s *{{.StructName}}Service) Create(req *models.Create{{.StructName}}Request
 }
 
 func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName}}Request) (*models.{{.StructName}}, error) {
-    item, err := s.GetById(id)
-    if err != nil {
+    // First check if item exists
+    if err := s.DB.First(&models.{{.StructName}}{}, id).Error; err != nil {
         return nil, err
     }
+
+    // Build updates map
+    updates := make(map[string]interface{})
     {{- range .Fields}}
     {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
     if req.{{.Name}}Id != nil {
-        item.{{.Name}}Id = *req.{{.Name}}Id
+        updates["{{.DBName}}_id"] = *req.{{.Name}}Id
     }
     {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
     if req.{{.Name}} != nil {
-        item.{{.Name}} = *req.{{.Name}}
+        updates["{{.DBName}}"] = *req.{{.Name}}
     }
     {{- else if ne .Relationship "has_many"}}
     if req.{{.Name}} != nil {
-        item.{{.Name}} = *req.{{.Name}}
+        updates["{{.DBName}}"] = *req.{{.Name}}
     }
     {{- end}}
     {{- end}}
-    if err := s.DB.Save(item).Error; err != nil {
+
+    // Apply updates
+    if err := s.DB.Model(&models.{{.StructName}}{}).Where("id = ?", id).Updates(updates).Error; err != nil {
         return nil, err
     }
+
+    // Return updated item
     return s.GetById(id)
 }
 
@@ -115,15 +122,47 @@ func (s *{{.StructName}}Service) GetAll(page *int, limit *int, search *string) (
     {{end}}{{end}}
 
     if page != nil && limit != nil {
-        var items []*models.{{.StructName}}
+        var items []models.{{.StructName}}Response
         paginatedResponse, err := paginate(query, *page, *limit, &items)
         if err != nil {
             return nil, err
         }
+
+        // Add counts for associated has_many relationships
+        itemIds := make([]uint, 0, len(items))
+        for i := range items {
+            itemIds = append(itemIds, items[i].Id)
+        }
+
+        {{ range .Fields }}
+        {{ if or (eq .Relationship "has_many") (eq .Relationship "hasMany") }}
+        var {{.JSONName}}Counts []struct {
+            {{$.StructName}}Id uint
+            Count int64
+        }
+        s.DB.Table("{{.AssociatedTable}}").
+            Select("{{$.TableName}}_id as {{$.StructName}}_id, count(*) as count").
+            Where("{{$.TableName}}_id IN ?", itemIds).
+            Group("{{$.TableName}}_id").
+            Scan(&{{.JSONName}}Counts)
+
+        {{.JSONName}}CountMap := make(map[uint]int64)
+        for _, c := range {{.JSONName}}Counts {
+            {{.JSONName}}CountMap[c.{{$.StructName}}Id] = c.Count
+        }
+
+        // Attach counts to items
+        for i := range items {
+            items[i].{{.Name}}Count = {{.JSONName}}CountMap[items[i].Id]
+        }
+        {{ end }}
+        {{ end }}
+
+        paginatedResponse.Data = items
         return &paginatedResponse, nil
     }
 
-    var allItems []*models.{{.StructName}}
+    var allItems []models.{{.StructName}}
     if err := query.Preload(clause.Associations).Find(&allItems).Error; err != nil {
         return nil, err
     }
@@ -175,7 +214,9 @@ func (s *{{$.StructName}}Service) UpdateSort(sortedIds []uint) error {
     })
 }
 {{end}}
+{{end}}
 
+{{range .Fields}}
 {{if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
 // Get{{.Name}} returns all {{.Name}} for a {{$.StructName}}
 func (s *{{$.StructName}}Service) Get{{.Name}}(id uint) ([]*models.{{.AssociatedType}}, error) {
@@ -192,7 +233,9 @@ func (s *{{$.StructName}}Service) Get{{.Name}}(id uint) ([]*models.{{.Associated
     return associated, nil
 }
 {{end}}
+{{end}}
 
+{{range .Fields}}
 {{if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
 // Get{{.Name}} returns the {{.Name}} for a {{$.StructName}}
 func (s *{{$.StructName}}Service) Get{{.Name}}(id uint) (*models.{{.AssociatedType}}, error) {
