@@ -161,7 +161,7 @@ func AddModuleInitializer(content []byte, packageName, singularName string) ([]b
 	}
 
 	structName := ToPascalCase(singularName)
-	pluralName := ToSnakeCase(singularName)
+	pluralName := ToSnakeCase(ToPlural(singularName))
 	newInitializer := fmt.Sprintf(`	"%s": func(db *gorm.DB, router *gin.RouterGroup) module.Module { return %s.New%sModule(db, router) },`,
 		pluralName, pluralName, structName)
 
