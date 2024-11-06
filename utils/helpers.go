@@ -152,10 +152,17 @@ func AddModuleInitializer(content []byte, packageName, singularName string) ([]b
 	contentStr := string(content)
 
 	// Find the module initializer marker
-	markerIndex := strings.Index(contentStr, "// MODULE_INITIALIZER_MARKER")
+	marker := "// MODULE_INITIALIZER_MARKER"
+	markerIndex := strings.Index(contentStr, marker)
 	if markerIndex == -1 {
 		return content, false
 	}
+
+	// Find the start of the line containing the marker
+	lineStart := strings.LastIndex(contentStr[:markerIndex], "\n") + 1
+
+	// Get the indentation from the marker line
+	indentation := contentStr[lineStart:markerIndex]
 
 	// Convert package name to proper format for map key
 	mapKeyPackageName := ToSnakeCase(packageName)
@@ -171,14 +178,15 @@ func AddModuleInitializer(content []byte, packageName, singularName string) ([]b
 	// Package name in the import path should maintain underscores
 	importPackageName := ToSnakeCase(singularName)
 
-	// Create the new initializer
-	newInitializer := fmt.Sprintf(`        "%s": func(db *gorm.DB, router *gin.RouterGroup) module.Module { return %s.New%sModule(db, router) },`,
+	// Create the new initializer with proper indentation
+	newInitializer := fmt.Sprintf(`%s"%s": func(db *gorm.DB, router *gin.RouterGroup) module.Module { return %s.New%sModule(db, router) },`,
+		indentation,       // Use the same indentation as the marker
 		mapKeyPackageName, // Use snake_case for map key
 		importPackageName, // Use snake_case for package import
 		structName)        // Use PascalCase for struct name
 
-	// Insert the new initializer before the marker
-	updatedContent := contentStr[:markerIndex] + newInitializer + "\n        " + contentStr[markerIndex:]
+	// Insert the new initializer before the marker line
+	updatedContent := contentStr[:lineStart] + newInitializer + "\n" + contentStr[lineStart:]
 
 	return []byte(updatedContent), true
 }
