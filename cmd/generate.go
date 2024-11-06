@@ -33,7 +33,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 	// Convert singular name to snake_case for directory naming
 	dirName := utils.ToSnakeCase(singularName)
 	pluralName := utils.ToPlural(singularName)
-	pluralDirName := utils.ToSnakeCase(pluralName)
+	pluralDirName := utils.ToSnakeCase(singularName)
 
 	// Use PascalCase for struct naming
 	structName := utils.ToPascalCase(singularName)
@@ -44,7 +44,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 	// Create directories (singular names in snake_case)
 	dirs := []string{
 		filepath.Join("app", "models"),
-		filepath.Join("app", pluralDirName), // Changed to snake_case singular directory
+		filepath.Join("app", dirName), // Changed to snake_case singular directory
 	}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
@@ -62,7 +62,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 		dirName+".go",
 		"templates/model.tmpl",
 		structName,
-		pluralDirName,
+		dirName,
 		"models",
 		processedFields,
 	)
@@ -72,11 +72,11 @@ func generateModule(cmd *cobra.Command, args []string) {
 	for _, file := range files {
 		templateName := strings.TrimSuffix(file, ".go") + ".tmpl"
 		utils.GenerateFileFromTemplate(
-			filepath.Join("app", pluralDirName), // Use singular directory in snake_case
+			filepath.Join("app", dirName), // Use singular directory in snake_case
 			file,
 			"templates/"+templateName,
 			structName,
-			pluralDirName,
+			dirName,
 			packageName,
 			processedFields,
 		)
