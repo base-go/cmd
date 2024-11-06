@@ -9,8 +9,8 @@ type {{.StructName}} struct {
     Id        uint           `json:"id" gorm:"primaryKey"`
     {{- range .Fields}}
     {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
-    {{.Name}}Id uint `json:"{{.JSONName}}" gorm:"column:{{.DBName}};index"`
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}Id;references:Id"`
+    {{.Name}}Id uint `json:"{{.JSONName}}"AssociatedTable gorm:"column:{{.JSONName}};index"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.DBName}},omitempty" gorm:"foreignKey:{{.Name}}Id;references:Id"`
     {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
     {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
     {{- else if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
