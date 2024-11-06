@@ -50,7 +50,6 @@ type {{.StructName}}Response struct {
     {{.Name}} *{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
     {{- else if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
     {{.Name}}Count int64 `json:"{{.JSONName}}_count"`
-    {{.Name}} []{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end}}
