@@ -151,20 +151,33 @@ func AddImport(content []byte, importStr string) ([]byte, bool) {
 func AddModuleInitializer(content []byte, packageName, singularName string) ([]byte, bool) {
 	contentStr := string(content)
 
+	// Find the module initializer marker
 	markerIndex := strings.Index(contentStr, "// MODULE_INITIALIZER_MARKER")
 	if markerIndex == -1 {
 		return content, false
 	}
 
-	if strings.Contains(contentStr[:markerIndex], fmt.Sprintf(`"%s":`, packageName)) {
+	// Convert package name to proper format for map key
+	mapKeyPackageName := ToSnakeCase(packageName)
+
+	// Check if the module already exists (using the snake_case package name)
+	if strings.Contains(contentStr[:markerIndex], fmt.Sprintf(`"%s":`, mapKeyPackageName)) {
 		return content, false
 	}
 
+	// Create properly formatted struct name (PascalCase)
 	structName := ToPascalCase(singularName)
-	singularName = ToSnakeCase(ToLower(singularName))
-	newInitializer := fmt.Sprintf(`	"%s": func(db *gorm.DB, router *gin.RouterGroup) module.Module { return %s.New%sModule(db, router) },`,
-		packageName, packageName, structName)
-	fmt.Println(newInitializer)
+
+	// Package name in the import path should maintain underscores
+	importPackageName := ToSnakeCase(singularName)
+
+	// Create the new initializer
+	newInitializer := fmt.Sprintf(`        "%s": func(db *gorm.DB, router *gin.RouterGroup) module.Module { return %s.New%sModule(db, router) },`,
+		mapKeyPackageName, // Use snake_case for map key
+		importPackageName, // Use snake_case for package import
+		structName)        // Use PascalCase for struct name
+
+	// Insert the new initializer before the marker
 	updatedContent := contentStr[:markerIndex] + newInitializer + "\n        " + contentStr[markerIndex:]
 
 	return []byte(updatedContent), true
