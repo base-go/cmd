@@ -33,7 +33,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 	// Convert singular name to snake_case for directory naming
 	dirName := utils.ToSnakeCase(singularName)
 	pluralName := utils.ToPlural(singularName)
-	pluralDirName := utils.ToSnakeCase(singularName)
+	//pluralDirName := utils.ToSnakeCase(singularName)
 
 	// Use PascalCase for struct naming
 	structName := utils.ToPascalCase(singularName)
