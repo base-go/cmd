@@ -97,8 +97,8 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 				if len(parts) > 2 {
 					associatedType = ToPascalCase(parts[2])
 					goType = "*" + associatedType
-					jsonName += ""
-					dbName += "_id"
+					jsonName += "_id"
+					dbName += ""
 				}
 			case "hasone", "has_one":
 				relationship = "has_one"
