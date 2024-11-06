@@ -11,11 +11,10 @@ type {{.StructName}} struct {
     {{- range .Fields}}
     {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id" gorm:"column:{{.DBName}}_id"`
-    {{.Name}} *models.{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}Id;references:Id"`
     {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
-    {{.Name}} *models.{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
     {{- else if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
-    {{.Name}} []*models.{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id"`
+    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}" gorm:"column:{{.DBName}}{{if eq .Relationship "sort"}};default:0{{end}}"`
     {{- end}}
