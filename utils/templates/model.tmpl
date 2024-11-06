@@ -1,3 +1,9 @@
+package models
+
+import (
+    "time"
+    "gorm.io/gorm"
+)
 // Main model struct
 type {{.StructName}} struct {
     Id        uint           `json:"id" gorm:"primaryKey"`
