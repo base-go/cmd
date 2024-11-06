@@ -32,7 +32,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 
 	// Convert singular name to snake_case for directory naming
 	dirName := utils.ToSnakeCase(singularName)
-	pluralName := utils.ToPlural(singularName)
+	//pluralName := utils.ToPlural(singularName)
 	//pluralDirName := utils.ToSnakeCase(singularName)
 
 	// Use PascalCase for struct naming
@@ -83,7 +83,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 	}
 
 	// Update app/init.go to register the new module
-	if err := utils.UpdateInitFile(singularName, pluralName); err != nil {
+	if err := utils.UpdateInitFile(singularName); err != nil {
 		fmt.Printf("Error updating app/init.go: %v\n", err)
 		return
 	}

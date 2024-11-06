@@ -107,7 +107,7 @@ func ToPlural(s string) string {
 	return pluralizeClient.Plural(s)
 }
 
-func UpdateInitFile(singularName, pluralName string) error {
+func UpdateInitFile(singularName string) error {
 	initFilePath := "app/init.go"
 
 	content, err := os.ReadFile(initFilePath)
@@ -117,7 +117,7 @@ func UpdateInitFile(singularName, pluralName string) error {
 
 	packageName := ToSnakeCase(singularName)
 
-	importStr := fmt.Sprintf("\"base/app/%s\"", ToSnakeCase(pluralName))
+	importStr := fmt.Sprintf("\"base/app/%s\"", packageName)
 	content, importAdded := AddImport(content, importStr)
 
 	content, initializerAdded := AddModuleInitializer(content, packageName, singularName)
