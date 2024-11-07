@@ -29,13 +29,10 @@ type {{.StructName}}ListResponse struct {
     Id        uint           `json:"id"`
     {{- range .Fields}}
     {{- if not (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne"))}}
-    {{.Name}}Id {{.Type}} `json:"{{.JSONName}}"`
+    {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end}}
     {{- if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
     {{.Name}}Count int64 `json:"{{.JSONName}}_count"`
-    {{- end}}
-    {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
-    {{.Name}} *{{.AssociatedType}}Response `json:"{{.DBName}},omitempty"`
     {{- end}}
     {{- end}}
     CreatedAt time.Time      `json:"created_at"`
@@ -53,7 +50,7 @@ type {{.StructName}}Response struct {
     {{.Name}} *{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
     {{- else if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
     {{.Name}}Count int64 `json:"{{.JSONName}}_count"`
-    {{.Name}} []{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
+
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end}}
@@ -98,14 +95,11 @@ func (item *{{.StructName}}) ToListResponse() *{{.StructName}}ListResponse {
     response := &{{.StructName}}ListResponse{
         Id: item.Id,
         {{- range .Fields}}
-        {{- if not (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne"))}}
-        {{.Name}}Id: item.{{.Name}}Id,
-        {{- end}}
+
         {{- if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
         {{.Name}}Count: int64(len(item.{{.Name}})),
-        {{- end}}
-        {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
-        {{.Name}}: item.{{.Name}}.ToResponse(),
+        {{- else}}
+        {{.Name}}: item.{{.Name}},
         {{- end}}
         {{- end}}
         CreatedAt: item.CreatedAt,
@@ -125,12 +119,11 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
         {{- range .Fields}}
         {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
         {{.Name}}Id: item.{{.Name}}Id,
-        {{.Name}}: item.{{.Name}}.ToResponse(),
+
         {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
         {{.Name}}: item.{{.Name}}.ToResponse(),
         {{- else if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
         {{.Name}}Count: int64(len(item.{{.Name}})),
-        {{.Name}}: make([]{{.AssociatedType}}Response, 0),
         {{- else}}
         {{.Name}}: item.{{.Name}},
         {{- end}}
@@ -140,17 +133,7 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
         DeletedAt: item.DeletedAt,
     }
 
-    {{- range .Fields}}
-    {{- if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
-    if item.{{.Name}} != nil {
-        for _, v := range item.{{.Name}} {
-            if v != nil {
-                response.{{.Name}} = append(response.{{.Name}}, *v.ToResponse())
-            }
-        }
-    }
-    {{- end}}
-    {{- end}}
+
 
     return response
 }
