@@ -29,7 +29,7 @@ type {{.StructName}}ListResponse struct {
     Id        uint           `json:"id"`
     {{- range .Fields}}
     {{- if not (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne"))}}
-    {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
+    {{.Name}}Id {{.Type}} `json:"{{.JSONName}}"`
     {{- end}}
     {{- if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
     {{.Name}}Count int64 `json:"{{.JSONName}}_count"`
@@ -99,7 +99,7 @@ func (item *{{.StructName}}) ToListResponse() *{{.StructName}}ListResponse {
         Id: item.Id,
         {{- range .Fields}}
         {{- if not (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne"))}}
-        {{.Name}}: item.{{.Name}},
+        {{.Name}}Id: item.{{.Name}}Id,
         {{- end}}
         {{- if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
         {{.Name}}Count: int64(len(item.{{.Name}})),
