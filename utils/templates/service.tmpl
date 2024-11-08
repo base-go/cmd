@@ -1,8 +1,16 @@
 package {{.PackageName}}
-
+ {{$stringFieldExists := false}}
+{{range .Fields}}
+{{if or (eq .Type "string") (eq .Type "text")}}
+{{$stringFieldExists = true}}
+{{end}}
+{{end}}
 import (
     "errors"
     "math"
+ {{if $stringFieldExists}}
+    "strings"
+    {{end}}
 
     "gorm.io/gorm"
     "gorm.io/gorm/clause"
@@ -95,12 +103,7 @@ func (s *{{.StructName}}Service) GetAll(page *int, limit *int, search *string) (
     query := s.DB.Model(&models.{{.StructName}}{})
 
     // Add search condition if search parameter is provided
-    {{$stringFieldExists := false}}
-    {{range .Fields}}
-    {{if or (eq .Type "string") (eq .Type "text")}}
-    {{$stringFieldExists = true}}
-    {{end}}
-    {{end}}
+
 
     {{if $stringFieldExists}}
     if search != nil && *search != "" {
