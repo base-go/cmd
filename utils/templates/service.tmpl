@@ -27,7 +27,7 @@ func (s *{{.StructName}}Service) Create(req *models.Create{{.StructName}}Request
         {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
         {{.Name}}Id: req.{{.Name}}Id,
         {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
-        {{.Name}}: req.{{.Name}},
+        {{.Name}}Id: req.{{.Name}}Id,
         {{- else if ne .Relationship "has_many"}}
         {{.Name}}: req.{{.Name}},
         {{- end}}
@@ -65,8 +65,8 @@ func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName
         updates["{{.DBName}}_id"] = *req.{{.Name}}Id
     }
     {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
-    if req.{{.Name}} != nil {
-        updates["{{.DBName}}"] = *req.{{.Name}}
+    if req.{{.Name}}Id != nil {
+        updates["{{.DBName}}_id"] = *req.{{.Name}}Id
     }
     {{- else if ne .Relationship "has_many"}}
     if req.{{.Name}} != nil {
@@ -96,6 +96,14 @@ func (s *{{.StructName}}Service) GetAll(page *int, limit *int, search *string) (
     query := s.DB.Model(&models.{{.StructName}}{})
 
     // Add search condition if search parameter is provided
+    {{$stringFieldExists := false}}
+    {{range .Fields}}
+    {{if or (eq .Type "string") (eq .Type "text")}}
+    {{$stringFieldExists = true}}
+    {{end}}
+    {{end}}
+
+    {{if $stringFieldExists}}
     if search != nil && *search != "" {
         searchQuery := "%" + *search + "%"
 
@@ -104,7 +112,7 @@ func (s *{{.StructName}}Service) GetAll(page *int, limit *int, search *string) (
         var params []interface{}
 
         {{- range .Fields}}
-        {{- if and (ne .Relationship "has_many") (ne .Relationship "has_one") (ne .Relationship "belongs_to") (eq .Type "string")}}
+        {{- if or (eq .Type "string") (eq .Type "text")}}
         conditions = append(conditions, "{{.DBName}} LIKE ?")
         params = append(params, searchQuery)
         {{- end}}
@@ -116,6 +124,7 @@ func (s *{{.StructName}}Service) GetAll(page *int, limit *int, search *string) (
             query = query.Where(whereClause, params...)
         }
     }
+    {{end}}
 
     {{range .Fields}}{{if eq .Relationship "sort"}}
     query = query.Order("{{.DBName}} asc")
@@ -230,6 +239,36 @@ func (s *{{$.StructName}}Service) Get{{.Name}}(id uint) ([]*models.{{.Associated
     }
 
     return associated, nil
+}
+
+// Add{{.Name}} adds a {{.AssociatedType}} to {{$.StructName}}
+func (s *{{$.StructName}}Service) Add{{.Name}}(id uint, associatedId uint) error {
+    var item models.{{$.StructName}}
+    if err := s.DB.First(&item, id).Error; err != nil {
+        return err
+    }
+
+    var associated models.{{.AssociatedType}}
+    if err := s.DB.First(&associated, associatedId).Error; err != nil {
+        return err
+    }
+
+    return s.DB.Model(&item).Association("{{.Name}}").Append(&associated)
+}
+
+// Remove{{.Name}} removes a {{.AssociatedType}} from {{$.StructName}}
+func (s *{{$.StructName}}Service) Remove{{.Name}}(id uint, associatedId uint) error {
+    var item models.{{$.StructName}}
+    if err := s.DB.First(&item, id).Error; err != nil {
+        return err
+    }
+
+    var associated models.{{.AssociatedType}}
+    if err := s.DB.First(&associated, associatedId).Error; err != nil {
+        return err
+    }
+
+    return s.DB.Model(&item).Association("{{.Name}}").Delete(&associated)
 }
 {{end}}
 {{end}}
