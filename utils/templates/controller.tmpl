@@ -1,111 +1,131 @@
 package {{.PackageName}}
 
 import (
+    "fmt"
     "net/http"
     "strconv"
 
+    "go.uber.org/zap"
     "github.com/gin-gonic/gin"
     "base/app/models"
+    "base/core/event"
+    "base/core/emitter"
 )
+
+// @title {{.StructName}} API
+// @version 1.0
+// @description API endpoints for managing {{.PluralName}}
 
 type {{.StructName}}Controller struct {
     {{.StructName}}Service *{{.StructName}}Service
+    Logger       *zap.Logger
+    EventService *event.EventService
+    Emitter     *emitter.Emitter
 }
 
-func New{{.StructName}}Controller(service *{{.StructName}}Service) *{{.StructName}}Controller {
+func New{{.StructName}}Controller(
+    service *{{.StructName}}Service,
+    logger *zap.Logger,
+    eventService *event.EventService,
+    emitter *emitter.Emitter,
+) *{{.StructName}}Controller {
     return &{{.StructName}}Controller{
         {{.StructName}}Service: service,
+        Logger:       logger,
+        EventService: eventService,
+        Emitter:     emitter,
     }
 }
 
 func (c *{{.StructName}}Controller) Routes(router *gin.RouterGroup) {
-    router.GET("/{{.RouteName}}", c.List)       // Paginated list
-    router.GET("/{{.RouteName}}/all", c.ListAll) // Unpaginated list
+    c.Logger.Info("registering {{.StructName}} routes")
+
+    router.GET("/{{.RouteName}}", c.List)
+    router.GET("/{{.RouteName}}/all", c.ListAll)
     router.GET("/{{.RouteName}}/:id", c.Get)
     router.POST("/{{.RouteName}}", c.Create)
     router.PUT("/{{.RouteName}}/:id", c.Update)
     router.DELETE("/{{.RouteName}}/:id", c.Delete)
 
-    {{- range .Fields}}
+    {{range .Fields}}
+    {{- if isFileField .}}
+    router.GET("/{{$.RouteName}}/:id/{{.JSONName}}", c.Get{{.Name}})
+    router.PUT("/{{$.RouteName}}/:id/{{.JSONName}}", c.Update{{.Name}})
+    router.DELETE("/{{$.RouteName}}/:id/{{.JSONName}}", c.Delete{{.Name}})
+    {{end}}
     {{- if eq .Relationship "sort"}}
     router.GET("/{{$.RouteName}}/sorted", c.GetSorted)
     router.PUT("/{{$.RouteName}}/sort", c.UpdateSort)
     {{- end}}
     {{- if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
     router.GET("/{{$.RouteName}}/:id/{{.JSONName}}", c.GetAssociated{{.Name}})
+    router.POST("/{{$.RouteName}}/:id/{{.JSONName}}/:associated_id", c.Add{{.Name}})
+    router.DELETE("/{{$.RouteName}}/:id/{{.JSONName}}/:associated_id", c.Remove{{.Name}})
     {{- end}}
     {{- end}}
-}
-
-// Create{{.StructName}} godoc
-// @Summary Create a new {{.StructName}}
-// @Description Create a new {{.StructName}} with the input payload
-// @Tags {{.StructName}}
-// @Security ApiKeyAuth
-// @Accept json
-// @Produce json
-// @Param {{.RouteName}} body models.Create{{.StructName}}Request true "Create {{.StructName}} request"
-// @Success 201 {object} models.{{.StructName}}Response
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-// @Router /{{.RouteName}} [post]
-func (c *{{.StructName}}Controller) Create(ctx *gin.Context) {
-    var req models.Create{{.StructName}}Request
-    if err := ctx.ShouldBindJSON(&req); err != nil {
-        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
-        return
-    }
-
-    item, err := c.{{.StructName}}Service.Create(&req)
-    if err != nil {
-        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to create item: " + err.Error()})
-        return
-    }
-
-    ctx.JSON(http.StatusCreated, item.ToResponse())
 }
 
 // Get{{.StructName}} godoc
-// @Summary Get a {{.StructName}}
-// @Description Get a {{.StructName}} by its id
+// @Summary Get a {{.StructName}} by ID
+// @Description Retrieve a {{.StructName}} by its ID
 // @Tags {{.StructName}}
-// @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Param id path int true "{{.StructName}} id"
+// @Security ApiKey
+// @Param id path int true "{{.StructName}} ID"
+{{- range .Fields}}
+{{- if isFileField .}}
+// @Accept multipart/form-data
+// @Param {{.JSONName}} formData file false "File to upload"
+{{- else if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
+// @Param {{.JSONName}} formData integer false "{{.Name}} ID"
+{{- else}}
+// @Param {{.JSONName}} formData string false "{{.Name}}"
+{{- end}}
+{{- end}}
 // @Success 200 {object} models.{{.StructName}}Response
-// @Failure 400 {object} ErrorResponse
-// @Failure 404 {object} ErrorResponse
+// @Failure 400 {object} ErrorResponse "Invalid ID format"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 404 {object} ErrorResponse "{{.StructName}} not found"
 // @Router /{{.RouteName}}/{id} [get]
 func (c *{{.StructName}}Controller) Get(ctx *gin.Context) {
     id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
     if err != nil {
+        c.Logger.Warn("invalid id format in Get request",
+            zap.String("id", ctx.Param("id")),
+            zap.Error(err))
         ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid id format"})
         return
     }
 
     item, err := c.{{.StructName}}Service.GetById(uint(id))
     if err != nil {
+        c.Logger.Error("failed to get {{.StructName}} by id",
+            zap.Uint64("id", id),
+            zap.Error(err))
         ctx.JSON(http.StatusNotFound, ErrorResponse{Error: "Item not found"})
         return
     }
 
+    c.Logger.Debug("retrieved {{.StructName}}",
+        zap.Uint64("id", id))
     ctx.JSON(http.StatusOK, item.ToResponse())
 }
 
 // List{{.PluralName}} godoc
-// @Summary List {{.PluralName}}
-// @Description Get a list of {{.PluralName}}
+// @Summary List {{.PluralName}} with pagination
+// @Description Get a paginated list of {{.PluralName}} with optional search
 // @Tags {{.StructName}}
-// @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Param page query int false "Page number"
-// @Param limit query int false "Number of items per page"
+// @Security ApiKey
+// @Param page query int false "Page number (default: 1)"
+// @Param limit query int false "Items per page (default: 10, max: 100)"
 // @Param search query string false "Search term for filtering results"
-// @Success 200 {object} types.PaginatedResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Success 200 {object} types.PaginatedResponse{data=[]models.{{.StructName}}Response}
+// @Failure 400 {object} ErrorResponse "Invalid parameters"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /{{.RouteName}} [get]
 func (c *{{.StructName}}Controller) List(ctx *gin.Context) {
     page := 1
@@ -114,14 +134,20 @@ func (c *{{.StructName}}Controller) List(ctx *gin.Context) {
     if p, err := strconv.Atoi(ctx.DefaultQuery("page", "1")); err == nil && p > 0 {
         page = p
     } else if err != nil {
-        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid 'page' parameter"})
+        c.Logger.Warn("invalid page parameter",
+            zap.String("page", ctx.Query("page")),
+            zap.Error(err))
+        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid page parameter"})
         return
     }
 
     if l, err := strconv.Atoi(ctx.DefaultQuery("limit", "10")); err == nil && l > 0 && l <= 100 {
         limit = l
     } else if err != nil {
-        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid 'limit' parameter"})
+        c.Logger.Warn("invalid limit parameter",
+            zap.String("limit", ctx.Query("limit")),
+            zap.Error(err))
+        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid limit parameter"})
         return
     }
 
@@ -130,9 +156,19 @@ func (c *{{.StructName}}Controller) List(ctx *gin.Context) {
         search = &searchTerm
     }
 
+    c.Logger.Debug("listing {{.PluralName}}",
+        zap.Int("page", page),
+        zap.Int("limit", limit),
+        zap.String("search", stringValue(search)))
+
     paginatedResponse, err := c.{{.StructName}}Service.GetAll(&page, &limit, search)
     if err != nil {
-        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch items: " + err.Error()})
+        c.Logger.Error("failed to fetch {{.PluralName}}",
+            zap.Error(err),
+            zap.Int("page", page),
+            zap.Int("limit", limit),
+            zap.String("search", stringValue(search)))
+        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch items"})
         return
     }
 
@@ -140,56 +176,141 @@ func (c *{{.StructName}}Controller) List(ctx *gin.Context) {
 }
 
 // ListAll{{.PluralName}} godoc
-// @Summary List all {{.PluralName}}
-// @Description Get a list of all {{.PluralName}} without pagination
+// @Summary List all {{.PluralName}} without pagination
+// @Description Get a complete list of {{.PluralName}} without pagination
 // @Tags {{.StructName}}
-// @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Success 200 {object} types.PaginatedResponse
-// @Failure 500 {object} ErrorResponse
+// @Security ApiKey
+// @Success 200 {object} types.PaginatedResponse{data=[]models.{{.StructName}}Response}
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /{{.RouteName}}/all [get]
 func (c *{{.StructName}}Controller) ListAll(ctx *gin.Context) {
+    c.Logger.Debug("listing all {{.PluralName}}")
+
     paginatedResponse, err := c.{{.StructName}}Service.GetAll(nil, nil, nil)
     if err != nil {
-        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch all items: " + err.Error()})
+        c.Logger.Error("failed to fetch all {{.PluralName}}",
+            zap.Error(err))
+        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch all items"})
         return
     }
 
     ctx.JSON(http.StatusOK, paginatedResponse)
 }
 
-// Update{{.StructName}} godoc
-// @Summary Update a {{.StructName}}
-// @Description Update a {{.StructName}} by its id
+// Create{{.StructName}} godoc
+// @Summary Create a new {{.StructName}}
+// @Description Create a new {{.StructName}} with the provided data
 // @Tags {{.StructName}}
-// @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Param id path int true "{{.StructName}} id"
-// @Param {{.RouteName}} body models.Update{{.StructName}}Request true "Update {{.StructName}} request"
+// @Security ApiKey
+// @Param request body models.Create{{.StructName}}Request true "Create request"
+// @Success 201 {object} models.{{.StructName}}Response
+// @Failure 400 {object} ErrorResponse "Invalid request data"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 500 {object} ErrorResponse "Internal server error"
+// @Router /{{.RouteName}} [post]
+func (c *{{.StructName}}Controller) Create(ctx *gin.Context) {
+    var req models.Create{{.StructName}}Request
+    if err := ctx.ShouldBindJSON(&req); err != nil {
+        c.Logger.Warn("invalid create request",
+            zap.Error(err))
+        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid request data"})
+        return
+    }
+
+    c.Logger.Debug("creating {{.StructName}}",
+        zap.Any("request", req))
+
+    item, err := c.{{.StructName}}Service.Create(&req)
+    if err != nil {
+        c.Logger.Error("failed to create {{.StructName}}",
+            zap.Error(err),
+            zap.Any("request", req))
+        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to create item"})
+        return
+    }
+
+    // Emit events via both systems
+    if err := c.EventService.Emitter.Emit(event.Created, event.Payload{
+        Model: "{{.StructName}}",
+        ID:    item.Id,
+    }); err != nil {
+        c.Logger.Error("failed to emit event service created event",
+            zap.Error(err),
+            zap.Uint("id", item.Id))
+    }
+
+    if c.Emitter != nil {
+        c.Emitter.Emit("{{.RouteName}}.created", item)
+    } else {
+        c.Logger.Warn("emitter is nil; cannot emit '{{.RouteName}}.created' event")
+    }
+
+    ctx.JSON(http.StatusCreated, item.ToResponse())
+}
+
+// Update{{.StructName}} godoc
+// @Summary Update a {{.StructName}}
+// @Description Update an existing {{.StructName}} by its ID
+// @Tags {{.StructName}}
+// @Accept json
+// @Produce json
+// @Security ApiKey
+// @Param id path int true "{{.StructName}} ID"
+// @Param request body models.Update{{.StructName}}Request true "Update request"
 // @Success 200 {object} models.{{.StructName}}Response
-// @Failure 400 {object} ErrorResponse
-// @Failure 404 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Failure 400 {object} ErrorResponse "Invalid request data"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 404 {object} ErrorResponse "{{.StructName}} not found"
+// @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /{{.RouteName}}/{id} [put]
 func (c *{{.StructName}}Controller) Update(ctx *gin.Context) {
     id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
     if err != nil {
+        c.Logger.Warn("invalid id format in Update request",
+            zap.String("id", ctx.Param("id")),
+            zap.Error(err))
         ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid id format"})
         return
     }
 
     var req models.Update{{.StructName}}Request
     if err := ctx.ShouldBindJSON(&req); err != nil {
-        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+        c.Logger.Warn("invalid update request",
+            zap.Uint64("id", id),
+            zap.Error(err))
+        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid request data"})
         return
     }
 
     item, err := c.{{.StructName}}Service.Update(uint(id), &req)
     if err != nil {
-        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to update item: " + err.Error()})
+        c.Logger.Error("failed to update {{.StructName}}",
+            zap.Error(err),
+            zap.Uint64("id", id),
+            zap.Any("request", req))
+        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to update item"})
         return
+    }
+
+    // Emit events via both systems
+    if err := c.EventService.Emitter.Emit(event.Updated, event.Payload{
+        Model: "{{.StructName}}",
+        ID:    item.Id,
+    }); err != nil {
+        c.Logger.Error("failed to emit event service updated event",
+            zap.Error(err),
+            zap.Uint("id", item.Id))
+    }
+
+    if c.Emitter != nil {
+        c.Emitter.Emit("{{.RouteName}}.updated", item)
+    } else {
+        c.Logger.Warn("emitter is nil; cannot emit '{{.RouteName}}.updated' event")
     }
 
     ctx.JSON(http.StatusOK, item.ToResponse())
@@ -197,47 +318,236 @@ func (c *{{.StructName}}Controller) Update(ctx *gin.Context) {
 
 // Delete{{.StructName}} godoc
 // @Summary Delete a {{.StructName}}
-// @Description Delete a {{.StructName}} by its id
+// @Description Delete a {{.StructName}} by its ID
 // @Tags {{.StructName}}
-// @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Param id path int true "{{.StructName}} id"
+// @Security ApiKey
+// @Param id path int true "{{.StructName}} ID"
 // @Success 200 {object} SuccessResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Failure 400 {object} ErrorResponse "Invalid ID format"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /{{.RouteName}}/{id} [delete]
 func (c *{{.StructName}}Controller) Delete(ctx *gin.Context) {
     id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
     if err != nil {
+        c.Logger.Warn("invalid id format in Delete request",
+            zap.String("id", ctx.Param("id")),
+            zap.Error(err))
         ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid id format"})
         return
     }
 
     if err := c.{{.StructName}}Service.Delete(uint(id)); err != nil {
-        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to delete item: " + err.Error()})
+        c.Logger.Error("failed to delete {{.StructName}}",
+            zap.Error(err),
+            zap.Uint64("id", id))
+        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to delete item"})
         return
+    }
+
+    // Emit events via both systems
+    if err := c.EventService.Emitter.Emit(event.Deleted, event.Payload{
+        Model: "{{.StructName}}",
+        ID:    uint(id),
+    }); err != nil {
+        c.Logger.Error("failed to emit event service deleted event",
+            zap.Error(err),
+            zap.Uint64("id", id))
+    }
+
+    if c.Emitter != nil {
+        c.Emitter.Emit("{{.RouteName}}.deleted", map[string]interface{}{
+            "id": id,
+        })
+    } else {
+        c.Logger.Warn("emitter is nil; cannot emit '{{.RouteName}}.deleted' event")
     }
 
     ctx.JSON(http.StatusOK, SuccessResponse{Message: "Item deleted successfully"})
 }
 
 {{range .Fields}}
+{{if isFileField .}}
+// Get{{.Name}} godoc
+// @Summary Get {{$.StructName}}'s {{.Name}} information
+// @Description Get the {{.Name}} file information for a {{$.StructName}}
+// @Tags {{$.StructName}}
+// @Accept json
+// @Produce json
+// @Security ApiKey
+// @Param id path int true "{{$.StructName}} ID"
+// @Success 200 {object} storage.Attachment
+// @Failure 400 {object} ErrorResponse "Invalid ID format"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 404 {object} ErrorResponse "{{$.StructName}} or {{.Name}} not found"
+// @Router /{{$.RouteName}}/{id}/{{.JSONName}} [get]
+func (c *{{$.StructName}}Controller) Get{{.Name}}(ctx *gin.Context) {
+    id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
+    if err != nil {
+        c.Logger.Warn("invalid id format in Get{{.Name}} request",
+            zap.String("id", ctx.Param("id")),
+            zap.Error(err))
+        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid id format"})
+        return
+    }
+
+    item, err := c.{{$.StructName}}Service.GetById(uint(id))
+    if err != nil {
+        c.Logger.Error("failed to get {{$.StructName}} for {{.Name}}",
+            zap.Error(err),
+            zap.Uint64("id", id))
+        ctx.JSON(http.StatusNotFound, ErrorResponse{Error: "Item not found"})
+        return
+    }
+
+    if item.{{.Name}} == nil {
+        c.Logger.Debug("no {{.Name}} found for {{$.StructName}}",
+            zap.Uint64("id", id))
+        ctx.JSON(http.StatusNotFound, ErrorResponse{Error: "No {{.Name}} found"})
+        return
+    }
+
+    ctx.JSON(http.StatusOK, item.{{.Name}})
+}
+
+// Update{{.Name}} godoc
+// @Summary Upload {{$.StructName}}'s {{.Name}}
+// @Description Upload or update the {{.Name}} file for a {{$.StructName}}
+// @Tags {{$.StructName}}
+// @Accept multipart/form-data
+// @Produce json
+// @Security ApiKey
+// @Param id path int true "{{$.StructName}} ID"
+// @Param file formData file true "File to upload"
+// @Success 200 {object} models.{{$.StructName}}Response
+// @Failure 400 {object} ErrorResponse "Invalid request"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 500 {object} ErrorResponse "Internal server error"
+// @Router /{{$.RouteName}}/{id}/{{.JSONName}} [put]
+func (c *{{$.StructName}}Controller) Update{{.Name}}(ctx *gin.Context) {
+    id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
+    if err != nil {
+        c.Logger.Warn("invalid id format in Update{{.Name}} request",
+            zap.String("id", ctx.Param("id")),
+            zap.Error(err))
+        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid id format"})
+        return
+    }
+
+    file, err := ctx.FormFile("file")
+    if err != nil {
+        c.Logger.Warn("no file provided in Update{{.Name}} request",
+            zap.Uint64("id", id),
+            zap.Error(err))
+        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "No file provided"})
+        return
+    }
+
+    item, err := c.{{$.StructName}}Service.Update{{.Name}}(uint(id), file)
+    if err != nil {
+        c.Logger.Error("failed to update {{.Name}}",
+            zap.Error(err),
+            zap.Uint64("id", id),
+            zap.String("filename", file.Filename))
+        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: fmt.Sprintf("Failed to update {{.Name}}: %v", err)})
+        return
+    }
+
+    // Emit events via both systems
+    if err := c.EventService.Emitter.Emit(event.FileUpdated, event.Payload{
+        Model: "{{$.StructName}}",
+        ID:    uint(id),
+        Meta: map[string]interface{}{
+            "field": "{{.Name}}",
+            "filename": file.Filename,
+        },
+    }); err != nil {
+        c.Logger.Error("failed to emit event service file updated event",
+            zap.Error(err),
+            zap.Uint64("id", id))
+    }
+
+    if c.Emitter != nil {
+        c.Emitter.Emit("{{$.RouteName}}.{{.JSONName}}.updated", map[string]interface{}{
+            "id": id,
+            "filename": file.Filename,
+        })
+    } else {
+        c.Logger.Warn("emitter is nil; cannot emit '{{$.RouteName}}.{{.JSONName}}.updated' event")
+    }
+
+    ctx.JSON(http.StatusOK, item.ToResponse())
+}
+
+// Delete{{.Name}} godoc
+// @Summary Delete {{$.StructName}}'s {{.Name}}
+// @Description Remove the {{.Name}} file from a {{$.StructName}}
+// @Tags {{$.StructName}}
+// @Accept json
+// @Produce json
+// @Security ApiKey
+// @Param id path int true "{{$.StructName}} ID"
+// @Success 200 {object} SuccessResponse
+// @Failure 400 {object} ErrorResponse "Invalid ID format"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 500 {object} ErrorResponse "Internal server error"
+// @Router /{{$.RouteName}}/{id}/{{.JSONName}} [delete]
+func (c *{{$.StructName}}Controller) Delete{{.Name}}(ctx *gin.Context) {
+    id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
+    if err != nil {
+        c.Logger.Warn("invalid id format in Delete{{.Name}} request",
+            zap.String("id", ctx.Param("id")),
+            zap.Error(err))
+        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid id format"})
+        return
+    }
+
+    c.Logger.Debug("deleting {{.Name}} from {{$.StructName}}",
+        zap.Uint64("id", id))
+
+    if err := c.{{$.StructName}}Service.Delete{{.Name}}(uint(id)); err != nil {
+        c.Logger.Error("failed to delete {{.Name}}",
+            zap.Error(err),
+            zap.Uint64("id", id))
+        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: fmt.Sprintf("Failed to delete {{.Name}}: %v", err)})
+        return
+    }
+
+    // Emit file deletion event
+    if err := c.EventService.Emit(event.FileDeleted, "{{$.StructName}}", uint(id), map[string]interface{}{
+        "field": "{{.Name}}",
+    }); err != nil {
+        c.Logger.Error("failed to emit file deletion event",
+            zap.Error(err),
+            zap.Uint64("id", id))
+    }
+
+    ctx.JSON(http.StatusOK, SuccessResponse{Message: "{{.Name}} deleted successfully"})
+}
+{{end}}
+
 {{if eq .Relationship "sort"}}
 // GetSorted godoc
 // @Summary Get sorted {{$.PluralName}}
 // @Description Get all {{$.PluralName}} ordered by {{.JSONName}}
 // @Tags {{$.StructName}}
-// @Security ApiKeyAuth
 // @Accept json
 // @Produce json
+// @Security ApiKey
 // @Success 200 {array} models.{{$.StructName}}Response
-// @Failure 500 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /{{$.RouteName}}/sorted [get]
 func (c *{{$.StructName}}Controller) GetSorted(ctx *gin.Context) {
+    c.Logger.Debug("getting sorted {{$.PluralName}}")
+
     items, err := c.{{$.StructName}}Service.GetSorted()
     if err != nil {
-        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch sorted items: " + err.Error()})
+        c.Logger.Error("failed to fetch sorted {{$.PluralName}}",
+            zap.Error(err))
+        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch sorted items"})
         return
     }
 
@@ -253,24 +563,41 @@ func (c *{{$.StructName}}Controller) GetSorted(ctx *gin.Context) {
 // @Summary Update {{$.PluralName}} sort order
 // @Description Update the sort order of multiple {{$.PluralName}}
 // @Tags {{$.StructName}}
-// @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Param sorted_ids body []uint true "Array of ids in desired sort order"
+// @Security ApiKey
+// @Param sorted_ids body []uint true "Array of IDs in desired sort order"
 // @Success 200 {object} SuccessResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Failure 400 {object} ErrorResponse "Invalid request body"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /{{$.RouteName}}/sort [put]
 func (c *{{$.StructName}}Controller) UpdateSort(ctx *gin.Context) {
     var sortedIds []uint
     if err := ctx.ShouldBindJSON(&sortedIds); err != nil {
+        c.Logger.Warn("invalid sort request",
+            zap.Error(err))
         ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid request body"})
         return
     }
 
+    c.Logger.Debug("updating {{$.StructName}} sort order",
+        zap.Any("sorted_ids", sortedIds))
+
     if err := c.{{$.StructName}}Service.UpdateSort(sortedIds); err != nil {
-        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to update sort order: " + err.Error()})
+        c.Logger.Error("failed to update sort order",
+            zap.Error(err),
+            zap.Any("sorted_ids", sortedIds))
+        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to update sort order"})
         return
+    }
+
+    // Emit sort update event
+    if err := c.EventService.Emit(event.SortUpdated, "{{$.StructName}}", 0, map[string]interface{}{
+        "sorted_ids": sortedIds,
+    }); err != nil {
+        c.Logger.Error("failed to emit sort update event",
+            zap.Error(err))
     }
 
     ctx.JSON(http.StatusOK, SuccessResponse{Message: "Sort order updated successfully"})
@@ -279,31 +606,40 @@ func (c *{{$.StructName}}Controller) UpdateSort(ctx *gin.Context) {
 
 {{if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
 // GetAssociated{{.Name}} godoc
-// @Summary Get associated {{.Name}} for a {{$.StructName}}
-// @Description Get all associated {{.Name}} for a specific {{$.StructName}}
+// @Summary Get associated {{.Name}} for {{$.StructName}}
+// @Description Get all {{.Name}} associated with a specific {{$.StructName}}
 // @Tags {{$.StructName}}
-// @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Param id path int true "{{$.StructName}} id"
+// @Security ApiKey
+// @Param id path int true "{{$.StructName}} ID"
 // @Success 200 {array} models.{{.AssociatedType}}Response
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Failure 400 {object} ErrorResponse "Invalid ID format"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 500 {object} ErrorResponse "Internal server error"
 // @Router /{{$.RouteName}}/{id}/{{.JSONName}} [get]
 func (c *{{$.StructName}}Controller) GetAssociated{{.Name}}(ctx *gin.Context) {
     id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
     if err != nil {
+        c.Logger.Warn("invalid id format in GetAssociated{{.Name}} request",
+            zap.String("id", ctx.Param("id")),
+            zap.Error(err))
         ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid ID format"})
         return
     }
 
+    c.Logger.Debug("getting associated {{.Name}}",
+        zap.Uint64("id", id))
+
     items, err := c.{{$.StructName}}Service.Get{{.Name}}(uint(id))
     if err != nil {
-        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch {{.Name}}: " + err.Error()})
+        c.Logger.Error("failed to fetch associated {{.Name}}",
+            zap.Error(err),
+            zap.Uint64("id", id))
+        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch {{.Name}}"})
         return
     }
 
-    // Convert to response type
     responses := make([]models.{{.AssociatedType}}Response, len(items))
     for i, item := range items {
         if item != nil {
@@ -313,13 +649,144 @@ func (c *{{$.StructName}}Controller) GetAssociated{{.Name}}(ctx *gin.Context) {
 
     ctx.JSON(http.StatusOK, responses)
 }
+
+// Add{{.Name}} godoc
+// @Summary Add {{.AssociatedType}} to {{$.StructName}}
+// @Description Associate a {{.AssociatedType}} with a {{$.StructName}}
+// @Tags {{$.StructName}}
+// @Accept json
+// @Produce json
+// @Security ApiKey
+// @Param id path int true "{{$.StructName}} ID"
+// @Param associated_id path int true "{{.AssociatedType}} ID to add"
+// @Success 200 {object} SuccessResponse
+// @Failure 400 {object} ErrorResponse "Invalid ID format"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 500 {object} ErrorResponse "Internal server error"
+// @Router /{{$.RouteName}}/{id}/{{.JSONName}}/{associated_id} [post]
+func (c *{{$.StructName}}Controller) Add{{.Name}}(ctx *gin.Context) {
+    id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
+    if err != nil {
+        c.Logger.Warn("invalid id format in Add{{.Name}} request",
+            zap.String("id", ctx.Param("id")),
+            zap.Error(err))
+        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid ID format"})
+        return
+    }
+
+    associatedId, err := strconv.ParseUint(ctx.Param("associated_id"), 10, 32)
+    if err != nil {
+        c.Logger.Warn("invalid associated_id format in Add{{.Name}} request",
+            zap.String("associated_id", ctx.Param("associated_id")),
+            zap.Error(err))
+        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid associated ID format"})
+        return
+    }
+
+    c.Logger.Debug("adding {{.Name}} to {{$.StructName}}",
+        zap.Uint64("id", id),
+        zap.Uint64("associated_id", associatedId))
+
+    if err := c.{{$.StructName}}Service.Add{{.Name}}(uint(id), []uint{uint(associatedId)}); err != nil {
+        c.Logger.Error("failed to add {{.Name}}",
+            zap.Error(err),
+            zap.Uint64("id", id),
+            zap.Uint64("associated_id", associatedId))
+        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: fmt.Sprintf("Failed to add {{.Name}}: %v", err)})
+        return
+    }
+
+    // Emit relationship added event
+    if err := c.EventService.Emit(event.RelationshipUpdated, "{{$.StructName}}", uint(id), map[string]interface{}{
+        "action": "add",
+        "relationship": "{{.Name}}",
+        "associated_id": associatedId,
+    }); err != nil {
+        c.Logger.Error("failed to emit relationship added event",
+            zap.Error(err),
+            zap.Uint64("id", id),
+            zap.Uint64("associated_id", associatedId))
+    }
+
+    ctx.JSON(http.StatusOK, SuccessResponse{Message: "{{.Name}} added successfully"})
+}
+
+// Remove{{.Name}} godoc
+// @Summary Remove {{.AssociatedType}} from {{$.StructName}}
+// @Description Remove a {{.AssociatedType}} association from a {{$.StructName}}
+// @Tags {{$.StructName}}
+// @Accept json
+// @Produce json
+// @Security ApiKey
+// @Param id path int true "{{$.StructName}} ID"
+// @Param associated_id path int true "{{.AssociatedType}} ID to remove"
+// @Success 200 {object} SuccessResponse
+// @Failure 400 {object} ErrorResponse "Invalid ID format"
+// @Failure 401 {object} ErrorResponse "Unauthorized"
+// @Failure 500 {object} ErrorResponse "Internal server error"
+// @Router /{{$.RouteName}}/{id}/{{.JSONName}}/{associated_id} [delete]
+func (c *{{$.StructName}}Controller) Remove{{.Name}}(ctx *gin.Context) {
+    id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
+    if err != nil {
+        c.Logger.Warn("invalid id format in Remove{{.Name}} request",
+            zap.String("id", ctx.Param("id")),
+            zap.Error(err))
+        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid ID format"})
+        return
+    }
+
+    associatedId, err := strconv.ParseUint(ctx.Param("associated_id"), 10, 32)
+    if err != nil {
+        c.Logger.Warn("invalid associated_id format in Remove{{.Name}} request",
+            zap.String("associated_id", ctx.Param("associated_id")),
+            zap.Error(err))
+        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid associated ID format"})
+        return
+    }
+
+    c.Logger.Debug("removing {{.Name}} from {{$.StructName}}",
+        zap.Uint64("id", id),
+        zap.Uint64("associated_id", associatedId))
+
+    if err := c.{{$.StructName}}Service.Remove{{.Name}}(uint(id), []uint{uint(associatedId)}); err != nil {
+        c.Logger.Error("failed to remove {{.Name}}",
+            zap.Error(err),
+            zap.Uint64("id", id),
+            zap.Uint64("associated_id", associatedId))
+        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: fmt.Sprintf("Failed to remove {{.Name}}: %v", err)})
+        return
+    }
+
+    // Emit relationship removed event
+    if err := c.EventService.Emit(event.RelationshipUpdated, "{{$.StructName}}", uint(id), map[string]interface{}{
+        "action": "remove",
+        "relationship": "{{.Name}}",
+        "associated_id": associatedId,
+    }); err != nil {
+        c.Logger.Error("failed to emit relationship removed event",
+            zap.Error(err),
+            zap.Uint64("id", id),
+            zap.Uint64("associated_id", associatedId))
+    }
+
+    ctx.JSON(http.StatusOK, SuccessResponse{Message: "{{.Name}} removed successfully"})
+}
 {{end}}
 {{end}}
 
+// Helper function to safely get string value from pointer
+func stringValue(s *string) string {
+    if s == nil {
+        return ""
+    }
+    return *s
+}
+
+// Response types for Swagger documentation
 type ErrorResponse struct {
-    Error string `json:"error"`
+    Error string `json:"error" example:"Error message"`
 }
 
 type SuccessResponse struct {
-    Message string `json:"message"`
+    Message string `json:"message" example:"Operation completed successfully"`
 }

@@ -1,17 +1,17 @@
-package {{.PackageName}}
- {{$stringFieldExists := false}}
-{{range .Fields}}
-{{if or (eq .Type "string") (eq .Type "text")}}
-{{$stringFieldExists = true}}
-{{end}}
-{{end}}
+package {{.PackageName}}{{$stringFieldExists := false}}{{$hasFileField := hasFileField .Fields}}
+{{range .Fields}}{{if or (eq .Type "string") (eq .Type "text")}}{{$stringFieldExists = true}}{{end}}{{end}}
+
 import (
     "errors"
     "math"
     {{if $stringFieldExists}}
     "strings"
     {{end}}
-
+    "go.uber.org/zap"
+    {{if $hasFileField}}
+    "mime/multipart"
+    "base/core/storage"
+    {{end}}
     "gorm.io/gorm"
     "gorm.io/gorm/clause"
     "base/app/models"
@@ -20,14 +20,29 @@ import (
 
 type {{.StructName}}Service struct {
     DB *gorm.DB
+    Logger *zap.Logger
+    {{if $hasFileField}}
+    ActiveStorage *storage.ActiveStorage
+    {{end}}
 }
 
-func New{{.StructName}}Service(db *gorm.DB) *{{.StructName}}Service {
+func New{{.StructName}}Service(
+    db *gorm.DB,
+    logger *zap.Logger,
+    {{if $hasFileField}}
+    activeStorage *storage.ActiveStorage,
+    {{end}}
+) *{{.StructName}}Service {
     return &{{.StructName}}Service{
         DB: db,
+        Logger: logger,
+        {{if $hasFileField}}
+        ActiveStorage: activeStorage,
+        {{end}}
     }
 }
 
+// CRUD Methods
 func (s *{{.StructName}}Service) Create(req *models.Create{{.StructName}}Request) (*models.{{.StructName}}, error) {
     item := models.{{.StructName}}{
         {{- range .Fields}}
@@ -40,31 +55,48 @@ func (s *{{.StructName}}Service) Create(req *models.Create{{.StructName}}Request
         {{- end}}
         {{- end}}
     }
-
     {{range .Fields}}{{if eq .Relationship "sort"}}
-    // Set initial sort order if not set
     if item.{{.Name}} == 0 {
         var maxOrder int
         if err := s.DB.Model(&models.{{$.StructName}}{}).Select("COALESCE(MAX({{.DBName}}), -1)").Scan(&maxOrder).Error; err != nil {
+            s.Logger.Error("failed to get max order for sorting",
+                zap.Error(err),
+                zap.String("model", "{{$.StructName}}"))
             return nil, err
         }
         item.{{.Name}} = maxOrder + 1
-    }
-    {{end}}{{end}}
+    }{{end}}{{end}}
 
     if err := s.DB.Create(&item).Error; err != nil {
+        s.Logger.Error("failed to create {{.StructName}}",
+            zap.Error(err),
+            zap.Any("request", req))
         return nil, err
     }
+
+    s.Logger.Info("created {{.StructName}}", zap.Uint("id", item.Id))
     return s.GetById(item.Id)
 }
 
+func (s *{{.StructName}}Service) GetById(id uint) (*models.{{.StructName}}, error) {
+    var item models.{{.StructName}}
+    if err := s.DB.Preload(clause.Associations).First(&item, id).Error; err != nil {
+        s.Logger.Error("failed to get {{.StructName}} by id",
+            zap.Error(err),
+            zap.Uint("id", id))
+        return nil, err
+    }
+    return &item, nil
+}
+
 func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName}}Request) (*models.{{.StructName}}, error) {
-    // First check if item exists
     if err := s.DB.First(&models.{{.StructName}}{}, id).Error; err != nil {
+        s.Logger.Error("failed to find {{.StructName}} for update",
+            zap.Error(err),
+            zap.Uint("id", id))
         return nil, err
     }
 
-    // Build updates map
     updates := make(map[string]interface{})
     {{- range .Fields}}
     {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
@@ -75,44 +107,52 @@ func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName
     if req.{{.Name}}Id != nil {
         updates["{{.DBName}}_id"] = *req.{{.Name}}Id
     }
-    {{- else if ne .Relationship "has_many"}}
+    {{- else if and (ne .Relationship "has_many") (ne .Type "file") (ne .Type "image") (ne .Type "attachment")}}
     if req.{{.Name}} != nil {
         updates["{{.DBName}}"] = *req.{{.Name}}
     }
     {{- end}}
     {{- end}}
 
-    // Apply updates
     if err := s.DB.Model(&models.{{.StructName}}{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+        s.Logger.Error("failed to update {{.StructName}}",
+            zap.Error(err),
+            zap.Uint("id", id),
+            zap.Any("updates", updates))
         return nil, err
     }
 
-    // Return updated item
+    s.Logger.Info("updated {{.StructName}}",
+        zap.Uint("id", id),
+        zap.Any("updates", updates))
     return s.GetById(id)
 }
 
-func (s *{{.StructName}}Service) GetById(id uint) (*models.{{.StructName}}, error) {
-    var item models.{{.StructName}}
-    if err := s.DB.Preload(clause.Associations).First(&item, id).Error; err != nil {
-        return nil, err
+func (s *{{.StructName}}Service) Delete(id uint) error {
+    result := s.DB.Delete(&models.{{.StructName}}{}, id)
+    if result.Error != nil {
+        s.Logger.Error("failed to delete {{.StructName}}",
+            zap.Error(result.Error),
+            zap.Uint("id", id))
+        return result.Error
     }
-    return &item, nil
+    if result.RowsAffected == 0 {
+        s.Logger.Warn("{{.StructName}} not found for deletion",
+            zap.Uint("id", id))
+        return errors.New("item not found")
+    }
+
+    s.Logger.Info("deleted {{.StructName}}", zap.Uint("id", id))
+    return nil
 }
 
 func (s *{{.StructName}}Service) GetAll(page *int, limit *int, search *string) (*types.PaginatedResponse, error) {
     query := s.DB.Model(&models.{{.StructName}}{})
-
-    // Add search condition if search parameter is provided
-
-
     {{if $stringFieldExists}}
     if search != nil && *search != "" {
         searchQuery := "%" + *search + "%"
-
-        // Build the WHERE clause for searching string fields
         var conditions []string
         var params []interface{}
-
         {{- range .Fields}}
         {{- if or (eq .Type "string") (eq .Type "text")}}
         conditions = append(conditions, "{{.DBName}} LIKE ?")
@@ -120,37 +160,35 @@ func (s *{{.StructName}}Service) GetAll(page *int, limit *int, search *string) (
         {{- end}}
         {{- end}}
 
-        // Apply the search conditions if any exist
         if len(conditions) > 0 {
             whereClause := strings.Join(conditions, " OR ")
             query = query.Where(whereClause, params...)
         }
-    }
-    {{end}}
-
+    }{{end}}
     {{range .Fields}}{{if eq .Relationship "sort"}}
     query = query.Order("{{.DBName}} asc")
     {{end}}{{end}}
 
     if page != nil && limit != nil {
-        var items []models.{{.StructName}}
         var total int64
-
-        // Get total count
         if err := query.Count(&total).Error; err != nil {
+            s.Logger.Error("failed to count total {{.StructName}} records",
+                zap.Error(err))
             return nil, err
         }
 
-        // Calculate pagination
         offset := (*page - 1) * *limit
         totalPages := int(math.Ceil(float64(total) / float64(*limit)))
 
-        // Get paginated data with associations
+        var items []models.{{.StructName}}
         if err := query.Preload(clause.Associations).Limit(*limit).Offset(offset).Find(&items).Error; err != nil {
+            s.Logger.Error("failed to fetch paginated {{.StructName}} records",
+                zap.Error(err),
+                zap.Int("page", *page),
+                zap.Int("limit", *limit))
             return nil, err
         }
 
-        // Convert items to responses
         responses := make([]models.{{.StructName}}Response, len(items))
         for i, item := range items {
             responses[i] = *item.ToResponse()
@@ -167,13 +205,13 @@ func (s *{{.StructName}}Service) GetAll(page *int, limit *int, search *string) (
         }, nil
     }
 
-    // Handle non-paginated request
     var allItems []models.{{.StructName}}
     if err := query.Preload(clause.Associations).Find(&allItems).Error; err != nil {
+        s.Logger.Error("failed to fetch all {{.StructName}} records",
+            zap.Error(err))
         return nil, err
     }
 
-    // Convert all items to responses
     responses := make([]models.{{.StructName}}Response, len(allItems))
     for i, item := range allItems {
         responses[i] = *item.ToResponse()
@@ -190,36 +228,147 @@ func (s *{{.StructName}}Service) GetAll(page *int, limit *int, search *string) (
     }, nil
 }
 
-func (s *{{.StructName}}Service) Delete(id uint) error {
-    result := s.DB.Delete(&models.{{.StructName}}{}, id)
-    if result.Error != nil {
-        return result.Error
+{{range .Fields}}
+{{if isFileField .}}
+// File handling methods
+func (s *{{$.StructName}}Service) Update{{.Name}}(id uint, file *multipart.FileHeader) (*models.{{$.StructName}}, error) {
+    tx := s.DB.Begin()
+    defer func() {
+        if r := recover(); r != nil {
+            tx.Rollback()
+        }
+    }()
+
+    var item models.{{$.StructName}}
+    if err := tx.Preload("{{.Name}}").First(&item, id).Error; err != nil {
+        tx.Rollback()
+        s.Logger.Error("failed to find {{$.StructName}} for {{.Name}} update",
+            zap.Error(err),
+            zap.Uint("id", id))
+        return nil, err
     }
-    if result.RowsAffected == 0 {
-        return errors.New("item not found")
+
+    if item.{{.Name}} != nil {
+        if err := s.ActiveStorage.Delete(item.{{.Name}}); err != nil {
+            tx.Rollback()
+            s.Logger.Error("failed to delete existing {{.Name}}",
+                zap.Error(err),
+                zap.Uint("id", id),
+                zap.Any("attachment", item.{{.Name}}))
+            return nil, err
+        }
     }
+
+    attachment, err := s.ActiveStorage.Attach(&item, "{{.JSONName}}", file)
+    if err != nil {
+        tx.Rollback()
+        s.Logger.Error("failed to upload {{.Name}}",
+            zap.Error(err),
+            zap.Uint("id", id),
+            zap.String("filename", file.Filename))
+        return nil, err
+    }
+
+    item.{{.Name}} = attachment
+    if err := tx.Save(&item).Error; err != nil {
+        tx.Rollback()
+        s.Logger.Error("failed to save {{$.StructName}} with new {{.Name}}",
+            zap.Error(err),
+            zap.Uint("id", id))
+        return nil, err
+    }
+
+    if err := tx.Commit().Error; err != nil {
+        s.Logger.Error("failed to commit transaction",
+            zap.Error(err),
+            zap.Uint("id", id))
+        return nil, err
+    }
+
+    s.Logger.Info("updated {{.Name}} for {{$.StructName}}",
+        zap.Uint("id", id),
+        zap.String("filename", file.Filename))
+    return s.GetById(id)
+}
+
+func (s *{{$.StructName}}Service) Delete{{.Name}}(id uint) error {
+    tx := s.DB.Begin()
+    defer func() {
+        if r := recover(); r != nil {
+            tx.Rollback()
+        }
+    }()
+
+    var item models.{{$.StructName}}
+    if err := tx.Preload("{{.Name}}").First(&item, id).Error; err != nil {
+        tx.Rollback()
+        s.Logger.Error("failed to find {{$.StructName}} for {{.Name}} deletion",
+            zap.Error(err),
+            zap.Uint("id", id))
+        return err
+    }
+
+    if item.{{.Name}} != nil {
+        if err := s.ActiveStorage.Delete(item.{{.Name}}); err != nil {
+            tx.Rollback()
+            s.Logger.Error("failed to delete {{.Name}}",
+                zap.Error(err),
+                zap.Uint("id", id),
+                zap.Any("attachment", item.{{.Name}}))
+            return err
+        }
+
+        item.{{.Name}} = nil
+        if err := tx.Save(&item).Error; err != nil {
+            tx.Rollback()
+            s.Logger.Error("failed to update {{$.StructName}} after deleting {{.Name}}",
+                zap.Error(err),
+                zap.Uint("id", id))
+            return err
+        }
+    }
+
+    if err := tx.Commit().Error; err != nil {
+        s.Logger.Error("failed to commit transaction",
+            zap.Error(err),
+            zap.Uint("id", id))
+        return err
+    }
+
+    s.Logger.Info("deleted {{.Name}} from {{$.StructName}}",
+        zap.Uint("id", id))
     return nil
 }
+{{end}}
+{{end}}
 
 {{range .Fields}}
 {{if eq .Relationship "sort"}}
-// GetSorted returns all items sorted by {{.JSONName}}
+// Sort methods
 func (s *{{$.StructName}}Service) GetSorted() ([]*models.{{$.StructName}}, error) {
     var items []*models.{{$.StructName}}
     if err := s.DB.Preload(clause.Associations).Order("{{.DBName}} asc").Find(&items).Error; err != nil {
+        s.Logger.Error("failed to get sorted {{$.StructName}} list",
+            zap.Error(err))
         return nil, err
     }
     return items, nil
 }
 
-// UpdateSort updates the sort order of items
 func (s *{{$.StructName}}Service) UpdateSort(sortedIds []uint) error {
     return s.DB.Transaction(func(tx *gorm.DB) error {
         for order, id := range sortedIds {
             if err := tx.Model(&models.{{$.StructName}}{}).Where("id = ?", id).Update("{{.DBName}}", order).Error; err != nil {
+                s.Logger.Error("failed to update {{$.StructName}} sort order",
+                    zap.Error(err),
+                    zap.Uint("id", id),
+                    zap.Int("order", order))
                 return err
             }
         }
+
+        s.Logger.Info("updated {{$.StructName}} sort order",
+            zap.Any("sorted_ids", sortedIds))
         return nil
     })
 }
@@ -228,68 +377,124 @@ func (s *{{$.StructName}}Service) UpdateSort(sortedIds []uint) error {
 
 {{range .Fields}}
 {{if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
-// Get{{.Name}} returns all {{.Name}} for a {{$.StructName}}
+// Relationship methods
 func (s *{{$.StructName}}Service) Get{{.Name}}(id uint) ([]*models.{{.AssociatedType}}, error) {
     item, err := s.GetById(id)
     if err != nil {
+        s.Logger.Error("failed to get {{$.StructName}} for {{.Name}} relationship",
+            zap.Error(err),
+            zap.Uint("id", id))
         return nil, err
     }
 
     var associated []*models.{{.AssociatedType}}
     if err := s.DB.Model(item).Association("{{.Name}}").Find(&associated); err != nil {
+        s.Logger.Error("failed to get {{.Name}} for {{$.StructName}}",
+            zap.Error(err),
+            zap.Uint("id", id))
         return nil, err
     }
 
+    s.Logger.Debug("retrieved {{.Name}} for {{$.StructName}}",
+        zap.Uint("id", id),
+        zap.Int("count", len(associated)))
     return associated, nil
 }
 
-// Add{{.Name}} adds a {{.AssociatedType}} to {{$.StructName}}
-func (s *{{$.StructName}}Service) Add{{.Name}}(id uint, associatedId uint) error {
+func (s *{{$.StructName}}Service) Add{{.Name}}(id uint, relatedIds []uint) error {
+    tx := s.DB.Begin()
+    defer func() {
+        if r := recover(); r != nil {
+            tx.Rollback()
+        }
+    }()
+
     var item models.{{$.StructName}}
-    if err := s.DB.First(&item, id).Error; err != nil {
+    if err := tx.First(&item, id).Error; err != nil {
+        tx.Rollback()
+        s.Logger.Error("failed to find {{$.StructName}} for adding {{.Name}}",
+            zap.Error(err),
+            zap.Uint("id", id))
         return err
     }
 
-    var associated models.{{.AssociatedType}}
-    if err := s.DB.First(&associated, associatedId).Error; err != nil {
+    var relatedItems []*models.{{.AssociatedType}}
+    if err := tx.Find(&relatedItems, relatedIds).Error; err != nil {
+        tx.Rollback()
+        s.Logger.Error("failed to find related {{.AssociatedType}} items",
+            zap.Error(err),
+            zap.Uints("related_ids", relatedIds))
         return err
     }
 
-    return s.DB.Model(&item).Association("{{.Name}}").Append(&associated)
+    if err := tx.Model(&item).Association("{{.Name}}").Append(relatedItems); err != nil {
+        tx.Rollback()
+        s.Logger.Error("failed to add {{.Name}} to {{$.StructName}}",
+            zap.Error(err),
+            zap.Uint("id", id),
+            zap.Uints("related_ids", relatedIds))
+        return err
+    }
+
+    if err := tx.Commit().Error; err != nil {
+        s.Logger.Error("failed to commit transaction",
+            zap.Error(err),
+            zap.Uint("id", id))
+        return err
+    }
+
+    s.Logger.Info("added {{.Name}} to {{$.StructName}}",
+        zap.Uint("id", id),
+        zap.Uints("related_ids", relatedIds))
+    return nil
 }
 
-// Remove{{.Name}} removes a {{.AssociatedType}} from {{$.StructName}}
-func (s *{{$.StructName}}Service) Remove{{.Name}}(id uint, associatedId uint) error {
+func (s *{{$.StructName}}Service) Remove{{.Name}}(id uint, relatedIds []uint) error {
+    tx := s.DB.Begin()
+    defer func() {
+        if r := recover(); r != nil {
+            tx.Rollback()
+        }
+    }()
+
     var item models.{{$.StructName}}
-    if err := s.DB.First(&item, id).Error; err != nil {
+    if err := tx.First(&item, id).Error; err != nil {
+        tx.Rollback()
+        s.Logger.Error("failed to find {{$.StructName}} for removing {{.Name}}",
+            zap.Error(err),
+            zap.Uint("id", id))
         return err
     }
 
-    var associated models.{{.AssociatedType}}
-    if err := s.DB.First(&associated, associatedId).Error; err != nil {
+    var relatedItems []*models.{{.AssociatedType}}
+    if err := tx.Find(&relatedItems, relatedIds).Error; err != nil {
+        tx.Rollback()
+        s.Logger.Error("failed to find related {{.AssociatedType}} items",
+            zap.Error(err),
+            zap.Uints("related_ids", relatedIds))
         return err
     }
 
-    return s.DB.Model(&item).Association("{{.Name}}").Delete(&associated)
-}
-{{end}}
-{{end}}
-
-{{range .Fields}}
-{{if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
-// Get{{.Name}} returns the {{.Name}} for a {{$.StructName}}
-func (s *{{$.StructName}}Service) Get{{.Name}}(id uint) (*models.{{.AssociatedType}}, error) {
-    item, err := s.GetById(id)
-    if err != nil {
-        return nil, err
+    if err := tx.Model(&item).Association("{{.Name}}").Delete(relatedItems); err != nil {
+        tx.Rollback()
+        s.Logger.Error("failed to remove {{.Name}} from {{$.StructName}}",
+            zap.Error(err),
+            zap.Uint("id", id),
+            zap.Uints("related_ids", relatedIds))
+        return err
     }
 
-    var associated models.{{.AssociatedType}}
-    if err := s.DB.Model(item).Association("{{.Name}}").Find(&associated); err != nil {
-        return nil, err
+    if err := tx.Commit().Error; err != nil {
+        s.Logger.Error("failed to commit transaction",
+            zap.Error(err),
+            zap.Uint("id", id))
+        return err
     }
 
-    return &associated, nil
+    s.Logger.Info("removed {{.Name}} from {{$.StructName}}",
+        zap.Uint("id", id),
+        zap.Uints("related_ids", relatedIds))
+    return nil
 }
 {{end}}
 {{end}}

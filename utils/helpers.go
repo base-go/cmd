@@ -32,11 +32,30 @@ func GetGoType(t string) string {
 		return "int"
 	case "bool":
 		return "bool"
+	case "file", "image", "attachment":
+		return "*storage.Attachment"
 	default:
 		return t
 	}
 }
-
+func getExampleValue(t string) string {
+	switch t {
+	case "string", "text":
+		return "example string"
+	case "int", "int64", "uint", "uint64":
+		return "1"
+	case "float", "float64":
+		return "1.0"
+	case "bool":
+		return "true"
+	case "time.Time":
+		return "2024-01-01T00:00:00Z"
+	case "file", "image", "attachment":
+		return "null"
+	default:
+		return ""
+	}
+}
 func ToLower(s string) string {
 	return strings.ToLower(s)
 }
@@ -107,7 +126,29 @@ func ToPlural(s string) string {
 	return pluralizeClient.Plural(s)
 }
 
-func UpdateInitFile(singularName string) error {
+// HasFileField checks if any field is a file type
+func HasFileField(fields []FieldStruct) bool {
+	for _, field := range fields {
+		if isFileField(field) {
+			return true
+		}
+	}
+	return false
+}
+
+// isFileField is an internal helper to check if a field is a file type
+func isFileField(field FieldStruct) bool {
+	return field.Type == "file" ||
+		field.Type == "image" ||
+		field.Type == "attachment" ||
+		field.Type == "*storage.Attachment"
+}
+
+func isRelationshipField(field FieldStruct, relType string) bool {
+	return field.Relationship == relType ||
+		field.Relationship == strings.Replace(relType, "_", "", -1)
+}
+func UpdateInitFile(singularName string, hasFileFields bool) error {
 	initFilePath := "app/init.go"
 
 	content, err := os.ReadFile(initFilePath)
@@ -116,11 +157,9 @@ func UpdateInitFile(singularName string) error {
 	}
 
 	packageName := ToSnakeCase(singularName)
-
 	importStr := fmt.Sprintf("\"base/app/%s\"", packageName)
 	content, importAdded := AddImport(content, importStr)
-
-	content, initializerAdded := AddModuleInitializer(content, packageName, singularName)
+	content, initializerAdded := AddModuleInitializer(content, packageName, singularName, hasFileFields)
 
 	if importAdded || initializerAdded {
 		return os.WriteFile(initFilePath, content, 0644)
@@ -129,6 +168,47 @@ func UpdateInitFile(singularName string) error {
 	return nil
 }
 
+func AddModuleInitializer(content []byte, packageName, singularName string, hasFileFields bool) ([]byte, bool) {
+	contentStr := string(content)
+	marker := "// MODULE_INITIALIZER_MARKER"
+	markerIndex := strings.Index(contentStr, marker)
+	if markerIndex == -1 {
+		return content, false
+	}
+
+	lineStart := strings.LastIndex(contentStr[:markerIndex], "\n") + 1
+	indentation := contentStr[lineStart:markerIndex]
+	mapKeyPackageName := ToSnakeCase(packageName)
+
+	if strings.Contains(contentStr[:markerIndex], fmt.Sprintf(`"%s":`, mapKeyPackageName)) {
+		return content, false
+	}
+
+	structName := ToPascalCase(singularName)
+	importPackageName := ToSnakeCase(singularName)
+
+	var newInitializer string
+	if hasFileFields {
+		newInitializer = fmt.Sprintf(`%s"%s": func(db *gorm.DB, router *gin.RouterGroup, emitter *emitter.Emitter, storage *storage.ActiveStorage, logger *zap.Logger, eventService *event.EventService) module.Module {
+            return %s.New%sModule(db, router, logger, storage, eventService)
+        },`,
+			indentation,
+			mapKeyPackageName,
+			importPackageName,
+			structName)
+	} else {
+		newInitializer = fmt.Sprintf(`%s"%s": func(db *gorm.DB, router *gin.RouterGroup, emitter *emitter.Emitter, _ *storage.ActiveStorage, logger *zap.Logger, eventService *event.EventService) module.Module {
+            return %s.New%sModule(db, router, logger, eventService)
+        },`,
+			indentation,
+			mapKeyPackageName,
+			importPackageName,
+			structName)
+	}
+
+	updatedContent := contentStr[:lineStart] + newInitializer + "\n" + contentStr[lineStart:]
+	return []byte(updatedContent), true
+}
 func AddImport(content []byte, importStr string) ([]byte, bool) {
 	if bytes.Contains(content, []byte(importStr)) {
 		return content, false
@@ -146,49 +226,6 @@ func AddImport(content []byte, importStr string) ([]byte, bool) {
 	updatedContent := append(content[:insertPos], append(newImportLine, content[insertPos:]...)...)
 
 	return updatedContent, true
-}
-
-func AddModuleInitializer(content []byte, packageName, singularName string) ([]byte, bool) {
-	contentStr := string(content)
-
-	// Find the module initializer marker
-	marker := "// MODULE_INITIALIZER_MARKER"
-	markerIndex := strings.Index(contentStr, marker)
-	if markerIndex == -1 {
-		return content, false
-	}
-
-	// Find the start of the line containing the marker
-	lineStart := strings.LastIndex(contentStr[:markerIndex], "\n") + 1
-
-	// Get the indentation from the marker line
-	indentation := contentStr[lineStart:markerIndex]
-
-	// Convert package name to proper format for map key
-	mapKeyPackageName := ToSnakeCase(packageName)
-
-	// Check if the module already exists (using the snake_case package name)
-	if strings.Contains(contentStr[:markerIndex], fmt.Sprintf(`"%s":`, mapKeyPackageName)) {
-		return content, false
-	}
-
-	// Create properly formatted struct name (PascalCase)
-	structName := ToPascalCase(singularName)
-
-	// Package name in the import path should maintain underscores
-	importPackageName := ToSnakeCase(singularName)
-
-	// Create the new initializer with proper indentation
-	newInitializer := fmt.Sprintf(`%s"%s": func(db *gorm.DB, router *gin.RouterGroup) module.Module { return %s.New%sModule(db, router) },`,
-		indentation,       // Use the same indentation as the marker
-		mapKeyPackageName, // Use snake_case for map key
-		importPackageName, // Use snake_case for package import
-		structName)        // Use PascalCase for struct name
-
-	// Insert the new initializer before the marker line
-	updatedContent := contentStr[:lineStart] + newInitializer + "\n" + contentStr[lineStart:]
-
-	return []byte(updatedContent), true
 }
 
 func UpdateInitFileForDestroy(pluralName string) error {

@@ -44,8 +44,15 @@ func GenerateFileFromTemplate(dir, filename, templateFile, singularName, pluralN
 	}
 
 	funcMap := template.FuncMap{
-		"toLower": strings.ToLower,
-		"toTitle": cases.Title(language.Und).String,
+		"toLower":         strings.ToLower,
+		"toTitle":         cases.Title(language.Und).String,
+		"hasFileField":    HasFileField,
+		"getExampleValue": getExampleValue,
+		"isFileField":     isFileField,
+		"isRelationshipField": func(field FieldStruct, relType string) bool {
+			return field.Relationship == relType ||
+				field.Relationship == strings.Replace(relType, "_", "", -1)
+		},
 	}
 
 	tmpl, err := template.New(filepath.Base(templateFile)).Funcs(funcMap).Parse(string(tmplContent))
@@ -92,6 +99,10 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 			var associatedType, associatedTable, pluralType, relationship string
 			goType := GetGoType(fieldType)
 			switch strings.ToLower(fieldType) {
+			case "file", "image", "attachment":
+				// Handle file types
+				goType = "*storage.Attachment"
+				relationship = fieldType
 			case "belongsto", "belongs_to":
 				relationship = "belongs_to"
 				if len(parts) > 2 {

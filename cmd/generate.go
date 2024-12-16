@@ -33,7 +33,6 @@ func generateModule(cmd *cobra.Command, args []string) {
 	// Convert singular name to snake_case for directory naming
 	dirName := utils.ToSnakeCase(singularName)
 	pluralName := utils.ToPlural(singularName)
-	//pluralDirName := utils.ToSnakeCase(singularName)
 
 	// Use PascalCase for struct naming
 	structName := utils.ToPascalCase(singularName)
@@ -41,10 +40,10 @@ func generateModule(cmd *cobra.Command, args []string) {
 	// Use the singular name in snake_case for package naming
 	packageName := utils.ToSnakeCase(singularName)
 
-	// Create directories (singular names in snake_case)
+	// Create directories
 	dirs := []string{
 		filepath.Join("app", "models"),
-		filepath.Join("app", dirName), // Changed to snake_case singular directory
+		filepath.Join("app", dirName),
 	}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
@@ -56,7 +55,10 @@ func generateModule(cmd *cobra.Command, args []string) {
 	// Process fields into FieldStruct
 	processedFields := utils.GenerateFieldStructs(fields)
 
-	// Generate model file with processed fields
+	// Check if module needs file handling
+	hasFileFields := utils.HasFileField(processedFields) // Using exported version
+
+	// Generate model file
 	utils.GenerateFileFromTemplate(
 		filepath.Join("app", "models"),
 		dirName+".go",
@@ -67,12 +69,12 @@ func generateModule(cmd *cobra.Command, args []string) {
 		processedFields,
 	)
 
-	// Generate other files (in singular directory with snake_case)
+	// Generate other files
 	files := []string{"controller.go", "service.go", "mod.go"}
 	for _, file := range files {
 		templateName := strings.TrimSuffix(file, ".go") + ".tmpl"
 		utils.GenerateFileFromTemplate(
-			filepath.Join("app", dirName), // Use singular directory in snake_case
+			filepath.Join("app", dirName),
 			file,
 			"templates/"+templateName,
 			structName,
@@ -82,8 +84,8 @@ func generateModule(cmd *cobra.Command, args []string) {
 		)
 	}
 
-	// Update app/init.go to register the new module
-	if err := utils.UpdateInitFile(singularName); err != nil {
+	// Update app/init.go with conditional initialization
+	if err := utils.UpdateInitFile(singularName, hasFileFields); err != nil {
 		fmt.Printf("Error updating app/init.go: %v\n", err)
 		return
 	}

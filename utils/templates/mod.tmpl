@@ -1,46 +1,92 @@
 package {{.PackageName}}
 
 import (
+    "base/core/event"
     "base/core/module"
+    "base/core/storage"
     "base/app/models"
+    "context"
 
     "github.com/gin-gonic/gin"
+    "go.uber.org/zap"
     "gorm.io/gorm"
 )
 
 type {{.StructName}}Module struct {
     module.DefaultModule
-    DB         *gorm.DB
-    Controller *{{.StructName}}Controller
-    Service    *{{.StructName}}Service
+    DB            *gorm.DB
+    Controller    *{{.StructName}}Controller
+    Service       *{{.StructName}}Service
+    Logger        *zap.Logger
+    EventService  *event.EventService
+    ActiveStorage *storage.ActiveStorage
 }
 
-func New{{.StructName}}Module(db *gorm.DB, router *gin.RouterGroup) module.Module {
-    service := New{{.StructName}}Service(db)
-    controller := New{{.StructName}}Controller(service)
+func New{{.StructName}}Module(
+    db *gorm.DB,
+    router *gin.RouterGroup,
+    logger *zap.Logger,
+    activeStorage *storage.ActiveStorage,
+    eventService *event.EventService,
+) module.Module {
+    service := New{{.StructName}}Service(db, activeStorage, logger)
+    controller := New{{.StructName}}Controller(service, logger, eventService)
 
     {{.LowerStructName}}Module := &{{.StructName}}Module{
-        DB:         db,
-        Controller: controller,
-        Service:    service,
+        DB:            db,
+        Controller:    controller,
+        Service:       service,
+        Logger:        logger,
+        EventService:  eventService,
+        ActiveStorage: activeStorage,
     }
 
     {{.LowerStructName}}Module.Routes(router)
-    {{.LowerStructName}}Module.Migrate()
+
+    // Perform database migration
+    if err := {{.LowerStructName}}Module.Migrate(); err != nil {
+        logger.Error("Failed to migrate {{.LowerStructName}} module",
+            zap.Error(err))
+
+        // Track critical failures
+        eventService.Track(context.Background(), event.EventOptions{
+            Type:        "system_event",
+            Category:    "migration",
+            Actor:       "system",
+            Target:      "{{.LowerStructName}}_module",
+            Action:      "migrate",
+            Status:      "failed",
+            Description: "Failed to migrate {{.LowerStructName}} module",
+            Metadata: map[string]interface{}{
+                "error": err.Error(),
+            },
+        })
+    }
 
     return {{.LowerStructName}}Module
 }
- 
-
 
 func (m *{{.StructName}}Module) Routes(router *gin.RouterGroup) {
-	m.Controller.Routes(router)
+    m.Controller.Routes(router)
+}
+
+func (m *{{.StructName}}Module) Init() error {
+    return nil
 }
 
 func (m *{{.StructName}}Module) Migrate() error {
-	return m.DB.AutoMigrate(&models.{{.StructName}}{})
+    return m.DB.AutoMigrate(&models.{{.StructName}}{})
 }
 
 func (m *{{.StructName}}Module) GetModels() []interface{} {
     return []interface{}{&models.{{.StructName}}{}}
+}
+
+func (m *{{.StructName}}Module) GetModelNames() []string {
+    models := m.GetModels()
+    names := make([]string, len(models))
+    for i, model := range models {
+        names[i] = m.DB.Model(model).Statement.Table
+    }
+    return names
 }
