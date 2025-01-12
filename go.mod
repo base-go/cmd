@@ -9,6 +9,7 @@ require (
 
 require (
 	github.com/gertd/go-pluralize v0.2.1
+	github.com/joho/godotenv v1.5.1
 	github.com/spf13/cobra v1.8.1
 	golang.org/x/text v0.17.0
 )
