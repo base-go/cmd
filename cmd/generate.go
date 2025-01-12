@@ -116,9 +116,20 @@ func generateModule(cmd *cobra.Command, args []string) {
 			return
 		}
 
+		// Add import if not exists
+		importPath := fmt.Sprintf(`"base/app/%s"`, packageName)
+		contentStr := string(content)
+		if !strings.Contains(contentStr, importPath) {
+			importIndex := strings.Index(contentStr, "import (")
+			if importIndex != -1 {
+				closingBracket := strings.Index(contentStr[importIndex:], ")") + importIndex
+				newContent := contentStr[:closingBracket] + "\n" + importPath + contentStr[closingBracket:]
+				contentStr = newContent
+			}
+		}
+
 		// Insert the initializer before the marker comment
 		markerComment := "// MODULE_INITIALIZER_MARKER"
-		contentStr := string(content)
 		markerIndex := strings.Index(contentStr, markerComment)
 		if markerIndex == -1 {
 			fmt.Println("Could not find marker comment in init.go")
@@ -127,7 +138,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 
 		// Find the start of the line containing the marker
 		lineStart := strings.LastIndex(contentStr[:markerIndex], "\n") + 1
-		newContent := contentStr[:lineStart] + "\t\t" + moduleInitializer + "\n\t\t" + contentStr[lineStart:]
+		newContent := contentStr[:lineStart] + moduleInitializer + "\n" + contentStr[lineStart:]
 
 		if err := os.WriteFile(initFile, []byte(newContent), 0644); err != nil {
 			fmt.Printf("Error writing to init.go: %v\n", err)

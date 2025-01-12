@@ -1,7 +1,9 @@
+
 # Base - Command Line Tool for the Base Framework
 
 Base is a powerful command-line tool designed to streamline development with the Base framework.
 It offers scaffolding, module generation, and utilities to accelerate Go application development.
+You can to seed data, import JSON files, and more with a few simple commands.
 
 ## Table of Contents
 
@@ -10,27 +12,24 @@ It offers scaffolding, module generation, and utilities to accelerate Go applica
 - [Commands](#commands)
   - [`base new`](#base-new)
   - [`base g`](#base-generate-or-base-g)
-  - [`base d`](#base-destroy-or-base-d)
-  - [`base start`](#base-start-or-base-s)
-- [Blog Example](#blog-example)
+  - [`base start` or `base s`](#base-start-or-base-s)
+  - [`base update`](#base-update)
+- [Examples](#examples)
+  - [Generating a New Project](#generating-a-new-project)
+  - [Generating Modules](#generating-modules)
+  - [Seeding Data](#seeding-data)
 - [Contributing](#contributing)
 - [License](#license)
+
+---
 
 ## Installation
 
 You can install the Base CLI tool using one of the following methods:
 
-1. **Using the install script** (Recommended):
+1. **Using the install script**:
    ```bash
    curl -sSL https://raw.githubusercontent.com/base-go/cmd/main/install.sh | bash
-   ```
-
-2. **From Source**:
-   ```bash
-   git clone https://github.com/base-go/cmd.git
-   cd cmd
-   go build -o base
-   sudo mv base /usr/local/bin/
    ```
 
 ## Getting Started
@@ -42,6 +41,8 @@ base --help
 ```
 
 This displays the help menu with all available commands and options.
+
+---
 
 ## Commands
 
@@ -56,45 +57,37 @@ base new <project-name>
 
 **Example**:
 ```bash
-base new myblog
-cd myblog
-go mod tidy
+base new myapp
 ```
+
+---
 
 ### `base generate` or `base g`
 
-Generate a new module with specified fields and types.
+Generate a new module with specified fields and options.
 
 **Usage**:
 ```bash
 base g <module-name> [field:type ...] [options]
 ```
 
+- `<module-name>`: Name of the module (e.g., `User`, `Post`)
+- `[field:type ...]`: List of fields with types
+- `[options]`: Additional flags, such as `--admin` for generating an admin interface
+
 **Supported Field Types**:
-- **Basic Types**: 
-  - `string`: For short text
-  - `text`: For long text content
-  - `int`: For numbers
-  - `float`: For decimal numbers
-  - `bool`: For true/false values
-  - `time`: For dates and timestamps
-  - `file`: For file uploads
-  - `image`: For image uploads
-  
-- **Relationship Types**:
-  - `belongsTo`: One-to-one relationship (child side)
-  - `hasOne`: One-to-one relationship (parent side)
-  - `hasMany`: One-to-many relationship
-  - `sort`: For sortable records
+- **Primitive Types**: `string`, `text`, `int`, `bool`, `float`, `time`
+- **Relationships**: `belongsTo`, `hasOne`, `hasMany`
+
+**Example**:
+```bash
+base g User name:string email:string password:string profile:hasOne:Profile
+```
 
 ### `base destroy` or `base d`
 
-Remove a module and its associated files.
-
-**Usage**:
-```bash
-base d <module-name>
-```
+Destroy a module and its associated files.
+---
 
 ### `base start` or `base s`
 
@@ -105,110 +98,159 @@ Start the development server.
 base s
 ```
 
-## Blog Example
+---
 
-Let's create a complete blog system with users, posts, categories, and comments.
+### `base update`
 
-### 1. Create a New Project
+Update the Base Core package to the latest version.
 
+**Usage**:
 ```bash
-base new myblog
-cd myblog
+base update
 ```
 
-### 2. Generate the User Module
+### `base upgrade`
+
+Upgrade the Base CLI tool to the latest version.
+
+---
+
+## Examples
+
+### Generating a New Project
+
+Create a new project called `myapp`:
 
 ```bash
-base g user name:string email:string password:string bio:text avatar:image
+base new myapp
+cd myapp
+go mod tidy
 ```
 
-This creates:
-- User model with name, email, password, bio fields
-- File upload handling for avatar
-- CRUD API endpoints
-- Service layer with search functionality
+---
 
-### 3. Generate the Category Module
+### Generating Modules
+
+#### Blog System Example:
 
 ```bash
-base g category name:string description:text sort:sort
+# Generate User module
+base g User name:string email:string password:string
+
+# Generate Post module
+base g Post title:string content:text published_at:time author:belongsTo:User
+
+# Generate Comment module
+base g Comment content:text user:belongsTo:User post:belongsTo:Post
+
+# Generate Category module with admin interface
+base g Category name:string description:text --admin
 ```
 
-Features:
-- Sortable categories
-- Full CRUD operations
-- Search by name and description
+---
 
-### 4. Generate the Post Module
+### Seeding Data
+
+Base CLI automatically generates seed files for each module. To seed your database with initial data, use:
 
 ```bash
-base g post title:string content:text published_at:time featured_image:image author:belongsTo:User category:belongsTo:Category
+base seed
 ```
 
-Creates:
-- Post model with relationships to User and Category
-- Image upload handling for featured_image
-- Timestamps for publishing
-- Full text search
-- CRUD operations with relationship handling
-
-### 5. Generate the Comment Module
+To reset and seed fresh data:
 
 ```bash
-base g comment content:text user:belongsTo:User post:belongsTo:Post
+base replant
 ```
 
-Features:
-- Comments linked to both users and posts
-- CRUD operations with relationship validations
-- Nested relationship handling
+**Important Note on Seeding Relationships**:
+Ensure parent records are seeded before child records. Adjust the order in `app/seed.go` accordingly.
 
-### 6. Test the Generated API
+Example:
 
-Start the server:
-```bash
-base s
+```go
+func InitializeSeeders() []module.Seeder {
+    return []module.Seeder{
+        &user.UserSeeder{},        // Parent
+        &category.CategorySeeder{},// Independent
+        &post.PostSeeder{},        // Child of User
+        &comment.CommentSeeder{},  // Child of User and Post
+    }
+}
 ```
 
-Example API calls:
+---
+### Feeding Data
+Base CLI provides a flexible way to import JSON data into your database. You can map JSON fields to database columns using the `base feed` command.
 
-```bash
-# Create a category
-curl -X POST http://localhost:8080/api/categories \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Technology", "description": "Tech articles"}'
+## Base Feed Command
 
-# Create a post
-curl -X POST http://localhost:8080/api/posts \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "First Post",
-    "content": "Hello World!",
-    "author_id": 1,
-    "category_id": 1
-  }'
+The `base feed` command imports JSON data into your database with flexible field mapping options.
 
-# Get all posts with pagination and search
-curl "http://localhost:8080/api/posts?page=1&limit=10&search=technology"
-```
-
-### 7. Clean Up (Optional)
-
-To remove a module:
+### Basic Syntax
 
 ```bash
-base d post    # Removes the post module
-base d comment # Removes the comment module
+base feed <table_name>[:<json_path>] [field_mappings...]
 ```
+
+- `<table_name>`: Database table to insert data into.
+- `<json_path>` (optional): Path to the JSON file.
+- `[field_mappings...]` (optional): Mappings for JSON fields to database columns.
+
+### Usage Examples
+
+1. **Basic usage**:
+   ```bash
+   base feed users
+   ```
+
+2. **Using a custom JSON file**:
+   ```bash
+   base feed users:custom_data/my_users.json
+   ```
+
+3. **Simple field mapping**:
+   ```bash
+   base feed users name:full_name email:user_email
+   ```
+
+4. **Mapping one source to multiple columns**:
+   ```bash
+   base feed users username:full_name username:login_name
+   ```
+
+5. **Concatenating multiple fields**:
+   ```bash
+   base feed users "first_name last_name":full_name email:contact_email
+   ```
+
+6. **Combining all types of mappings**:
+   ```bash
+   base feed users "first_name last_name":full_name username:login username:display_name email:contact_email
+   ```
+
+---
 
 ## Contributing
 
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+Contributions are welcome! Follow these steps:
+
+1. Fork the repository.
+2. Create a branch (`git checkout -b feature/AmazingFeature`).
+3. Commit your changes (`git commit -m 'Add AmazingFeature'`).
+4. Push to the branch (`git push origin feature/AmazingFeature`).
+5. Open a pull request.
+
+To report issues, use the [GitHub Issues](https://github.com/base-go/cmd/issues) page, and provide detailed information to help us address the issue promptly.
+
+---
 
 ## License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
+
+---
+
+© 2024 Basecode LLC. All rights reserved.
+
+For more information on the Base framework, refer to the official documentation.
