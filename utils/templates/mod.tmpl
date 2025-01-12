@@ -3,6 +3,8 @@ package {{.PackageName}}
 import (
     "base/core/module"
     "base/app/models"
+    "base/core/emitter"
+    "base/core/logger"
 
     "github.com/gin-gonic/gin"
     "gorm.io/gorm"
@@ -13,32 +15,38 @@ type {{.StructName}}Module struct {
     DB         *gorm.DB
     Controller *{{.StructName}}Controller
     Service    *{{.StructName}}Service
+    Logger     logger.Logger
+    Emitter    *emitter.Emitter
 }
 
-func New{{.StructName}}Module(db *gorm.DB, router *gin.RouterGroup) module.Module {
-    service := New{{.StructName}}Service(db)
+func New{{.StructName}}Module(db *gorm.DB, router *gin.RouterGroup, log logger.Logger, emitter *emitter.Emitter) module.Module {
+    service := New{{.StructName}}Service(db, emitter, log)
     controller := New{{.StructName}}Controller(service)
 
-    {{.LowerStructName}}Module := &{{.StructName}}Module{
+    {{.PackageName}}Module := &{{.StructName}}Module{
         DB:         db,
         Controller: controller,
         Service:    service,
+        Logger:     log,
+        Emitter:    emitter,
     }
 
-    {{.LowerStructName}}Module.Routes(router)
-    {{.LowerStructName}}Module.Migrate()
+    {{.PackageName}}Module.Routes(router)
+    {{.PackageName}}Module.Migrate()
 
-    return {{.LowerStructName}}Module
+    log.Info("initialized {{.StructName}} module")
+
+    return {{.PackageName}}Module
 }
- 
-
 
 func (m *{{.StructName}}Module) Routes(router *gin.RouterGroup) {
-	m.Controller.Routes(router)
+    m.Logger.Info("setting up {{.StructName}} routes")
+    m.Controller.Routes(router)
 }
 
 func (m *{{.StructName}}Module) Migrate() error {
-	return m.DB.AutoMigrate(&models.{{.StructName}}{})
+    m.Logger.Info("running {{.StructName}} migrations")
+    return m.DB.AutoMigrate(&models.{{.StructName}}{})
 }
 
 func (m *{{.StructName}}Module) GetModels() []interface{} {

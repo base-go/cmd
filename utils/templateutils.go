@@ -116,6 +116,9 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 					jsonName = ToSnakeCase(PluralizeClient.Plural(name))
 					associatedTable = ToSnakeCase(pluralType)
 				}
+			case "attachment":
+				relationship = "attachment"
+				goType = "*storage.Attachment"
 			case "sort":
 				relationship = "sort"
 				goType = "int"
@@ -126,7 +129,7 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 					dbName = ToSnakeCase(name)
 				}
 			}
-			fieldStructs = append(fieldStructs, FieldStruct{
+			fieldStruct := FieldStruct{
 				Name:            name,
 				Type:            goType,
 				JSONName:        jsonName,
@@ -135,7 +138,8 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 				AssociatedTable: associatedTable,
 				PluralType:      pluralType,
 				Relationship:    relationship,
-			})
+			}
+			fieldStructs = append(fieldStructs, fieldStruct)
 		}
 	}
 	return fieldStructs

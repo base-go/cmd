@@ -21,7 +21,6 @@ var generateCmd = &cobra.Command{
 }
 
 func init() {
-
 	rootCmd.AddCommand(generateCmd)
 }
 
@@ -38,13 +37,13 @@ func generateModule(cmd *cobra.Command, args []string) {
 	// Use PascalCase for struct naming
 	structName := utils.ToPascalCase(singularName)
 
-	// Use the singular name in snake_case for package naming
-	packageName := utils.ToSnakeCase(singularName)
+	// Use the plural name in snake_case for package naming
+	packageName := utils.ToSnakeCase(pluralName)
 
-	// Create directories (singular names in snake_case)
+	// Create directories (plural names in snake_case)
 	dirs := []string{
 		filepath.Join("app", "models"),
-		filepath.Join("app", pluralDirName), // Changed to snake_case singular directory
+		filepath.Join("app", pluralDirName),
 	}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
@@ -53,40 +52,88 @@ func generateModule(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	// Process fields into FieldStruct
-	processedFields := utils.GenerateFieldStructs(fields)
+	// Process fields
+	fieldStructs := utils.GenerateFieldStructs(fields)
 
-	// Generate model file with processed fields
-	utils.GenerateFileFromTemplate(
-		filepath.Join("app", "models"),
-		dirName+".go",
-		"templates/model.tmpl",
-		structName,
-		pluralDirName,
-		"models",
-		processedFields,
-	)
+	// Generate files using templates
+	templates := []struct {
+		targetDir    string
+		filename     string
+		templateFile string
+	}{
+		{
+			targetDir:    filepath.Join("app", "models"),
+			filename:     fmt.Sprintf("%s.go", dirName),
+			templateFile: "templates/model.tmpl",
+		},
+		{
+			targetDir:    filepath.Join("app", pluralDirName),
+			filename:     "service.go",
+			templateFile: "templates/service.tmpl",
+		},
+		{
+			targetDir:    filepath.Join("app", pluralDirName),
+			filename:     "controller.go",
+			templateFile: "templates/controller.tmpl",
+		},
+		{
+			targetDir:    filepath.Join("app", pluralDirName),
+			filename:     "module.go",
+			templateFile: "templates/module.tmpl",
+		},
+	}
 
-	// Generate other files (in singular directory with snake_case)
-	files := []string{"controller.go", "service.go", "mod.go"}
-	for _, file := range files {
-		templateName := strings.TrimSuffix(file, ".go") + ".tmpl"
+	for _, tmpl := range templates {
 		utils.GenerateFileFromTemplate(
-			filepath.Join("app", pluralDirName), // Use singular directory in snake_case
-			file,
-			"templates/"+templateName,
+			tmpl.targetDir,
+			tmpl.filename,
+			tmpl.templateFile,
 			structName,
-			pluralDirName,
+			pluralName,
 			packageName,
-			processedFields,
+			fieldStructs,
 		)
 	}
 
-	// Update app/init.go to register the new module
-	if err := utils.UpdateInitFile(singularName, pluralName); err != nil {
-		fmt.Printf("Error updating app/init.go: %v\n", err)
-		return
+	// Update init.go
+	initFile := filepath.Join("app", "init.go")
+	if _, err := os.Stat(initFile); err == nil {
+		content, err := os.ReadFile(initFile)
+		if err != nil {
+			fmt.Printf("Error reading init.go: %v\n", err)
+			return
+		}
+
+		// Create the module initializer line
+		moduleInitializer := fmt.Sprintf(`"%s": func(db *gorm.DB, router *gin.RouterGroup, log logger.Logger, emitter *emitter.Emitter, activeStorage *storage.ActiveStorage) module.Module { 
+            return %s.New%sModule(db, router, log, emitter, activeStorage)
+        },`,
+			packageName, packageName, structName)
+
+		// Check if the module initializer already exists
+		if strings.Contains(string(content), fmt.Sprintf(`"%s":`, packageName)) {
+			fmt.Printf("Module initializer for %s already exists in init.go\n", packageName)
+			return
+		}
+
+		// Insert the initializer before the marker comment
+		markerComment := "// MODULE_INITIALIZER_MARKER"
+		contentStr := string(content)
+		markerIndex := strings.Index(contentStr, markerComment)
+		if markerIndex == -1 {
+			fmt.Println("Could not find marker comment in init.go")
+			return
+		}
+
+		// Find the start of the line containing the marker
+		lineStart := strings.LastIndex(contentStr[:markerIndex], "\n") + 1
+		newContent := contentStr[:lineStart] + "\t\t" + moduleInitializer + "\n\t\t" + contentStr[lineStart:]
+
+		if err := os.WriteFile(initFile, []byte(newContent), 0644); err != nil {
+			fmt.Printf("Error writing to init.go: %v\n", err)
+			return
+		}
 	}
 
-	fmt.Printf("Module %s generated successfully with fields: %v\n", singularName, fields)
+	fmt.Printf("Successfully generated %s module\n", structName)
 }

@@ -1,49 +1,40 @@
-package {{.PackageName}}
+package {{toLower .PluralName}}
 
 import (
-    "errors"
     "math"
     "strings"
+    "mime/multipart"
 
     "gorm.io/gorm"
-    "gorm.io/gorm/clause"
-    "base/app/models"
+    "base/core/storage"
     "base/core/types"
+    "base/app/models"
 )
 
 type {{.StructName}}Service struct {
-    DB *gorm.DB
+    DB      *gorm.DB
+    storage *storage.ActiveStorage
 }
 
-func New{{.StructName}}Service(db *gorm.DB) *{{.StructName}}Service {
+func New{{.StructName}}Service(db *gorm.DB, activeStorage *storage.ActiveStorage) *{{.StructName}}Service {
     return &{{.StructName}}Service{
-        DB: db,
+        DB:      db,
+        storage: activeStorage,
     }
 }
 
 func (s *{{.StructName}}Service) Create(req *models.Create{{.StructName}}Request) (*models.{{.StructName}}, error) {
     item := models.{{.StructName}}{
         {{- range .Fields}}
-        {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
+        {{- if not (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne") (eq .Relationship "attachment"))}}
+        {{- if eq .Relationship "belongs_to"}}
         {{.Name}}Id: req.{{.Name}}Id,
-        {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
-        {{.Name}}: req.{{.Name}},
-        {{- else if ne .Relationship "has_many"}}
+        {{- else}}
         {{.Name}}: req.{{.Name}},
         {{- end}}
         {{- end}}
+        {{- end}}
     }
-
-    {{range .Fields}}{{if eq .Relationship "sort"}}
-    // Set initial sort order if not set
-    if item.{{.Name}} == 0 {
-        var maxOrder int
-        if err := s.DB.Model(&models.{{$.StructName}}{}).Select("COALESCE(MAX({{.DBName}}), -1)").Scan(&maxOrder).Error; err != nil {
-            return nil, err
-        }
-        item.{{.Name}} = maxOrder + 1
-    }
-    {{end}}{{end}}
 
     if err := s.DB.Create(&item).Error; err != nil {
         return nil, err
@@ -60,222 +51,116 @@ func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName
     // Build updates map
     updates := make(map[string]interface{})
     {{- range .Fields}}
-    {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
+    {{- if not (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne") (eq .Relationship "attachment"))}}
+    {{- if eq .Relationship "belongs_to"}}
     if req.{{.Name}}Id != nil {
-        updates["{{.DBName}}_id"] = *req.{{.Name}}Id
+        updates["{{.DBName}}"] = *req.{{.Name}}Id
     }
-    {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
+    {{- else}}
     if req.{{.Name}} != nil {
         updates["{{.DBName}}"] = *req.{{.Name}}
     }
-    {{- else if ne .Relationship "has_many"}}
-    if req.{{.Name}} != nil {
-        updates["{{.DBName}}"] = *req.{{.Name}}
-    }
+    {{- end}}
     {{- end}}
     {{- end}}
 
-    // Apply updates
     if err := s.DB.Model(&models.{{.StructName}}{}).Where("id = ?", id).Updates(updates).Error; err != nil {
         return nil, err
     }
-
-    // Return updated item
     return s.GetById(id)
 }
 
 func (s *{{.StructName}}Service) GetById(id uint) (*models.{{.StructName}}, error) {
     var item models.{{.StructName}}
-    if err := s.DB.Preload(clause.Associations).First(&item, id).Error; err != nil {
+    if err := item.Preload(s.DB).First(&item, id).Error; err != nil {
         return nil, err
     }
     return &item, nil
 }
 
 func (s *{{.StructName}}Service) GetAll(page *int, limit *int, search *string) (*types.PaginatedResponse, error) {
+    var items []*models.{{.StructName}}
+    var total int64
     query := s.DB.Model(&models.{{.StructName}}{})
 
-    // Add search condition if search parameter is provided
+    // Apply search if provided
     if search != nil && *search != "" {
-        searchQuery := "%" + *search + "%"
-
-        // Build the WHERE clause for searching string fields
-        var conditions []string
-        var params []interface{}
-
-        {{- range .Fields}}
-        {{- if and (ne .Relationship "has_many") (ne .Relationship "has_one") (ne .Relationship "belongs_to") (eq .Type "string")}}
-        conditions = append(conditions, "{{.DBName}} LIKE ?")
-        params = append(params, searchQuery)
-        {{- end}}
-        {{- end}}
-
-        // Apply the search conditions if any exist
-        if len(conditions) > 0 {
-            whereClause := strings.Join(conditions, " OR ")
-            query = query.Where(whereClause, params...)
-        }
+        searchValue := "%" + strings.ToLower(*search) + "%"
+        query = query.Where(
+            {{- $first := true}}
+            {{- range .Fields}}
+            {{- if and (not (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne") (eq .Relationship "attachment"))) (eq .Type "string")}}
+            {{if $first}}
+            "LOWER({{.DBName}}) LIKE ?", searchValue,
+            {{- $first = false}}
+            {{else}}
+            ).Or("LOWER({{.DBName}}) LIKE ?", searchValue,
+            {{- end}}
+            {{- end}}
+            {{- end}}
+        )
     }
 
-    {{range .Fields}}{{if eq .Relationship "sort"}}
-    query = query.Order("{{.DBName}} asc")
-    {{end}}{{end}}
+    // Get total count
+    if err := query.Count(&total).Error; err != nil {
+        return nil, err
+    }
 
+    // Apply pagination if provided
     if page != nil && limit != nil {
-        var items []models.{{.StructName}}Response
-        paginatedResponse, err := paginate(query, *page, *limit, &items)
-        if err != nil {
-            return nil, err
-        }
-
-        // Add counts for associated has_many relationships
-        itemIds := make([]uint, 0, len(items))
-        for i := range items {
-            itemIds = append(itemIds, items[i].Id)
-        }
-
-        {{ range .Fields }}
-        {{ if or (eq .Relationship "has_many") (eq .Relationship "hasMany") }}
-        var {{.JSONName}}Counts []struct {
-            {{$.StructName}}Id uint
-            Count int64
-        }
-        s.DB.Table("{{.AssociatedTable}}").
-            Select("{{$.TableName}}_id as {{$.StructName}}_id, count(*) as count").
-            Where("{{$.TableName}}_id IN ?", itemIds).
-            Group("{{$.TableName}}_id").
-            Scan(&{{.JSONName}}Counts)
-
-        {{.JSONName}}CountMap := make(map[uint]int64)
-        for _, c := range {{.JSONName}}Counts {
-            {{.JSONName}}CountMap[c.{{$.StructName}}Id] = c.Count
-        }
-
-        // Attach counts to items
-        for i := range items {
-            items[i].{{.Name}}Count = {{.JSONName}}CountMap[items[i].Id]
-        }
-        {{ end }}
-        {{ end }}
-
-        paginatedResponse.Data = items
-        return &paginatedResponse, nil
+        offset := (*page - 1) * *limit
+        query = query.Offset(offset).Limit(*limit)
     }
 
-    var allItems []models.{{.StructName}}
-    if err := query.Preload(clause.Associations).Find(&allItems).Error; err != nil {
+    // Get items with preloaded relations
+    if err := (&models.{{.StructName}}{}).Preload(query).Find(&items).Error; err != nil {
         return nil, err
     }
 
-    response := types.PaginatedResponse{
-        Data: allItems,
-        Pagination: types.Pagination{
-            Total:      int64(len(allItems)),
-            Page:       1,
-            PageSize:   len(allItems),
-            TotalPages: 1,
-        },
-    }
-
-    return &response, nil
-}
-
-func (s *{{.StructName}}Service) Delete(id uint) error {
-    result := s.DB.Delete(&models.{{.StructName}}{}, id)
-    if result.Error != nil {
-        return result.Error
-    }
-    if result.RowsAffected == 0 {
-        return errors.New("item not found")
-    }
-    return nil
-}
-
-{{range .Fields}}
-{{if eq .Relationship "sort"}}
-// GetSorted returns all items sorted by {{.JSONName}}
-func (s *{{$.StructName}}Service) GetSorted() ([]*models.{{$.StructName}}, error) {
-    var items []*models.{{$.StructName}}
-    if err := s.DB.Preload(clause.Associations).Order("{{.DBName}} asc").Find(&items).Error; err != nil {
-        return nil, err
-    }
-    return items, nil
-}
-
-// UpdateSort updates the sort order of items
-func (s *{{$.StructName}}Service) UpdateSort(sortedIds []uint) error {
-    return s.DB.Transaction(func(tx *gorm.DB) error {
-        for order, id := range sortedIds {
-            if err := tx.Model(&models.{{$.StructName}}{}).Where("id = ?", id).Update("{{.DBName}}", order).Error; err != nil {
-                return err
-            }
-        }
-        return nil
-    })
-}
-{{end}}
-{{end}}
-
-{{range .Fields}}
-{{if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
-// Get{{.Name}} returns all {{.Name}} for a {{$.StructName}}
-func (s *{{$.StructName}}Service) Get{{.Name}}(id uint) ([]*models.{{.AssociatedType}}, error) {
-    item, err := s.GetById(id)
-    if err != nil {
-        return nil, err
-    }
-
-    var associated []*models.{{.AssociatedType}}
-    if err := s.DB.Model(item).Association("{{.Name}}").Find(&associated); err != nil {
-        return nil, err
-    }
-
-    return associated, nil
-}
-{{end}}
-{{end}}
-
-{{range .Fields}}
-{{if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
-// Get{{.Name}} returns the {{.Name}} for a {{$.StructName}}
-func (s *{{$.StructName}}Service) Get{{.Name}}(id uint) (*models.{{.AssociatedType}}, error) {
-    item, err := s.GetById(id)
-    if err != nil {
-        return nil, err
-    }
-
-    var associated models.{{.AssociatedType}}
-    if err := s.DB.Model(item).Association("{{.Name}}").Find(&associated); err != nil {
-        return nil, err
-    }
-
-    return &associated, nil
-}
-{{end}}
-{{end}}
-
-func paginate(db *gorm.DB, page, limit int, out interface{}) (types.PaginatedResponse, error) {
-    var total int64
-    if err := db.Count(&total).Error; err != nil {
-        return types.PaginatedResponse{}, err
-    }
-
-    totalPages := int(math.Ceil(float64(total) / float64(limit)))
-    offset := (page - 1) * limit
-
-    if err := db.Preload(clause.Associations).Limit(limit).Offset(offset).Find(out).Error; err != nil {
-        return types.PaginatedResponse{}, err
+    // Convert to response type
+    listItems := make([]*models.{{.StructName}}ListResponse, len(items))
+    for i, item := range items {
+        listItems[i] = item.ToListResponse()
     }
 
     pagination := types.Pagination{
-        Total:      total,
-        Page:       page,
-        PageSize:   limit,
-        TotalPages: totalPages,
+        Total:      int(total),
+        Page:       *page,
+        PageSize:   *limit,
+        TotalPages: int(math.Ceil(float64(total) / float64(*limit))),
     }
 
-    return types.PaginatedResponse{
-        Data:       out,
+    response := &types.PaginatedResponse{
+        Data:       listItems,
         Pagination: pagination,
-    }, nil
+    }
+
+    return response, nil
 }
+
+func (s *{{.StructName}}Service) Delete(id uint) error {
+    // First check if item exists
+    if err := s.DB.First(&models.{{.StructName}}{}, id).Error; err != nil {
+        return err
+    }
+
+    return s.DB.Delete(&models.{{.StructName}}{}, id).Error
+}
+
+{{range .Fields}}
+{{if eq .Relationship "attachment"}}
+func (s *{{$.StructName}}Service) Upload{{.Name}}(id uint, file *multipart.FileHeader) error {
+    var item models.{{$.StructName}}
+    if err := s.DB.First(&item, id).Error; err != nil {
+        return err
+    }
+
+    attachment, err := s.storage.Attach(&item, "{{.DBName}}", file)
+    if err != nil {
+        return err
+    }
+
+    return s.DB.Model(&item).Update("{{.DBName}}", attachment).Error
+}
+{{end}}
+{{end}}

@@ -129,25 +129,6 @@ func UpdateInitFile(singularName, pluralName string) error {
 	return nil
 }
 
-func AddImport(content []byte, importStr string) ([]byte, bool) {
-	if bytes.Contains(content, []byte(importStr)) {
-		return content, false
-	}
-
-	importPos := bytes.Index(content, []byte("import ("))
-	if importPos == -1 {
-		return content, false
-	}
-
-	insertPos := importPos + len("import (") + 1
-
-	newImportLine := []byte("\t" + importStr + "\n")
-
-	updatedContent := append(content[:insertPos], append(newImportLine, content[insertPos:]...)...)
-
-	return updatedContent, true
-}
-
 func AddModuleInitializer(content []byte, packageName, singularName string) ([]byte, bool) {
 	contentStr := string(content)
 
@@ -162,7 +143,7 @@ func AddModuleInitializer(content []byte, packageName, singularName string) ([]b
 
 	structName := ToPascalCase(singularName)
 
-	newInitializer := fmt.Sprintf(`	"%s": func(db *gorm.DB, router *gin.RouterGroup) module.Module { return %s.New%sModule(db, router) },`,
+	newInitializer := fmt.Sprintf(`	"%s": func(db *gorm.DB, router *gin.RouterGroup, log logger.Logger, emitter *emitter.Emitter, storage *storage.ActiveStorage) module.Module { return %s.New%sModule(db, router, log, emitter, storage) },`,
 		packageName, packageName, structName)
 
 	updatedContent := contentStr[:markerIndex] + newInitializer + "\n        " + contentStr[markerIndex:]
@@ -210,4 +191,23 @@ func RemoveModuleInitializer(content []byte, pluralName string) []byte {
 	}
 
 	return bytes.Join(newLines, []byte("\n"))
+}
+
+func AddImport(content []byte, importStr string) ([]byte, bool) {
+	if bytes.Contains(content, []byte(importStr)) {
+		return content, false
+	}
+
+	importPos := bytes.Index(content, []byte("import ("))
+	if importPos == -1 {
+		return content, false
+	}
+
+	insertPos := importPos + len("import (") + 1
+
+	newImportLine := []byte("\t" + importStr + "\n")
+
+	updatedContent := append(content[:insertPos], append(newImportLine, content[insertPos:]...)...)
+
+	return updatedContent, true
 }

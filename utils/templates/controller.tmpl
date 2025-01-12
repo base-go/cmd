@@ -19,20 +19,15 @@ func New{{.StructName}}Controller(service *{{.StructName}}Service) *{{.StructNam
 }
 
 func (c *{{.StructName}}Controller) Routes(router *gin.RouterGroup) {
-    router.GET("/{{.RouteName}}", c.List)       // Paginated list
-    router.GET("/{{.RouteName}}/all", c.ListAll) // Unpaginated list
-    router.GET("/{{.RouteName}}/:id", c.Get)
-    router.POST("/{{.RouteName}}", c.Create)
-    router.PUT("/{{.RouteName}}/:id", c.Update)
-    router.DELETE("/{{.RouteName}}/:id", c.Delete)
-
+    router.GET("/{{toLower .PluralName}}", c.List)       // Paginated list
+    router.GET("/{{toLower .PluralName}}/all", c.ListAll) // Unpaginated list
+    router.GET("/{{toLower .PluralName}}/:id", c.Get)
+    router.POST("/{{toLower .PluralName}}", c.Create)
+    router.PUT("/{{toLower .PluralName}}/:id", c.Update)
+    router.DELETE("/{{toLower .PluralName}}/:id", c.Delete)
     {{- range .Fields}}
-    {{- if eq .Relationship "sort"}}
-    router.GET("/{{$.RouteName}}/sorted", c.GetSorted)
-    router.PUT("/{{$.RouteName}}/sort", c.UpdateSort)
-    {{- end}}
-    {{- if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
-    router.GET("/{{$.RouteName}}/:id/{{.JSONName}}", c.GetAssociated{{.Name}})
+    {{- if eq .Relationship "attachment"}}
+    router.PUT("/{{toLower $.PluralName}}/:id/{{toLower .Name}}", c.Upload{{.Name}})
     {{- end}}
     {{- end}}
 }
@@ -44,11 +39,11 @@ func (c *{{.StructName}}Controller) Routes(router *gin.RouterGroup) {
 // @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Param {{.RouteName}} body models.Create{{.StructName}}Request true "Create {{.StructName}} request"
+// @Param {{toLower .PluralName}} body models.Create{{.StructName}}Request true "Create {{.StructName}} request"
 // @Success 201 {object} models.{{.StructName}}Response
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /{{.RouteName}} [post]
+// @Router /{{toLower .PluralName}} [post]
 func (c *{{.StructName}}Controller) Create(ctx *gin.Context) {
     var req models.Create{{.StructName}}Request
     if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -76,7 +71,7 @@ func (c *{{.StructName}}Controller) Create(ctx *gin.Context) {
 // @Success 200 {object} models.{{.StructName}}Response
 // @Failure 400 {object} ErrorResponse
 // @Failure 404 {object} ErrorResponse
-// @Router /{{.RouteName}}/{id} [get]
+// @Router /{{toLower .PluralName}}/{id} [get]
 func (c *{{.StructName}}Controller) Get(ctx *gin.Context) {
     id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
     if err != nil {
@@ -94,8 +89,8 @@ func (c *{{.StructName}}Controller) Get(ctx *gin.Context) {
 }
 
 // List{{.PluralName}} godoc
-// @Summary List {{.PluralName}}
-// @Description Get a list of {{.PluralName}}
+// @Summary List {{toLower .PluralName}}
+// @Description Get a list of {{toLower .PluralName}}
 // @Tags {{.StructName}}
 // @Security ApiKeyAuth
 // @Accept json
@@ -106,7 +101,7 @@ func (c *{{.StructName}}Controller) Get(ctx *gin.Context) {
 // @Success 200 {object} types.PaginatedResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /{{.RouteName}} [get]
+// @Router /{{toLower .PluralName}} [get]
 func (c *{{.StructName}}Controller) List(ctx *gin.Context) {
     page := 1
     limit := 10
@@ -140,15 +135,15 @@ func (c *{{.StructName}}Controller) List(ctx *gin.Context) {
 }
 
 // ListAll{{.PluralName}} godoc
-// @Summary List all {{.PluralName}}
-// @Description Get a list of all {{.PluralName}} without pagination
+// @Summary List all {{toLower .PluralName}}
+// @Description Get a list of all {{toLower .PluralName}} without pagination
 // @Tags {{.StructName}}
 // @Security ApiKeyAuth
 // @Accept json
 // @Produce json
 // @Success 200 {object} types.PaginatedResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /{{.RouteName}}/all [get]
+// @Router /{{toLower .PluralName}}/all [get]
 func (c *{{.StructName}}Controller) ListAll(ctx *gin.Context) {
     paginatedResponse, err := c.{{.StructName}}Service.GetAll(nil, nil, nil)
     if err != nil {
@@ -167,12 +162,12 @@ func (c *{{.StructName}}Controller) ListAll(ctx *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "{{.StructName}} id"
-// @Param {{.RouteName}} body models.Update{{.StructName}}Request true "Update {{.StructName}} request"
+// @Param {{toLower .PluralName}} body models.Update{{.StructName}}Request true "Update {{.StructName}} request"
 // @Success 200 {object} models.{{.StructName}}Response
 // @Failure 400 {object} ErrorResponse
 // @Failure 404 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /{{.RouteName}}/{id} [put]
+// @Router /{{toLower .PluralName}}/{id} [put]
 func (c *{{.StructName}}Controller) Update(ctx *gin.Context) {
     id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
     if err != nil {
@@ -206,7 +201,7 @@ func (c *{{.StructName}}Controller) Update(ctx *gin.Context) {
 // @Success 200 {object} SuccessResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /{{.RouteName}}/{id} [delete]
+// @Router /{{toLower .PluralName}}/{id} [delete]
 func (c *{{.StructName}}Controller) Delete(ctx *gin.Context) {
     id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
     if err != nil {
@@ -222,99 +217,43 @@ func (c *{{.StructName}}Controller) Delete(ctx *gin.Context) {
     ctx.JSON(http.StatusOK, SuccessResponse{Message: "Item deleted successfully"})
 }
 
-{{range .Fields}}
-{{if eq .Relationship "sort"}}
-// GetSorted godoc
-// @Summary Get sorted {{$.PluralName}}
-// @Description Get all {{$.PluralName}} ordered by {{.JSONName}}
+{{- range .Fields}}
+{{- if eq .Relationship "attachment"}}
+// Upload{{.Name}} godoc
+// @Summary Upload {{.Name}} for a {{$.StructName}}
+// @Description Upload {{.Name}} for a {{$.StructName}} by its id
 // @Tags {{$.StructName}}
 // @Security ApiKeyAuth
-// @Accept json
+// @Accept multipart/form-data
 // @Produce json
-// @Success 200 {array} models.{{$.StructName}}Response
-// @Failure 500 {object} ErrorResponse
-// @Router /{{$.RouteName}}/sorted [get]
-func (c *{{$.StructName}}Controller) GetSorted(ctx *gin.Context) {
-    items, err := c.{{$.StructName}}Service.GetSorted()
-    if err != nil {
-        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch sorted items: " + err.Error()})
-        return
-    }
-
-    response := make([]models.{{$.StructName}}Response, len(items))
-    for i, item := range items {
-        response[i] = *item.ToResponse()
-    }
-
-    ctx.JSON(http.StatusOK, response)
-}
-
-// UpdateSort godoc
-// @Summary Update {{$.PluralName}} sort order
-// @Description Update the sort order of multiple {{$.PluralName}}
-// @Tags {{$.StructName}}
-// @Security ApiKeyAuth
-// @Accept json
-// @Produce json
-// @Param sorted_ids body []uint true "Array of ids in desired sort order"
+// @Param id path int true "{{$.StructName}} id"
+// @Param file formData file true "{{.Name}} file to upload"
 // @Success 200 {object} SuccessResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /{{$.RouteName}}/sort [put]
-func (c *{{$.StructName}}Controller) UpdateSort(ctx *gin.Context) {
-    var sortedIds []uint
-    if err := ctx.ShouldBindJSON(&sortedIds); err != nil {
-        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid request body"})
-        return
-    }
-
-    if err := c.{{$.StructName}}Service.UpdateSort(sortedIds); err != nil {
-        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to update sort order: " + err.Error()})
-        return
-    }
-
-    ctx.JSON(http.StatusOK, SuccessResponse{Message: "Sort order updated successfully"})
-}
-{{end}}
-
-{{if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
-// GetAssociated{{.Name}} godoc
-// @Summary Get associated {{.Name}} for a {{$.StructName}}
-// @Description Get all associated {{.Name}} for a specific {{$.StructName}}
-// @Tags {{$.StructName}}
-// @Security ApiKeyAuth
-// @Accept json
-// @Produce json
-// @Param id path int true "{{$.StructName}} id"
-// @Success 200 {array} models.{{.AssociatedType}}Response
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-// @Router /{{$.RouteName}}/{id}/{{.JSONName}} [get]
-func (c *{{$.StructName}}Controller) GetAssociated{{.Name}}(ctx *gin.Context) {
+// @Router /{{toLower $.PluralName}}/{id}/{{toLower .Name}} [put]
+func (c *{{$.StructName}}Controller) Upload{{.Name}}(ctx *gin.Context) {
     id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
     if err != nil {
-        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid ID format"})
+        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid id format"})
         return
     }
 
-    items, err := c.{{$.StructName}}Service.Get{{.Name}}(uint(id))
+    file, err := ctx.FormFile("file")
     if err != nil {
-        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch {{.Name}}: " + err.Error()})
+        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Failed to get file: " + err.Error()})
         return
     }
 
-    // Convert to response type
-    responses := make([]models.{{.AssociatedType}}Response, len(items))
-    for i, item := range items {
-        if item != nil {
-            responses[i] = *item.ToResponse()
-        }
+    if err := c.{{$.StructName}}Service.Upload{{.Name}}(uint(id), file); err != nil {
+        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to upload file: " + err.Error()})
+        return
     }
 
-    ctx.JSON(http.StatusOK, responses)
+    ctx.JSON(http.StatusOK, SuccessResponse{Message: "File uploaded successfully"})
 }
-{{end}}
-{{end}}
+{{- end}}
+{{- end}}
 
 type ErrorResponse struct {
     Error string `json:"error"`

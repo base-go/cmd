@@ -3,19 +3,22 @@ package models
 import (
     "time"
     "gorm.io/gorm"
+    "base/core/storage"
 )
 
-// Main model struct
+// {{.StructName}} represents a {{toLower .StructName}} entity
 type {{.StructName}} struct {
     Id        uint           `json:"id" gorm:"primaryKey"`
     {{- range .Fields}}
     {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id" gorm:"column:{{.DBName}}_id"`
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}Id;references:Id"`
+    {{.Name}}Id uint `json:"{{.JSONName}}_id_id" gorm:"column:{{.JSONName}}_id_id"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}_id,omitempty" gorm:"foreignKey:{{.Name}}Id;references:Id"`
     {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
     {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
     {{- else if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
     {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id"`
+    {{- else if eq .Relationship "attachment"}}
+    {{.Name}} *storage.Attachment `json:"{{.JSONName}},omitempty" gorm:"type:jsonb"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}" gorm:"column:{{.DBName}}{{if eq .Relationship "sort"}};default:0{{end}}"`
     {{- end}}
@@ -25,35 +28,47 @@ type {{.StructName}} struct {
     DeletedAt gorm.DeletedAt `json:"deleted_at,omitempty" gorm:"index"`
 }
 
-// Base response for list views
-type {{.StructName}}ListResponse struct {
-    Id        uint           `json:"id"`
-    {{- range .Fields}}
-    {{- if not (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne"))}}
-    {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
-    {{- end}}
-    {{- if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
-    {{.Name}}Count int64 `json:"{{.JSONName}}_count"`
-    {{- end}}
-    {{- end}}
-    CreatedAt time.Time      `json:"created_at"`
-    UpdatedAt time.Time      `json:"updated_at"`
+// TableName returns the table name for the {{.StructName}} model
+func ({{.StructName}}) TableName() string {
+    return "{{toLower .PluralName}}"
 }
 
-// Detailed response for single item views
-type {{.StructName}}Response struct {
-    Id        uint           `json:"id"`
+// Implement the storage.Attachable interface
+func (item *{{.StructName}}) GetId() uint {
+    return item.Id
+}
+
+func (item *{{.StructName}}) GetModelName() string {
+    return "{{toLower .StructName}}"
+}
+
+// {{.StructName}}ListResponse represents the list view response
+type {{.StructName}}ListResponse struct {
+    Id        uint      `json:"id"`
     {{- range .Fields}}
     {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id"`
-    {{.Name}} *{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}_id,omitempty"`
+    {{- else if not (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne"))}}
+    {{.Name}} {{.Type}} `json:"{{.JSONName}}{{if eq .Relationship "sort"}},omitempty{{end}}"`
+    {{- end}}
+    {{- end}}
+    CreatedAt time.Time `json:"created_at"`
+    UpdatedAt time.Time `json:"updated_at"`
+}
+
+// {{.StructName}}Response represents the detailed view response
+type {{.StructName}}Response struct {
+    Id        uint      `json:"id"`
+    {{- range .Fields}}
+    {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
+    {{.Name}}Id uint `json:"{{.JSONName}}_id_id"`
+    {{.Name}} *{{.AssociatedType}}Response `json:"{{.JSONName}}_id,omitempty"`
+    {{- else if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
+    {{.Name}} []*{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
     {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
     {{.Name}} *{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
-    {{- else if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
-    {{.Name}}Count int64 `json:"{{.JSONName}}_count"`
-    {{.Name}} []{{.AssociatedType}}Response `json:"{{.JSONName}},omitempty"`
     {{- else}}
-    {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
+    {{.Name}} {{.Type}} `json:"{{.JSONName}}{{if eq .Relationship "sort"}},omitempty{{end}}"`
     {{- end}}
     {{- end}}
     CreatedAt time.Time      `json:"created_at"`
@@ -61,71 +76,85 @@ type {{.StructName}}Response struct {
     DeletedAt gorm.DeletedAt `json:"deleted_at,omitempty"`
 }
 
-// Create request
+// Create{{.StructName}}Request represents the create request
 type Create{{.StructName}}Request struct {
     {{- range .Fields}}
+    {{- if not (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne"))}}
     {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id" binding:"required"`
-    {{- else if ne (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne")) true }}
-    {{.Name}} {{.Type}} `json:"{{.JSONName}}"{{if not (eq .Relationship "sort")}} binding:"required"{{end}}`
+    {{.Name}}Id uint `json:"{{.JSONName}}_id_id" binding:"required"`
+    {{- else}}
+    {{.Name}} {{.Type}} `json:"{{.JSONName}}" binding:"required"`
+    {{- end}}
     {{- end}}
     {{- end}}
 }
 
-// Update request
+// Update{{.StructName}}Request represents the update request
 type Update{{.StructName}}Request struct {
     {{- range .Fields}}
+    {{- if not (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne"))}}
     {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
-    {{.Name}}Id *uint `json:"{{.JSONName}}_id,omitempty"`
-    {{- else if ne (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne")) true }}
+    {{.Name}}Id *uint `json:"{{.JSONName}}_id_id,omitempty"`
+    {{- else}}
     {{.Name}} *{{.Type}} `json:"{{.JSONName}},omitempty"`
     {{- end}}
     {{- end}}
+    {{- end}}
 }
 
-func ({{.StructName}}) TableName() string {
-    return "{{.TableName}}"
-}
-
-// Convert to list response (used in list views)
+// ToListResponse converts the model to a list response
 func (item *{{.StructName}}) ToListResponse() *{{.StructName}}ListResponse {
     if item == nil {
         return nil
     }
-
-    response := &{{.StructName}}ListResponse{
+    return &{{.StructName}}ListResponse{
         Id: item.Id,
         {{- range .Fields}}
-        {{- if not (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne"))}}
+        {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
         {{.Name}}: item.{{.Name}},
-        {{- end}}
-        {{- if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
-        {{.Name}}Count: int64(len(item.{{.Name}})),
+        {{- else if not (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne"))}}
+        {{.Name}}: item.{{.Name}},
         {{- end}}
         {{- end}}
         CreatedAt: item.CreatedAt,
         UpdatedAt: item.UpdatedAt,
     }
-    return response
 }
 
-// Convert to detailed response (used in single item views)
+// ToResponse converts the model to a detailed response
 func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
     if item == nil {
         return nil
     }
-
-    response := &{{.StructName}}Response{
+    return &{{.StructName}}Response{
         Id: item.Id,
         {{- range .Fields}}
         {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
         {{.Name}}Id: item.{{.Name}}Id,
-        {{.Name}}: item.{{.Name}}.ToResponse(),
+        {{.Name}}: func() *{{.AssociatedType}}Response {
+            if item.{{.Name}} == nil {
+                return nil
+            }
+            return item.{{.Name}}.ToResponse()
+        }(),
         {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
-        {{.Name}}: item.{{.Name}}.ToResponse(),
+        {{.Name}}: func() *{{.AssociatedType}}Response {
+            if item.{{.Name}} == nil {
+                return nil
+            }
+            return item.{{.Name}}.ToResponse()
+        }(),
         {{- else if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
-        {{.Name}}Count: int64(len(item.{{.Name}})),
-        {{.Name}}: make([]{{.AssociatedType}}Response, 0),
+        {{.Name}}: func() []*{{.AssociatedType}}Response {
+            if item.{{.Name}} == nil {
+                return nil
+            }
+            responses := make([]*{{.AssociatedType}}Response, len(item.{{.Name}}))
+            for i, v := range item.{{.Name}} {
+                responses[i] = v.ToResponse()
+            }
+            return responses
+        }(),
         {{- else}}
         {{.Name}}: item.{{.Name}},
         {{- end}}
@@ -134,25 +163,15 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
         UpdatedAt: item.UpdatedAt,
         DeletedAt: item.DeletedAt,
     }
-
-    {{- range .Fields}}
-    {{- if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
-    if item.{{.Name}} != nil {
-        for _, v := range item.{{.Name}} {
-            if v != nil {
-                response.{{.Name}} = append(response.{{.Name}}, *v.ToResponse())
-            }
-        }
-    }
-    {{- end}}
-    {{- end}}
-
-    return response
 }
 
 func (item *{{.StructName}}) Preload(db *gorm.DB) *gorm.DB {
     {{- range .Fields}}
-    {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo") (eq .Relationship "has_one") (eq .Relationship "hasOne") (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
+    {{- if or (eq .Relationship "belongs_to") (eq .Relationship "belongsTo")}}
+    db = db.Preload("{{.Name}}")
+    {{- else if or (eq .Relationship "has_one") (eq .Relationship "hasOne")}}
+    db = db.Preload("{{.Name}}")
+    {{- else if or (eq .Relationship "has_many") (eq .Relationship "hasMany")}}
     db = db.Preload("{{.Name}}")
     {{- end}}
     {{- end}}
