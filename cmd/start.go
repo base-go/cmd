@@ -52,6 +52,26 @@ func setupAirConfig(cwd string) error {
 	return nil
 }
 
+func ensureSwagInstalled() error {
+	if _, err := exec.LookPath("swag"); err != nil {
+		fmt.Println("Installing swag for API documentation...")
+		cmd := exec.Command("go", "install", "github.com/swaggo/swag/cmd/swag@latest")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
+	}
+	return nil
+}
+
+func generateSwaggerDocs(cwd string) error {
+	fmt.Println("Generating Swagger documentation...")
+	cmd := exec.Command("swag", "init")
+	cmd.Dir = cwd
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
 func startApplication(cmd *cobra.Command, args []string) {
 	// Get the current working directory
 	cwd, err := os.Getwd()
@@ -66,6 +86,18 @@ func startApplication(cmd *cobra.Command, args []string) {
 		fmt.Println("Error: Base project structure not found.")
 		fmt.Println("Make sure you are in the root directory of your Base project.")
 		fmt.Println("Expected to find main.go at:", mainPath)
+		return
+	}
+
+	// Ensure swag is installed and generate docs
+	if err := ensureSwagInstalled(); err != nil {
+		fmt.Printf("Error installing swag: %v\n", err)
+		return
+	}
+
+	// Generate Swagger docs before starting the server
+	if err := generateSwaggerDocs(cwd); err != nil {
+		fmt.Printf("Error generating swagger docs: %v\n", err)
 		return
 	}
 
@@ -88,6 +120,7 @@ func startApplication(cmd *cobra.Command, args []string) {
 		airCmd.Stdout = os.Stdout
 		airCmd.Stderr = os.Stderr
 		airCmd.Dir = cwd
+		airCmd.Env = append(os.Environ(), "SWAG_DISABLED=true")
 
 		if err := airCmd.Run(); err != nil {
 			fmt.Printf("Error running application with air: %v\n", err)

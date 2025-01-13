@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactored template generation for Air configuration
 - Improved error handling in `start` command
 - Enhanced code organization with dedicated Air utilities
+- Improved Swagger documentation generation in hot reload mode
 
 ### Fixed
 - Fixed directory path resolution in `start` command
@@ -31,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved error handling in Air configuration setup
 - Updated Air installation to use new repository (github.com/air-verse/air)
 - Fixed hot reload loop by excluding docs directory and improving process management
+- Fixed Swagger documentation triggering unnecessary rebuilds in hot reload mode
 
 ## [1.0.0] - 2024-01-13
 
