@@ -81,15 +81,15 @@ func GenerateFileFromTemplate(dir, filename, templateName, singularName, pluralN
 	// Execute template
 	data := struct {
 		StructName    string
-		PluralName   string
-		Package      string
-		Fields       []FieldStruct
+		PluralName    string
+		PackageName   string
+		Fields        []FieldStruct
 		HasImageField bool
 	}{
 		StructName:    singularName,
-		PluralName:   pluralName,
-		Package:      packageName,
-		Fields:       fields,
+		PluralName:    pluralName,
+		PackageName:   packageName,
+		Fields:        fields,
 		HasImageField: HasFieldType(fields, "attachment"),
 	}
 
