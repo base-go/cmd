@@ -24,15 +24,15 @@ type {{.StructName}} struct {
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to"}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id" gorm:"column:{{.JSONName}}_id"`
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}Id;references:Id"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
     {{- else if eq .Relationship "has_one"}}
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
     {{- else if eq .Relationship "has_many"}}
-    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
+    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
     {{- else if eq .Relationship "many2many"}}
-    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"many2many:{{toLower $.StructName}}_{{toLower .PluralName}};"`
+    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
     {{- else if eq .Type "text"}}
-    {{.Name}} string `json:"{{.JSONName}}" gorm:"column:{{.JSONName}};type:text"`
+    {{.Name}} string `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
     {{- else if eq .Type "attachment"}}
     {{.Name}}Id *uint `json:"{{.JSONName}}_id" gorm:"column:{{.JSONName}}_id"`
     {{.Name}} *storage.Attachment `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}Id;references:Id"`
@@ -40,8 +40,8 @@ type {{.StructName}} struct {
     {{.Name}} types.DateTime `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
     {{- else if eq .Type "self_reference"}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id" gorm:"column:{{.JSONName}}_id"`
-    {{.Name}} *{{$.StructName}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}Id;references:Id"`
-    {{.PluralName}} []*{{$.StructName}} `json:"{{toLower .PluralName}},omitempty" gorm:"foreignKey:{{.Name}}Id;references:Id"`
+    {{.Name}} *{{$.StructName}} `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
+    {{.PluralName}} []*{{$.StructName}} `json:"{{toLower .PluralName}}" gorm:"column:{{toLower .PluralName}}"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
     {{- end}}
@@ -71,13 +71,13 @@ type {{.StructName}}ListResponse struct {
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to"}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id"`
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}"`
     {{- else if eq .Relationship "has_one"}}
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}"`
     {{- else if eq .Relationship "has_many"}}
-    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
+    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}"`
     {{- else if eq .Relationship "many2many"}}
-    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
+    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}"`
     {{- else if eq .Type "text"}}
     {{.Name}} string `json:"{{.JSONName}}"`
     {{- else if eq .Type "attachment"}}
@@ -87,8 +87,8 @@ type {{.StructName}}ListResponse struct {
     {{.Name}} types.DateTime `json:"{{.JSONName}}"`
     {{- else if eq .Type "self_reference"}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id"`
-    {{.Name}} *{{$.StructName}} `json:"{{.JSONName}},omitempty"`
-    {{.PluralName}} []*{{$.StructName}} `json:"{{toLower .PluralName}},omitempty"`
+    {{.Name}} *{{$.StructName}} `json:"{{.JSONName}}"`
+    {{.PluralName}} []*{{$.StructName}} `json:"{{toLower .PluralName}}"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end}}
@@ -103,13 +103,13 @@ type {{.StructName}}Response struct {
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to"}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id"`
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}"`
     {{- else if eq .Relationship "has_one"}}
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}"`
     {{- else if eq .Relationship "has_many"}}
-    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
+    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}"`
     {{- else if eq .Relationship "many2many"}}
-    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
+    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}"`
     {{- else if eq .Type "text"}}
     {{.Name}} string `json:"{{.JSONName}}"`
     {{- else if eq .Type "attachment"}}
@@ -119,8 +119,8 @@ type {{.StructName}}Response struct {
     {{.Name}} types.DateTime `json:"{{.JSONName}}"`
     {{- else if eq .Type "self_reference"}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id"`
-    {{.Name}} *{{$.StructName}} `json:"{{.JSONName}},omitempty"`
-    {{.PluralName}} []*{{$.StructName}} `json:"{{toLower .PluralName}},omitempty"`
+    {{.Name}} *{{$.StructName}} `json:"{{.JSONName}}"`
+    {{.PluralName}} []*{{$.StructName}} `json:"{{toLower .PluralName}}"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end}}
@@ -135,6 +135,7 @@ type Create{{.StructName}}Request struct {
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to"}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id" binding:"required"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}" binding:"required"`
     {{- else if eq .Relationship "has_many"}}
     {{.Name}}Ids []uint `json:"{{.JSONName}}_ids"`
     {{- else if eq .Relationship "many2many"}}
@@ -147,6 +148,7 @@ type Create{{.StructName}}Request struct {
     {{.Name}} types.DateTime `json:"{{.JSONName}}"`
     {{- else if eq .Type "self_reference"}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id"`
+    {{.Name}} *{{$.StructName}} `json:"{{.JSONName}}" binding:"required"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}" binding:"required"`
     {{- end}}
@@ -215,5 +217,5 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
 
 // Preload preloads all the model's relationships
 func (item *{{.StructName}}) Preload(db *gorm.DB) *gorm.DB {
-    return db{{range .Fields}}{{if or (eq .Relationship "belongs_to") (eq .Relationship "has_one") (eq .Relationship "has_many") (eq .Relationship "many2many") (eq .Type "self_reference")}}.Preload("{{.Name}}"){{if eq .Type "self_reference"}}.Preload("{{.PluralName}}"){{end}}{{end}}{{end}}
+    return db
 }
