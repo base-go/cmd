@@ -131,6 +131,11 @@ base g Post \
   tags:hasMany:Tag \
   comments:hasMany:Comment
 
+# Generate Tag model
+base g Tag \
+  name:string:unique \
+  posts:hasMany:Post
+
 # Generate Comment model with self-referential relationships
 base g Comment \
   content:text \
@@ -233,6 +238,7 @@ cd blog
 # Generate the blog system models
 base g User username:string email:string password:string avatar:attachment
 base g Post title:string content:text author:belongsTo:User
+base g Tag name:string:unique posts:hasMany:Post
 
 # Start the development server
 base start
