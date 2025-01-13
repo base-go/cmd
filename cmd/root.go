@@ -6,12 +6,13 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "base [command] [args]",
-	Short: "Generate or destroy modules for the application",
-	Long:  `A command-line tool to generate new modules with predefined structure or destroy existing modules for the application.`,
+	Use:   "base",
+	Short: "Base CLI - A modern Go web framework",
+	Long: `Base CLI is a powerful tool for building modern web applications in Go.
+It provides scaffolding, code generation, and development utilities.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		// Skip version check for version command
-		if cmd.Name() != "version" {
+		// Skip version check for version and upgrade commands
+		if cmd.Name() != "version" && cmd.Name() != "upgrade" {
 			version.PrintUpdateMessage()
 		}
 	},

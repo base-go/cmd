@@ -3,40 +3,70 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/base-go/cmd/version"
 	"github.com/spf13/cobra"
 )
 
-type releaseInfo struct {
-	TagName     string `json:"tag_name"`
-	Name        string `json:"name"`
-	Description string `json:"body"`
+var Version = "dev"
+var CommitHash = "none"
+var BuildDate = time.Now().Format(time.RFC3339)
+var GoVersion = "unknown"
+
+type GithubRelease struct {
+	TagName     string    `json:"tag_name"`
+	PublishedAt time.Time `json:"published_at"`
+	Body        string    `json:"body"`
+	HTMLURL     string    `json:"html_url"`
+}
+
+func checkLatestVersion() (string, string, string, error) {
+	url := "https://api.github.com/repos/base-go/cmd/releases/latest"
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", "", "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	var release GithubRelease
+	if err := json.Unmarshal(body, &release); err != nil {
+		return "", "", "", err
+	}
+
+	return strings.TrimPrefix(release.TagName, "v"), release.HTMLURL, release.Body, nil
 }
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Print the version number of Base CLI",
-	Long:  `All software has versions. This is Base's.`,
+	Short: "Print version information",
 	Run: func(cmd *cobra.Command, args []string) {
 		info := version.GetBuildInfo()
-		fmt.Println(info)
+		fmt.Printf("Base CLI %s\n", info.Version)
+		fmt.Printf("Commit: %s\n", info.CommitHash)
+		fmt.Printf("Built: %s\n", info.BuildDate)
+		fmt.Printf("Go version: %s\n", info.GoVersion)
 
-		// Get release notes from GitHub
-		resp, err := http.Get("https://api.github.com/repos/base-go/cmd/releases/tags/" + info.Version)
-		if err == nil {
-			defer resp.Body.Close()
-			var release releaseInfo
-			if err := json.NewDecoder(resp.Body).Decode(&release); err == nil && release.Description != "" {
-				fmt.Println("\nWhat's new in this version:")
-				notes := strings.Split(release.Description, "\n")
-				for _, line := range notes {
-					if strings.TrimSpace(line) != "" {
-						fmt.Println(line)
-					}
-				}
+		// Check for updates
+		latestVersion, releaseURL, releaseNotes, err := checkLatestVersion()
+		if err != nil {
+			return
+		}
+
+		if info.Version == "dev" || info.Version != latestVersion {
+			fmt.Printf("\n📦 Update available! %s → %s\n", info.Version, latestVersion)
+			fmt.Printf("Run: base upgrade\n")
+			fmt.Printf("Release notes: %s\n", releaseURL)
+			if releaseNotes != "" {
+				fmt.Printf("\nChangelog:\n%s\n", releaseNotes)
 			}
 		}
 	},

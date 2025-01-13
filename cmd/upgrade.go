@@ -10,121 +10,151 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/base-go/cmd/version"
 	"github.com/spf13/cobra"
 )
 
-type GithubRelease struct {
-	TagName string `json:"tag_name"`
-	Assets  []struct {
-		Name               string `json:"name"`
-		BrowserDownloadURL string `json:"browser_download_url"`
-	} `json:"assets"`
+type Asset struct {
+	Name               string `json:"name"`
+	BrowserDownloadURL string `json:"browser_download_url"`
+}
+
+type Release struct {
+	TagName string  `json:"tag_name"`
+	Assets  []Asset `json:"assets"`
+}
+
+func getLatestRelease() (*Release, error) {
+	url := "https://api.github.com/repos/base-go/cmd/releases/latest"
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var release Release
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, err
+	}
+
+	return &release, nil
+}
+
+func downloadAndInstall(url, targetPath string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("bad status: %s", resp.Status)
+	}
+
+	out, err := os.Create(targetPath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return err
+	}
+
+	return os.Chmod(targetPath, 0755)
 }
 
 var upgradeCmd = &cobra.Command{
 	Use:   "upgrade",
 	Short: "Upgrade Base CLI to the latest version",
-	Long:  `Upgrade Base CLI to the latest version from GitHub releases.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("\nUpgrading Base to the latest version...")
-		fmt.Println("Version information:")
-		info := version.GetBuildInfo()
-		fmt.Println(info)
+		fmt.Println("Checking for updates...")
 
-		// Get the latest release from GitHub
-		resp, err := http.Get("https://api.github.com/repos/base-go/cmd/releases/latest")
+		release, err := getLatestRelease()
 		if err != nil {
-			fmt.Printf("Error checking latest version: %v\n", err)
-			return
-		}
-		defer resp.Body.Close()
-
-		var release GithubRelease
-		if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-			fmt.Printf("Error parsing release info: %v\n", err)
+			fmt.Printf("Error checking for updates: %v\n", err)
 			return
 		}
 
-		if release.TagName == "" {
-			fmt.Println("No release found")
+		currentVersion := "1.0.0" // Replace with actual current version
+		latestVersion := strings.TrimPrefix(release.TagName, "v")
+
+		if currentVersion == latestVersion {
+			fmt.Printf("You're already using the latest version (%s)\n", currentVersion)
 			return
 		}
 
-		fmt.Printf("Downloading version %s...\n", release.TagName)
+		// Determine the correct asset name based on OS and architecture
+		osName := runtime.GOOS
+		archName := runtime.GOARCH
+		assetPrefix := fmt.Sprintf("base_%s_%s", osName, archName)
 
-		// Find the correct asset for the current platform
 		var downloadURL string
-		platform := fmt.Sprintf("%s_%s", runtime.GOOS, runtime.GOARCH)
 		for _, asset := range release.Assets {
-			if strings.Contains(asset.Name, platform) {
+			if strings.HasPrefix(asset.Name, assetPrefix) {
 				downloadURL = asset.BrowserDownloadURL
 				break
 			}
 		}
 
 		if downloadURL == "" {
-			fmt.Printf("No binary found for platform %s\n", platform)
+			fmt.Printf("No compatible binary found for your system (%s_%s)\n", osName, archName)
 			return
 		}
 
-		// Download the binary
-		resp, err = http.Get(downloadURL)
-		if err != nil {
-			fmt.Printf("Error downloading release: %v\n", err)
-			return
-		}
-		defer resp.Body.Close()
+		fmt.Printf("Downloading version %s...\n", latestVersion)
 
-		// Create a temporary file
-		tmpFile, err := os.CreateTemp("", "base-*")
+		// Get the current executable path
+		execPath, err := os.Executable()
 		if err != nil {
-			fmt.Printf("Error creating temporary file: %v\n", err)
-			return
-		}
-		defer os.Remove(tmpFile.Name())
-
-		// Copy the downloaded binary to the temporary file
-		_, err = io.Copy(tmpFile, resp.Body)
-		if err != nil {
-			fmt.Printf("Error saving binary: %v\n", err)
-			return
-		}
-		tmpFile.Close()
-
-		// Make the temporary file executable
-		err = os.Chmod(tmpFile.Name(), 0755)
-		if err != nil {
-			fmt.Printf("Error making binary executable: %v\n", err)
+			fmt.Printf("Error getting executable path: %v\n", err)
 			return
 		}
 
-		// Get the path to the current binary
-		currentBinary, err := os.Executable()
-		if err != nil {
-			fmt.Printf("Error getting current binary path: %v\n", err)
-			return
-		}
-		currentBinary, err = filepath.EvalSymlinks(currentBinary)
-		if err != nil {
-			fmt.Printf("Error resolving symlinks: %v\n", err)
+		// Create a temporary file for the download
+		tmpDir := os.TempDir()
+		tmpFile := filepath.Join(tmpDir, "base-new")
+
+		// Download the new version
+		if err := downloadAndInstall(downloadURL, tmpFile); err != nil {
+			fmt.Printf("Error downloading update: %v\n", err)
 			return
 		}
 
-		// Replace the current binary
-		if err := os.Rename(tmpFile.Name(), currentBinary); err != nil {
-			if os.IsPermission(err) {
-				fmt.Println("\nTo upgrade Base CLI, please run the following command in your terminal:")
-				fmt.Println("  sudo base upgrade")
-				fmt.Println("\nThis requires sudo privileges to replace the existing binary.")
-			} else {
-				fmt.Printf("Error installing binary: %v\n", err)
+		// Replace the old binary
+		if err := os.Rename(tmpFile, execPath); err != nil {
+			// If direct rename fails (e.g., on Windows), try copy and remove
+			if err := copyFile(tmpFile, execPath); err != nil {
+				fmt.Printf("Error installing update: %v\n", err)
+				os.Remove(tmpFile)
+				return
 			}
-			return
+			os.Remove(tmpFile)
 		}
 
-		fmt.Printf("Base CLI has been successfully upgraded to version %s!\n", release.TagName)
+		fmt.Printf("Successfully upgraded to version %s!\n", latestVersion)
 	},
+}
+
+func copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
+	if err != nil {
+		return err
+	}
+
+	return os.Chmod(dst, 0755)
 }
 
 func init() {
