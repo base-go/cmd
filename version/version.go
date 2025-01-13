@@ -3,16 +3,16 @@ package version
 // Version information
 var (
 	// Version is the current version of Base CLI
-	Version string
+	Version = "1.0.0"
 
 	// CommitHash is the git commit hash at build time
-	CommitHash string
+	CommitHash = "unknown"
 
 	// BuildDate is the date when the binary was built
-	BuildDate string
+	BuildDate = "unknown"
 
 	// GoVersion is the version of Go used to build the binary
-	GoVersion string
+	GoVersion = "unknown"
 )
 
 // BuildInfo contains all version information
@@ -25,19 +25,6 @@ type BuildInfo struct {
 
 // GetBuildInfo returns all version information
 func GetBuildInfo() BuildInfo {
-	if Version == "" {
-		Version = "1.0.0"
-	}
-	if CommitHash == "" {
-		CommitHash = "unknown"
-	}
-	if BuildDate == "" {
-		BuildDate = "unknown"
-	}
-	if GoVersion == "" {
-		GoVersion = "unknown"
-	}
-	
 	return BuildInfo{
 		Version:    Version,
 		CommitHash: CommitHash,
