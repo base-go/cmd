@@ -1,66 +1,107 @@
 #!/bin/bash
 
-# Step 1: Check if Go is installed
-if ! [ -x "$(command -v go)" ]; then
-  echo "Error: Go is not installed." >&2
-  echo "Please install Go and rerun this script." >&2
-  exit 1
+set -e
+
+# Detect OS and architecture
+detect_os() {
+    case "$(uname -s)" in
+        Darwin*)   echo "darwin" ;;
+        Linux*)    echo "linux" ;;
+        MINGW64*|MSYS*|CYGWIN*) echo "windows" ;;
+        *)         echo "unknown" ;;
+    esac
+}
+
+detect_arch() {
+    case "$(uname -m)" in
+        x86_64|amd64) echo "amd64" ;;
+        arm64|aarch64) echo "arm64" ;;
+        *)            echo "unknown" ;;
+    esac
+}
+
+OS=$(detect_os)
+ARCH=$(detect_arch)
+
+if [ "$OS" = "unknown" ] || [ "$ARCH" = "unknown" ]; then
+    echo "Unsupported operating system or architecture"
+    exit 1
 fi
 
-# Step 2: Define the repository URL and installation directory
-REPO_URL="https://github.com/base-go/cmd/archive/main.zip"
-INSTALL_DIR="$HOME/.base"
-BIN_PATH="/usr/local/bin"
-
-# Set version information
-VERSION=${VERSION:-"1.0.0"}
-BUILD_DATE=${BUILD_DATE:-$(date -u '+%Y-%m-%dT%H:%M:%SZ')}
-GO_VERSION=${GO_VERSION:-$(go version | cut -d' ' -f3)}
-
-echo "Version information:"
-echo "Version: $VERSION"
-echo "Build Date: $BUILD_DATE"
-echo "Go Version: $GO_VERSION"
-
-# Step 3: Download and extract the repository
-if [ -d "$INSTALL_DIR" ]; then
-  echo "Directory $INSTALL_DIR already exists. Removing existing directory."
-  rm -rf "$INSTALL_DIR" || { echo "Failed to remove existing directory."; exit 1; }
+# Set installation directories based on OS
+if [ "$OS" = "windows" ]; then
+    INSTALL_DIR="$USERPROFILE/.base"
+    BIN_DIR="$USERPROFILE/bin"
+    BINARY_NAME="base.exe"
+else
+    INSTALL_DIR="$HOME/.base"
+    BIN_DIR="/usr/local/bin"
+    BINARY_NAME="base"
 fi
 
-echo "Downloading the repository..."
-mkdir -p "$INSTALL_DIR" || { echo "Failed to create installation directory."; exit 1; }
-curl -L "$REPO_URL" -o "$INSTALL_DIR/base.zip" || { echo "Failed to download repository."; exit 1; }
+# Create installation directories
+mkdir -p "$INSTALL_DIR"
+mkdir -p "$BIN_DIR" 2>/dev/null || {
+    echo "Error: Unable to create $BIN_DIR directory. Please run with sudo:"
+    echo "curl -sSL https://raw.githubusercontent.com/base-go/cmd/main/install.sh | sudo bash"
+    exit 1
+}
 
-echo "Extracting the repository..."
-unzip "$INSTALL_DIR/base.zip" -d "$INSTALL_DIR" || { echo "Failed to extract repository."; exit 1; }
-mv "$INSTALL_DIR"/cmd-main/* "$INSTALL_DIR" || { echo "Failed to move files."; exit 1; }
-rm -rf "$INSTALL_DIR/cmd-main" "$INSTALL_DIR/base.zip"
+echo "Installing Base CLI..."
+echo "OS: $OS"
+echo "Architecture: $ARCH"
 
-# Step 4: Initialize and tidy up the module
-echo "Initializing and tidying module..."
-cd "$INSTALL_DIR" || { echo "Failed to change directory."; exit 1; }
-echo "Current directory: $(pwd)"
-
-go mod tidy || { echo "Failed to tidy module."; exit 1; }
-
-# Step 5: Build the tool with version information
-echo "Building the tool..."
-go build -v \
-  -ldflags "-X 'github.com/base-go/cmd/version.Version=$VERSION' \
-            -X 'github.com/base-go/cmd/version.CommitHash=$COMMIT_HASH' \
-            -X 'github.com/base-go/cmd/version.BuildDate=$BUILD_DATE' \
-            -X 'github.com/base-go/cmd/version.GoVersion=$GO_VERSION'" \
-  -o base || { echo "Failed to build the tool."; exit 1; }
-
-# Step 6: Install the binary
-echo "Installing the tool..."
-if [ -f "$BIN_PATH/base" ]; then
-  echo "Existing binary found. Removing..."
-  sudo rm -f "$BIN_PATH/base" || { echo "Failed to remove existing binary."; exit 1; }
+# Get the latest release version
+LATEST_RELEASE=$(curl -s https://api.github.com/repos/base-go/cmd/releases/latest | grep "tag_name" | cut -d '"' -f 4)
+if [ -z "$LATEST_RELEASE" ]; then
+    echo "Error: Could not determine latest version"
+    exit 1
 fi
 
-sudo mv base "$BIN_PATH/base" || { echo "Failed to install the tool."; exit 1; }
+echo "Latest version: $LATEST_RELEASE"
 
-echo "Installation completed successfully."
-echo "You can now use 'base' from anywhere in your terminal."
+# Download the appropriate binary
+DOWNLOAD_URL="https://github.com/base-go/cmd/releases/download/$LATEST_RELEASE/base_${OS}_${ARCH}.tar.gz"
+if [ "$OS" = "windows" ]; then
+    DOWNLOAD_URL="https://github.com/base-go/cmd/releases/download/$LATEST_RELEASE/base_${OS}_${ARCH}.zip"
+fi
+
+echo "Downloading from: $DOWNLOAD_URL"
+TMP_DIR=$(mktemp -d)
+cd "$TMP_DIR"
+
+if [ "$OS" = "windows" ]; then
+    curl -sL "$DOWNLOAD_URL" -o base.zip
+    unzip base.zip
+else
+    curl -sL "$DOWNLOAD_URL" | tar xz
+fi
+
+# Install the binary
+mv "$BINARY_NAME" "$INSTALL_DIR/"
+chmod +x "$INSTALL_DIR/$BINARY_NAME"
+
+# Create symlink
+if [ "$OS" = "windows" ]; then
+    # On Windows, copy to bin directory
+    cp "$INSTALL_DIR/$BINARY_NAME" "$BIN_DIR/"
+else
+    # On Unix systems, create symlink
+    ln -sf "$INSTALL_DIR/$BINARY_NAME" "$BIN_DIR/$BINARY_NAME"
+fi
+
+# Cleanup
+cd - > /dev/null
+rm -rf "$TMP_DIR"
+
+echo "Base CLI has been installed successfully!"
+echo "Run 'base --help' to get started"
+
+# Add to PATH for Windows if needed
+if [ "$OS" = "windows" ]; then
+    if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
+        echo "Please add $BIN_DIR to your PATH to use the 'base' command"
+        echo "You can do this by running:"
+        echo "    setx PATH \"%PATH%;$BIN_DIR\""
+    fi
+fi
