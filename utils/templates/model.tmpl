@@ -16,12 +16,21 @@ type {{.StructName}} struct {
     Id        uint           `json:"id" gorm:"primaryKey"`
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to"}}
+    {{- if eq .AssociatedType $.StructName}}
+    {{.Name}}Id *uint `json:"{{.JSONName}}_id" gorm:"column:{{.JSONName}}_id"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}Id;references:Id"`
+    {{- else}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id" gorm:"column:{{.JSONName}}_id"`
     {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}Id;references:Id"`
+    {{- end}}
     {{- else if eq .Relationship "has_one"}}
     {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
     {{- else if eq .Relationship "has_many"}}
+    {{- if eq .AssociatedType $.StructName}}
+    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}Id;references:Id"`
+    {{- else}}
     {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
+    {{- end}}
     {{- else if eq .Relationship "many2many"}}
     {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"many2many:{{toLower $.StructName}}_{{toLower .PluralName}}"`
     {{- else if eq .Type "text"}}
@@ -59,8 +68,13 @@ type {{.StructName}}ListResponse struct {
     Id        uint      `json:"id"`
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to"}}
+    {{- if eq .AssociatedType $.StructName}}
+    {{.Name}}Id *uint `json:"{{.JSONName}}_id"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
+    {{- else}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id"`
     {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
+    {{- end}}
     {{- else if eq .Relationship "has_one"}}
     {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
     {{- else if eq .Relationship "has_many"}}
@@ -87,8 +101,13 @@ type {{.StructName}}Response struct {
     Id        uint      `json:"id"`
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to"}}
+    {{- if eq .AssociatedType $.StructName}}
+    {{.Name}}Id *uint `json:"{{.JSONName}}_id"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
+    {{- else}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id"`
     {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
+    {{- end}}
     {{- else if eq .Relationship "has_one"}}
     {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
     {{- else if eq .Relationship "has_many"}}
@@ -115,7 +134,11 @@ type {{.StructName}}Response struct {
 type Create{{.StructName}}Request struct {
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to"}}
+    {{- if eq .AssociatedType $.StructName}}
+    {{.Name}}Id *uint `json:"{{.JSONName}}_id"`
+    {{- else}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id" binding:"required"`
+    {{- end}}
     {{- else if eq .Relationship "has_many"}}
     {{.Name}}Ids []uint `json:"{{.JSONName}}_ids"`
     {{- else if eq .Relationship "many2many"}}
@@ -200,6 +223,7 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
     }
 }
 
+// Preload preloads all the model's relationships
 func (item *{{.StructName}}) Preload(db *gorm.DB) *gorm.DB {
     return db{{- range .Fields}}{{if or (eq .Relationship "belongs_to") (eq .Relationship "has_one") (eq .Relationship "has_many") (eq .Relationship "many2many")}}.Preload("{{.Name}}"){{- end}}{{- end}}
 }
