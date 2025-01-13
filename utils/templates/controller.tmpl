@@ -216,17 +216,19 @@ func (c *{{.StructName}}Controller) Delete(ctx *gin.Context) {
 
 {{- range .Fields}}
 {{- if eq .Relationship "attachment"}}
+
 // Upload{{.Name}} godoc
 // @Summary Upload {{.Name}} for a {{$.StructName}}
-// @Description Upload {{.Name}} for a {{$.StructName}} by its id
+// @Description Upload or update the {{.Name}} of a {{$.StructName}}
 // @Tags {{$.StructName}}
 // @Security ApiKeyAuth
 // @Accept multipart/form-data
 // @Produce json
 // @Param id path int true "{{$.StructName}} id"
-// @Param file formData file true "{{.Name}} file to upload"
-// @Success 200 {object} SuccessResponse
+// @Param file formData file true "File to upload"
+// @Success 200 {object} models.{{$.StructName}}Response
 // @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 // @Router /{{toLower $.PluralName}}/{id}/{{toLower .Name}} [put]
 func (c *{{$.StructName}}Controller) Upload{{.Name}}(ctx *gin.Context) {
@@ -238,16 +240,36 @@ func (c *{{$.StructName}}Controller) Upload{{.Name}}(ctx *gin.Context) {
 
     file, err := ctx.FormFile("file")
     if err != nil {
-        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Failed to get file: " + err.Error()})
+        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "No file uploaded"})
         return
     }
 
-    if err := c.{{$.StructName}}Service.Upload{{.Name}}(uint(id), file); err != nil {
+    // Get the item first
+    item, err := c.{{$.StructName}}Service.GetById(uint(id))
+    if err != nil {
+        ctx.JSON(http.StatusNotFound, ErrorResponse{Error: "Item not found"})
+        return
+    }
+
+    // Upload the file using storage service
+    attachment, err := storage.GetInstance().Attach(item, "{{toLower .Name}}", file)
+    if err != nil {
         ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to upload file: " + err.Error()})
         return
     }
 
-    ctx.JSON(http.StatusOK, SuccessResponse{Message: "File uploaded successfully"})
+    // Update the item with the new attachment
+    updateReq := &models.Update{{$.StructName}}Request{
+        {{.Name}}Id: &attachment.Id,
+    }
+
+    updatedItem, err := c.{{$.StructName}}Service.Update(uint(id), updateReq)
+    if err != nil {
+        ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to update item: " + err.Error()})
+        return
+    }
+
+    ctx.JSON(http.StatusOK, updatedItem.ToResponse())
 }
 {{- end}}
 {{- end}}
