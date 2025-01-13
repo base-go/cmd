@@ -153,7 +153,7 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 			relatedModel = parts[2]
 
 			// First add the ID field for belongs_to relationships
-			if relationship == "belongs_to" {
+			if relationship == "belongs_to" || relationship == "belongsTo" {
 				idField := FieldStruct{
 					Name:         ToPascalCase(name) + "Id",
 					Type:         "uint",
@@ -164,12 +164,15 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 				fieldStructs = append(fieldStructs, idField)
 			}
 
-			// Then add the relationship field
-			if relationship == "belongs_to" || relationship == "has_one" {
+			// Then add the relationship field with proper type
+			if relationship == "belongs_to" || relationship == "has_one" || relationship == "belongsTo" || relationship == "hasOne" {
 				fieldType = "*" + relatedModel
-			} else if relationship == "has_many" {
+			} else if relationship == "has_many" || relationship == "hasMany" || relationship == "manyToMany" || relationship == "many2many" {
 				fieldType = "[]*" + relatedModel
 			}
+		} else {
+			// For non-relationship fields, get the Go type
+			fieldType = GetGoType(fieldType)
 		}
 
 		fieldStruct := FieldStruct{

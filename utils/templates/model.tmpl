@@ -9,6 +9,13 @@ import (
     {{- if or (hasField .Fields "time") (hasField .Fields "date") (hasField .Fields "datetime") }}
     "base/core/types"
     {{- end }}
+    {{- range .Fields}}
+    {{- if eq .Relationship "belongs_to"}}
+    {{- if eq .AssociatedType "users.User"}}
+    "base/core/app/users"
+    {{- end}}
+    {{- end}}
+    {{- end}}
 )
 
 // {{.StructName}} represents a {{toLower .StructName}} entity
@@ -67,13 +74,6 @@ type {{.StructName}}ListResponse struct {
     {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
     {{- else if eq .Relationship "many2many"}}
     {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
-    {{- else if eq .Type "text"}}
-    {{.Name}} string `json:"{{.JSONName}}"`
-    {{- else if eq .Type "attachment"}}
-    {{.Name}}Id *uint `json:"{{.JSONName}}_id"`
-    {{.Name}} *storage.Attachment `json:"{{.JSONName}}"`
-    {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
-    {{.Name}} types.DateTime `json:"{{.JSONName}}"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end}}
@@ -95,13 +95,6 @@ type {{.StructName}}Response struct {
     {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
     {{- else if eq .Relationship "many2many"}}
     {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
-    {{- else if eq .Type "text"}}
-    {{.Name}} string `json:"{{.JSONName}}"`
-    {{- else if eq .Type "attachment"}}
-    {{.Name}}Id *uint `json:"{{.JSONName}}_id"`
-    {{.Name}} *storage.Attachment `json:"{{.JSONName}}"`
-    {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
-    {{.Name}} types.DateTime `json:"{{.JSONName}}"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end}}
@@ -116,16 +109,6 @@ type Create{{.StructName}}Request struct {
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to"}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id" binding:"required"`
-    {{- else if eq .Relationship "has_many"}}
-    {{.Name}}Ids []uint `json:"{{.JSONName}}_ids"`
-    {{- else if eq .Relationship "many2many"}}
-    {{.Name}}Ids []uint `json:"{{.JSONName}}_ids"`
-    {{- else if eq .Type "text"}}
-    {{.Name}} string `json:"{{.JSONName}}" binding:"required"`
-    {{- else if eq .Type "attachment"}}
-    {{.Name}}Id *uint `json:"{{.JSONName}}_id"`
-    {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
-    {{.Name}} types.DateTime `json:"{{.JSONName}}"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}" binding:"required"`
     {{- end}}
@@ -137,16 +120,6 @@ type Update{{.StructName}}Request struct {
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to"}}
     {{.Name}}Id *uint `json:"{{.JSONName}}_id,omitempty"`
-    {{- else if eq .Relationship "has_many"}}
-    {{.Name}}Ids []uint `json:"{{.JSONName}}_ids,omitempty"`
-    {{- else if eq .Relationship "many2many"}}
-    {{.Name}}Ids []uint `json:"{{.JSONName}}_ids,omitempty"`
-    {{- else if eq .Type "text"}}
-    {{.Name}} *string `json:"{{.JSONName}},omitempty"`
-    {{- else if eq .Type "attachment"}}
-    {{.Name}}Id *uint `json:"{{.JSONName}}_id,omitempty"`
-    {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
-    {{.Name}} *types.DateTime `json:"{{.JSONName}},omitempty"`
     {{- else}}
     {{.Name}} *{{.Type}} `json:"{{.JSONName}},omitempty"`
     {{- end}}
@@ -162,9 +135,6 @@ func (item *{{.StructName}}) ToListResponse() *{{.StructName}}ListResponse {
         Id: item.Id,
         {{- range .Fields}}
         {{- if eq .Relationship "belongs_to"}}
-        {{.Name}}Id: item.{{.Name}}Id,
-        {{.Name}}: item.{{.Name}},
-        {{- else if eq .Type "attachment"}}
         {{.Name}}Id: item.{{.Name}}Id,
         {{.Name}}: item.{{.Name}},
         {{- else}}
@@ -187,9 +157,6 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
         {{- if eq .Relationship "belongs_to"}}
         {{.Name}}Id: item.{{.Name}}Id,
         {{.Name}}: item.{{.Name}},
-        {{- else if eq .Type "attachment"}}
-        {{.Name}}Id: item.{{.Name}}Id,
-        {{.Name}}: item.{{.Name}},
         {{- else}}
         {{.Name}}: item.{{.Name}},
         {{- end}}
@@ -202,5 +169,5 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
 
 // Preload preloads all the model's relationships
 func (item *{{.StructName}}) Preload(db *gorm.DB) *gorm.DB {
-    return db{{- range .Fields}}{{if or (eq .Relationship "belongs_to") (eq .Relationship "has_one") (eq .Relationship "has_many") (eq .Relationship "many2many")}}.Preload("{{.Name}}"){{- end}}{{- end}}
+    return db{{- range .Fields}}{{if .Relationship}}.Preload("{{.Name}}"){{end}}{{- end}}
 }
