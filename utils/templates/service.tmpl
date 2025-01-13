@@ -31,14 +31,16 @@ func New{{.StructName}}Service(db *gorm.DB{{if .HasImageField}}, activeStorage *
 func (s *{{.StructName}}Service) Create(req *models.Create{{.StructName}}Request) (*models.{{.StructName}}, error) {
     item := models.{{.StructName}}{
         {{- range .Fields}}
-        {{- if not (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne") (eq .Relationship "attachment"))}}
         {{- if eq .Relationship "belongs_to"}}
         {{.Name}}Id: req.{{.Name}}Id,
-        {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
-        {{.Name}}: req.{{.Name}},
+        {{- else if eq .Relationship "has_many"}}
+        // Has-many relationships are handled after creation
+        {{- else if eq .Relationship "many2many"}}
+        // Many-to-many relationships are handled after creation
+        {{- else if eq .Type "attachment"}}
+        {{.Name}}Id: req.{{.Name}}Id,
         {{- else}}
         {{.Name}}: req.{{.Name}},
-        {{- end}}
         {{- end}}
         {{- end}}
     }
@@ -47,38 +49,71 @@ func (s *{{.StructName}}Service) Create(req *models.Create{{.StructName}}Request
         return nil, err
     }
 
-    return &item, nil
+    // Handle has-many and many-to-many relationships
+    {{- range .Fields}}
+    {{- if eq .Relationship "has_many"}}
+    if len(req.{{.Name}}Ids) > 0 {
+        if err := s.DB.Model(&item).Association("{{.Name}}").Replace(req.{{.Name}}Ids); err != nil {
+            return nil, err
+        }
+    }
+    {{- else if eq .Relationship "many2many"}}
+    if len(req.{{.Name}}Ids) > 0 {
+        if err := s.DB.Model(&item).Association("{{.Name}}").Replace(req.{{.Name}}Ids); err != nil {
+            return nil, err
+        }
+    }
+    {{- end}}
+    {{- end}}
+
+    return s.GetById(item.Id)
 }
 
 func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName}}Request) (*models.{{.StructName}}, error) {
-    // First check if item exists
-    if err := s.DB.First(&models.{{.StructName}}{}, id).Error; err != nil {
+    var item models.{{.StructName}}
+    if err := s.DB.First(&item, id).Error; err != nil {
         return nil, err
     }
 
     // Build updates map
     updates := make(map[string]interface{})
     {{- range .Fields}}
-    {{- if not (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne") (eq .Relationship "attachment"))}}
     {{- if eq .Relationship "belongs_to"}}
     if req.{{.Name}}Id != nil {
-        updates["{{.DBName}}"] = *req.{{.Name}}Id
+        updates["{{.JSONName}}_id"] = *req.{{.Name}}Id
     }
-    {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
+    {{- else if eq .Type "attachment"}}
+    if req.{{.Name}}Id != nil {
+        updates["{{.JSONName}}_id"] = *req.{{.Name}}Id
+    }
+    {{- else if not (or (eq .Relationship "has_many") (eq .Relationship "many2many"))}}
     if req.{{.Name}} != nil {
-        updates["{{.DBName}}"] = *req.{{.Name}}
+        updates["{{.JSONName}}"] = *req.{{.Name}}
     }
-    {{- else}}
-    if req.{{.Name}} != nil {
-        updates["{{.DBName}}"] = *req.{{.Name}}
-    }
-    {{- end}}
     {{- end}}
     {{- end}}
 
-    if err := s.DB.Model(&models.{{.StructName}}{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+    if err := s.DB.Model(&item).Updates(updates).Error; err != nil {
         return nil, err
     }
+
+    // Handle has-many and many-to-many relationships
+    {{- range .Fields}}
+    {{- if eq .Relationship "has_many"}}
+    if req.{{.Name}}Ids != nil {
+        if err := s.DB.Model(&item).Association("{{.Name}}").Replace(req.{{.Name}}Ids); err != nil {
+            return nil, err
+        }
+    }
+    {{- else if eq .Relationship "many2many"}}
+    if req.{{.Name}}Ids != nil {
+        if err := s.DB.Model(&item).Association("{{.Name}}").Replace(req.{{.Name}}Ids); err != nil {
+            return nil, err
+        }
+    }
+    {{- end}}
+    {{- end}}
+
     return s.GetById(id)
 }
 
@@ -124,39 +159,65 @@ func (s *{{.StructName}}Service) GetAll(page *int, limit *int) (*types.Paginated
         TotalPages: int(math.Ceil(float64(total) / float64(*limit))),
     }
 
-    response := &types.PaginatedResponse{
+    return &types.PaginatedResponse{
         Data:       listItems,
         Pagination: pagination,
-    }
-
-    return response, nil
+    }, nil
 }
 
 func (s *{{.StructName}}Service) Delete(id uint) error {
-    // First check if item exists
-    if err := s.DB.First(&models.{{.StructName}}{}, id).Error; err != nil {
-        return err
-    }
-
-    return s.DB.Delete(&models.{{.StructName}}{}, id).Error
-}
-
-{{- if .HasImageField}}
-{{range .Fields}}
-{{- if eq .Relationship "attachment"}}
-func (s *{{$.StructName}}Service) Upload{{.Name}}(id uint, file *multipart.FileHeader) error {
-    var item models.{{$.StructName}}
+    var item models.{{.StructName}}
     if err := s.DB.First(&item, id).Error; err != nil {
         return err
     }
 
-    attachment, err := s.storage.Attach(&item, "{{toLower .Name}}", file)
-    if err != nil {
+    // Begin transaction
+    tx := s.DB.Begin()
+    defer func() {
+        if r := recover(); r != nil {
+            tx.Rollback()
+        }
+    }()
+
+    // Clear associations
+    {{- range .Fields}}
+    {{- if or (eq .Relationship "has_many") (eq .Relationship "many2many")}}
+    if err := tx.Model(&item).Association("{{.Name}}").Clear(); err != nil {
+        tx.Rollback()
+        return err
+    }
+    {{- end}}
+    {{- end}}
+
+    // Delete the item
+    if err := tx.Delete(&item).Error; err != nil {
+        tx.Rollback()
         return err
     }
 
+    return tx.Commit().Error
+}
+
+{{- if .HasImageField}}
+{{range .Fields}}
+{{- if eq .Type "attachment"}}
+func (s *{{$.StructName}}Service) Upload{{.Name}}(id uint, file *multipart.FileHeader) (*models.{{$.StructName}}, error) {
+    var item models.{{$.StructName}}
+    if err := s.DB.First(&item, id).Error; err != nil {
+        return nil, err
+    }
+
+    attachment, err := s.storage.Attach(&item, "{{toLower .Name}}", file)
+    if err != nil {
+        return nil, err
+    }
+
     item.{{.Name}} = attachment
-    return s.DB.Save(&item).Error
+    if err := s.DB.Save(&item).Error; err != nil {
+        return nil, err
+    }
+
+    return s.GetById(id)
 }
 {{- end}}
 {{- end}}
