@@ -3,6 +3,8 @@ package cmd
 import (
 	"fmt"
 
+	"base/version"
+
 	"github.com/spf13/cobra"
 )
 
