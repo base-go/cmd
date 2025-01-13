@@ -97,35 +97,32 @@ func (c *{{.StructName}}Controller) Get(ctx *gin.Context) {
 // @Produce json
 // @Param page query int false "Page number"
 // @Param limit query int false "Number of items per page"
-// @Param search query string false "Search term for filtering results"
 // @Success 200 {object} types.PaginatedResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 // @Router /{{toLower .PluralName}} [get]
 func (c *{{.StructName}}Controller) List(ctx *gin.Context) {
-    page := 1
-    limit := 10
+    var page, limit *int
 
-    if p, err := strconv.Atoi(ctx.DefaultQuery("page", "1")); err == nil && p > 0 {
-        page = p
-    } else if err != nil {
-        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid 'page' parameter"})
-        return
+    if pageStr := ctx.Query("page"); pageStr != "" {
+        if pageNum, err := strconv.Atoi(pageStr); err == nil && pageNum > 0 {
+            page = &pageNum
+        } else {
+            ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid page number"})
+            return
+        }
     }
 
-    if l, err := strconv.Atoi(ctx.DefaultQuery("limit", "10")); err == nil && l > 0 && l <= 100 {
-        limit = l
-    } else if err != nil {
-        ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid 'limit' parameter"})
-        return
+    if limitStr := ctx.Query("limit"); limitStr != "" {
+        if limitNum, err := strconv.Atoi(limitStr); err == nil && limitNum > 0 {
+            limit = &limitNum
+        } else {
+            ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid limit number"})
+            return
+        }
     }
 
-    var search *string
-    if searchTerm := ctx.Query("search"); searchTerm != "" {
-        search = &searchTerm
-    }
-
-    paginatedResponse, err := c.{{.StructName}}Service.GetAll(&page, &limit, search)
+    paginatedResponse, err := c.{{.StructName}}Service.GetAll(page, limit)
     if err != nil {
         ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch items: " + err.Error()})
         return
@@ -135,7 +132,7 @@ func (c *{{.StructName}}Controller) List(ctx *gin.Context) {
 }
 
 // ListAll{{.PluralName}} godoc
-// @Summary List all {{toLower .PluralName}}
+// @Summary List all {{toLower .PluralName}} without pagination
 // @Description Get a list of all {{toLower .PluralName}} without pagination
 // @Tags {{.StructName}}
 // @Security ApiKeyAuth
@@ -145,7 +142,7 @@ func (c *{{.StructName}}Controller) List(ctx *gin.Context) {
 // @Failure 500 {object} ErrorResponse
 // @Router /{{toLower .PluralName}}/all [get]
 func (c *{{.StructName}}Controller) ListAll(ctx *gin.Context) {
-    paginatedResponse, err := c.{{.StructName}}Service.GetAll(nil, nil, nil)
+    paginatedResponse, err := c.{{.StructName}}Service.GetAll(nil, nil)
     if err != nil {
         ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch all items: " + err.Error()})
         return

@@ -2,7 +2,6 @@ package {{toLower .PluralName}}
 
 import (
     "math"
-    "strings"
     {{- if .HasImageField}}
     "mime/multipart"
     "base/core/storage"
@@ -91,28 +90,10 @@ func (s *{{.StructName}}Service) GetById(id uint) (*models.{{.StructName}}, erro
     return &item, nil
 }
 
-func (s *{{.StructName}}Service) GetAll(page *int, limit *int, search *string) (*types.PaginatedResponse, error) {
+func (s *{{.StructName}}Service) GetAll(page *int, limit *int) (*types.PaginatedResponse, error) {
     var items []*models.{{.StructName}}
     var total int64
     query := s.DB.Model(&models.{{.StructName}}{})
-
-    // Apply search if provided
-    if search != nil && *search != "" {
-        searchValue := "%" + strings.ToLower(*search) + "%"
-        query = query.Where(
-            {{- $first := true}}
-            {{- range .Fields}}
-            {{- if and (not (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne") (eq .Relationship "attachment"))) (eq .Type "string")}}
-            {{if $first}}
-            "LOWER({{.DBName}}) LIKE ?", searchValue,
-            {{- $first = false}}
-            {{- else}}
-            "OR LOWER({{.DBName}}) LIKE ?", searchValue,
-            {{- end}}
-            {{- end}}
-            {{- end}}
-        )
-    }
 
     // Get total count
     if err := query.Count(&total).Error; err != nil {
