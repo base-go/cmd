@@ -10,11 +10,13 @@ import (
 
 type {{.StructName}}Controller struct {
     {{.StructName}}Service *{{.StructName}}Service
+    activeStorage *storage.ActiveStorage
 }
 
-func New{{.StructName}}Controller(service *{{.StructName}}Service) *{{.StructName}}Controller {
+func New{{.StructName}}Controller(service *{{.StructName}}Service, activeStorage *storage.ActiveStorage) *{{.StructName}}Controller {
     return &{{.StructName}}Controller{
         {{.StructName}}Service: service,
+        activeStorage: activeStorage,
     }
 }
 
@@ -252,15 +254,17 @@ func (c *{{$.StructName}}Controller) Upload{{.Name}}(ctx *gin.Context) {
     }
 
     // Upload the file using storage service
-    attachment, err := storage.GetInstance().Attach(item, "{{toLower .Name}}", file)
+    attachment, err := c.activeStorage.Attach(item, "{{toLower .Name}}", file)
     if err != nil {
         ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to upload file: " + err.Error()})
         return
     }
 
     // Update the item with the new attachment
+    var attachmentId = attachment.Id
+    var ptrAttachmentId = &attachmentId
     updateReq := &models.Update{{$.StructName}}Request{
-        {{.Name}}Id: &attachment.Id,
+        {{.Name}}Id: &ptrAttachmentId,
     }
 
     updatedItem, err := c.{{$.StructName}}Service.Update(uint(id), updateReq)

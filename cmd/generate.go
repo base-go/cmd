@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"os/exec"
 
 	"github.com/spf13/cobra"
 )
@@ -102,4 +103,31 @@ func generateModule(cmd *cobra.Command, args []string) {
 		fmt.Printf("Error updating init.go: %v\n", err)
 		return
 	}
+
+	// Check if goimports is installed
+	if _, err := exec.LookPath("goimports"); err != nil {
+		fmt.Println("goimports not found, installing...")
+		if err := exec.Command("go", "install", "golang.org/x/tools/cmd/goimports@latest").Run(); err != nil {
+			fmt.Printf("Error installing goimports: %v\n", err)
+			fmt.Println("Please install goimports manually: go install golang.org/x/tools/cmd/goimports@latest")
+			return
+		}
+		fmt.Println("goimports installed successfully")
+	}
+
+	// Run goimports on generated files
+	generatedPath := filepath.Join("app", pluralDirName)
+	modelPath := filepath.Join("app", "models", fmt.Sprintf("%s.go", dirName))
+	
+	// Run goimports on the generated directory
+	if err := exec.Command("find", generatedPath, "-name", "*.go", "-exec", "goimports", "-w", "{}", ";").Run(); err != nil {
+		fmt.Printf("Error running goimports on %s: %v\n", generatedPath, err)
+	}
+	
+	// Run goimports on the model file
+	if err := exec.Command("goimports", "-w", modelPath).Run(); err != nil {
+		fmt.Printf("Error running goimports on %s: %v\n", modelPath, err)
+	}
+
+	fmt.Printf("Successfully generated %s module\n", structName)
 }

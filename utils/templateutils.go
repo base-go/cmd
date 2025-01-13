@@ -175,6 +175,22 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 			fieldType = GetGoType(fieldType)
 		}
 
+		// Check for attachment fields
+		if fieldType == "attachment" {
+			relationship = "attachment"
+			fieldType = "*storage.Attachment"
+			
+			// Add the ID field for the attachment
+			idField := FieldStruct{
+				Name:         ToPascalCase(name) + "Id",
+				Type:         "*uint",
+				JSONName:     ToSnakeCase(name) + "_id",
+				DBName:       ToSnakeCase(name) + "_id",
+				Relationship: "",
+			}
+			fieldStructs = append(fieldStructs, idField)
+		}
+
 		fieldStruct := FieldStruct{
 			Name:         ToPascalCase(name),
 			Type:         fieldType,

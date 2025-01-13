@@ -38,7 +38,7 @@ func New{{.StructName}}Module(db *gorm.DB, router *gin.RouterGroup, log logger.L
     {{- else}}
     service := New{{.StructName}}Service(db)
     {{- end}}
-    controller := New{{.StructName}}Controller(service)
+    controller := New{{.StructName}}Controller(service, activeStorage)
 
     m := &Module{
         DB:         db,
