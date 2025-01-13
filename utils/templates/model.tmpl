@@ -74,6 +74,13 @@ type {{.StructName}}ListResponse struct {
     {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
     {{- else if eq .Relationship "many2many"}}
     {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
+    {{- else if eq .Type "text"}}
+    {{.Name}} string `json:"{{.JSONName}}"`
+    {{- else if eq .Type "attachment"}}
+    {{.Name}}Id *uint `json:"{{.JSONName}}_id"`
+    {{.Name}} *storage.Attachment `json:"{{.JSONName}}"`
+    {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
+    {{.Name}} types.DateTime `json:"{{.JSONName}}"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end}}
@@ -95,6 +102,13 @@ type {{.StructName}}Response struct {
     {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
     {{- else if eq .Relationship "many2many"}}
     {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
+    {{- else if eq .Type "text"}}
+    {{.Name}} string `json:"{{.JSONName}}"`
+    {{- else if eq .Type "attachment"}}
+    {{.Name}}Id *uint `json:"{{.JSONName}}_id"`
+    {{.Name}} *storage.Attachment `json:"{{.JSONName}}"`
+    {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
+    {{.Name}} types.DateTime `json:"{{.JSONName}}"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end}}
@@ -109,6 +123,16 @@ type Create{{.StructName}}Request struct {
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to"}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id" binding:"required"`
+    {{- else if eq .Relationship "has_many"}}
+    {{.Name}}Ids []uint `json:"{{.JSONName}}_ids"`
+    {{- else if eq .Relationship "many2many"}}
+    {{.Name}}Ids []uint `json:"{{.JSONName}}_ids"`
+    {{- else if eq .Type "text"}}
+    {{.Name}} string `json:"{{.JSONName}}" binding:"required"`
+    {{- else if eq .Type "attachment"}}
+    {{.Name}}Id *uint `json:"{{.JSONName}}_id"`
+    {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
+    {{.Name}} types.DateTime `json:"{{.JSONName}}"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}" binding:"required"`
     {{- end}}
@@ -120,6 +144,16 @@ type Update{{.StructName}}Request struct {
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to"}}
     {{.Name}}Id *uint `json:"{{.JSONName}}_id,omitempty"`
+    {{- else if eq .Relationship "has_many"}}
+    {{.Name}}Ids []uint `json:"{{.JSONName}}_ids,omitempty"`
+    {{- else if eq .Relationship "many2many"}}
+    {{.Name}}Ids []uint `json:"{{.JSONName}}_ids,omitempty"`
+    {{- else if eq .Type "text"}}
+    {{.Name}} *string `json:"{{.JSONName}},omitempty"`
+    {{- else if eq .Type "attachment"}}
+    {{.Name}}Id *uint `json:"{{.JSONName}}_id,omitempty"`
+    {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
+    {{.Name}} *types.DateTime `json:"{{.JSONName}},omitempty"`
     {{- else}}
     {{.Name}} *{{.Type}} `json:"{{.JSONName}},omitempty"`
     {{- end}}
