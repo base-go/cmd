@@ -41,7 +41,7 @@ func ensureAirInstalled() error {
 
 func setupAirConfig(cwd string) error {
 	airConfigPath := filepath.Join(cwd, ".air.toml")
-	
+
 	// Only create config if it doesn't exist
 	if _, err := os.Stat(airConfigPath); os.IsNotExist(err) {
 		fmt.Println("Creating air configuration...")
@@ -65,7 +65,7 @@ func ensureSwagInstalled() error {
 
 func generateSwaggerDocs(cwd string) error {
 	fmt.Println("Generating Swagger documentation...")
-	cmd := exec.Command("swag", "init")
+	cmd := exec.Command("swag", "init", "--parseDependency", "--parseInternal", "--parseVendor")
 	cmd.Dir = cwd
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -130,7 +130,7 @@ func startApplication(cmd *cobra.Command, args []string) {
 		// Run without hot reloading
 		fmt.Println("Starting the Base application server...")
 		fmt.Println("Tip: Use --hot-reload or -r flag to enable hot reloading")
-		
+
 		goCmd := exec.Command("go", "run", "main.go")
 		goCmd.Stdout = os.Stdout
 		goCmd.Stderr = os.Stderr
