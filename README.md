@@ -16,10 +16,9 @@ It offers scaffolding, module generation, and utilities to accelerate Go applica
   - [`base upgrade`](#base-upgrade)
   - [`base version`](#base-version)
 - [Examples](#examples)
-  - [Generating a New Project](#generating-a-new-project)
   - [Generating Modules](#generating-modules)
+  - [Generating a New Project](#generating-a-new-project)
   - [Working with Image Uploads](#working-with-image-uploads)
-- [Base Blog Modules](#base-blog-modules)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -92,24 +91,6 @@ base g <module-name> [field:type ...] [options]
 
 **Example - Blog System**:
 ```bash
-# Generate User model with relationships
-base g User \
-  username:string \
-  email:string \
-  password:string \
-  avatar:attachment \
-  profile:hasOne:Profile \
-  posts:hasMany:Post \
-  comments:hasMany:Comment
-
-# Generate Profile model
-base g Profile \
-  bio:text \
-  website:string \
-  avatar:attachment \
-  social_links:text \
-  user:belongsTo:User
-
 # Generate Category model with self-referential relationships
 base g Category \
   name:string \
@@ -154,6 +135,32 @@ This will generate:
 - Proper handling of circular dependencies
 - File upload handling for attachments
 - Automatic preloading of relationships
+
+To remove generated code:
+```bash
+# Remove a module
+base d module_name     # Removes module directory, model, and unregisters from init.go
+
+# Common modules
+base d user           # Remove user authentication and authorization
+base d profile        # Remove user profiles
+base d post           # Remove blog posts
+base d category       # Remove categories
+base d comment        # Remove comments
+base d tag            # Remove tags
+```
+
+### User Authentication
+
+The user module provides built-in authentication with:
+- JWT token-based authentication
+- Role-based access control (RBAC)
+- Password hashing and validation
+- Session management
+- API key authentication for services
+- OAuth2 support for social login
+- Two-factor authentication (2FA)
+- Password reset and email verification
 
 ---
 
@@ -227,6 +234,32 @@ Go version: go1.21.0
 
 ## Examples
 
+### Generating Modules
+
+Generate a new module with relationships:
+
+```bash
+# Generate Post model with relationships
+base g Post \
+  title:string \
+  content:text \
+  image:attachment \
+  category:belongsTo:Category \
+  comments:hasMany:Comment \
+  tags:hasMany:Tag
+```
+
+Note: User authentication and authorization are built into `github.com/base-go/base` - no need to generate them.
+
+This will generate:
+- Models with proper GORM tags and relationships
+- Services with CRUD operations
+- Controllers with RESTful endpoints
+- Response/Request structs
+- Proper handling of circular dependencies
+- File upload handling for attachments
+- Automatic preloading of relationships
+
 ### Generating a New Project
 
 ```bash
@@ -237,7 +270,7 @@ base new blog
 cd blog
 
 # Generate the blog system models
-base g User username:string email:string password:string avatar:attachment
+base g Category name:string description:text image:attachment
 base g Post title:string content:text author:belongsTo:User
 base g Tag name:string posts:hasMany:Post
 
@@ -262,89 +295,6 @@ This generates:
 - Storage system integration
 - Image processing capabilities
 - Proper JSON serialization
-
----
-
-## Base Blog Modules
-
-The Base framework comes with a set of pre-built modules designed for building blog applications:
-
-### Core Modules
-
-1. **Post Module**
-   - Full CRUD operations for blog posts
-   - Support for rich text content
-   - Image attachments
-   - Relationships with categories, tags, and comments
-
-2. **Category Module**
-   - Hierarchical category structure
-   - Parent-child relationships
-   - Post categorization
-   - Description and image support
-
-3. **Comment Module**
-   - Nested comment structure
-   - Parent-child relationships for replies
-   - Author and post associations
-   - Content management
-
-4. **User Module**
-   - User authentication and authorization
-   - Profile management
-   - Role-based access control
-   - Activity tracking
-
-5. **Profile Module**
-   - Extended user information
-   - Avatar management
-   - Social media links
-   - Bio and personal details
-
-6. **Tag Module**
-   - Post tagging system
-   - Tag management
-   - Tag-based post filtering
-   - Tag cloud generation
-
-### Module Generation
-
-To generate these modules in your project, use:
-
-```bash
-# Generate a single module
-base g module post
-base g module category
-base g module comment
-base g module user
-base g module profile
-base g module tag
-
-# Generate all blog modules at once
-base g blog
-```
-
-### Module Removal
-
-To remove modules from your project:
-
-```bash
-# Remove a module
-base d post
-base d category
-base d comment
-base d user
-base d profile
-base d tag
-```
-
-Each module includes:
-- Models with proper relationships
-- Controllers with RESTful endpoints
-- Services with business logic
-- Migration support
-- Swagger documentation
-- Test templates
 
 ---
 
