@@ -6,7 +6,12 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/base-go/cmd/utils"
 	"github.com/spf13/cobra"
+)
+
+var (
+	hotReload bool
 )
 
 var startCmd = &cobra.Command{
@@ -19,6 +24,32 @@ var startCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(startCmd)
+	startCmd.Flags().BoolVarP(&hotReload, "hot-reload", "r", false, "Enable hot reloading using air")
+}
+
+func ensureAirInstalled() error {
+	// Check if air is installed
+	if _, err := exec.LookPath("air"); err != nil {
+		fmt.Println("Installing air for hot reloading...")
+		cmd := exec.Command("go", "install", "github.com/cosmtrek/air@latest")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
+	}
+	return nil
+}
+
+func setupAirConfig(cwd string) error {
+	airConfigPath := filepath.Join(cwd, ".air.toml")
+	
+	// Only create config if it doesn't exist
+	if _, err := os.Stat(airConfigPath); os.IsNotExist(err) {
+		fmt.Println("Creating air configuration...")
+		if err := utils.GenerateAirFileFromTemplate(cwd); err != nil {
+			return fmt.Errorf("failed to generate air config: %w", err)
+		}
+	}
+	return nil
 }
 
 func startApplication(cmd *cobra.Command, args []string) {
@@ -38,15 +69,43 @@ func startApplication(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// Run "go run main.go"
-	fmt.Println("Starting the Base application server...")
-	goCmd := exec.Command("go", "run", "main.go")
-	goCmd.Stdout = os.Stdout
-	goCmd.Stderr = os.Stderr
-	goCmd.Dir = cwd
+	if hotReload {
+		// Ensure air is installed
+		if err := ensureAirInstalled(); err != nil {
+			fmt.Printf("Error installing air: %v\n", err)
+			return
+		}
 
-	if err := goCmd.Run(); err != nil {
-		fmt.Printf("Error running application: %v\n", err)
-		return
+		// Setup air configuration
+		if err := setupAirConfig(cwd); err != nil {
+			fmt.Printf("Error setting up air configuration: %v\n", err)
+			return
+		}
+
+		// Run with air
+		fmt.Println("Starting the Base application server with hot reloading...")
+		airCmd := exec.Command("air")
+		airCmd.Stdout = os.Stdout
+		airCmd.Stderr = os.Stderr
+		airCmd.Dir = cwd
+
+		if err := airCmd.Run(); err != nil {
+			fmt.Printf("Error running application with air: %v\n", err)
+			return
+		}
+	} else {
+		// Run without hot reloading
+		fmt.Println("Starting the Base application server...")
+		fmt.Println("Tip: Use --hot-reload or -r flag to enable hot reloading")
+		
+		goCmd := exec.Command("go", "run", "main.go")
+		goCmd.Stdout = os.Stdout
+		goCmd.Stderr = os.Stderr
+		goCmd.Dir = cwd
+
+		if err := goCmd.Run(); err != nil {
+			fmt.Printf("Error running application: %v\n", err)
+			return
+		}
 	}
 }

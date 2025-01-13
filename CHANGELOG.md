@@ -11,16 +11,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for attachment field type in module generation
 - New `feed` command for importing data from JSON files
 - Improved error messages in the `start` command
+- Hot reload functionality using Air in `start` command
+- Automatic `.air.toml` configuration generation
+- Comprehensive documentation for hot reload feature in README
 
 ### Changed
 - Updated module template to handle storage dependency more elegantly
 - Improved search functionality in generated services
 - Fixed path resolution in `start` command
+- Refactored template generation for Air configuration
+- Improved error handling in `start` command
+- Enhanced code organization with dedicated Air utilities
 
 ### Fixed
 - Fixed directory path resolution in `start` command
 - Fixed SQL query generation for search functionality
 - Fixed storage handling in module generation
+- Fixed "(no value) used as value" error in template generation
+- Improved error handling in Air configuration setup
 
 ## [1.0.0] - 2024-01-13
 

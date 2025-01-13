@@ -178,12 +178,20 @@ base d User
 
 ### `base start` or `base s`
 
-Start the development server.
+The start command runs your Base application with hot reload enabled. This means your application will automatically rebuild and restart whenever you make changes to your source code.
 
-**Usage**:
 ```bash
-base s
+base start
 ```
+
+Features:
+- Automatic rebuild on file changes
+- Supports Go files, templates, HTML, and environment files
+- Excludes common directories like assets, tmp, vendor, and node_modules
+- Clean process management (terminates old processes before starting new ones)
+- Configurable through `.air.toml` in your project root
+
+The hot reload feature is powered by [Air](https://github.com/cosmtrek/air), which will be automatically configured when you first run `base start`. You can customize the hot reload behavior by modifying the `.air.toml` file in your project root.
 
 ---
 
