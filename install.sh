@@ -14,13 +14,11 @@ BIN_PATH="/usr/local/bin"
 
 # Set version information
 VERSION=${VERSION:-"1.0.0"}
-COMMIT_HASH=${COMMIT_HASH:-$(curl -s https://api.github.com/repos/base-go/cmd/commits/main | grep '"sha"' | head -n 1 | cut -d'"' -f4)}
 BUILD_DATE=${BUILD_DATE:-$(date -u '+%Y-%m-%dT%H:%M:%SZ')}
 GO_VERSION=${GO_VERSION:-$(go version | cut -d' ' -f3)}
 
 echo "Version information:"
 echo "Version: $VERSION"
-echo "Commit: $COMMIT_HASH"
 echo "Build Date: $BUILD_DATE"
 echo "Go Version: $GO_VERSION"
 
