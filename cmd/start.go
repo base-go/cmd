@@ -31,7 +31,7 @@ func ensureAirInstalled() error {
 	// Check if air is installed
 	if _, err := exec.LookPath("air"); err != nil {
 		fmt.Println("Installing air for hot reloading...")
-		cmd := exec.Command("go", "install", "github.com/cosmtrek/air@latest")
+		cmd := exec.Command("go", "install", "github.com/air-verse/air@latest")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		return cmd.Run()

@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed storage handling in module generation
 - Fixed "(no value) used as value" error in template generation
 - Improved error handling in Air configuration setup
+- Updated Air installation to use new repository (github.com/air-verse/air)
 
 ## [1.0.0] - 2024-01-13
 
