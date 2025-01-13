@@ -24,13 +24,13 @@ type {{.StructName}} struct {
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to"}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id" gorm:"column:{{.JSONName}}_id"`
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"foreignKey:{{.Name}}Id;references:Id"`
     {{- else if eq .Relationship "has_one"}}
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
     {{- else if eq .Relationship "has_many"}}
-    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
+    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
     {{- else if eq .Relationship "many2many"}}
-    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
+    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"many2many:{{toLower $.StructName}}_{{toLower .PluralName}}"`
     {{- else if eq .Type "text"}}
     {{.Name}} string `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
     {{- else if eq .Type "attachment"}}
@@ -40,8 +40,8 @@ type {{.StructName}} struct {
     {{.Name}} types.DateTime `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
     {{- else if eq .Type "self_reference"}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id" gorm:"column:{{.JSONName}}_id"`
-    {{.Name}} *{{$.StructName}} `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
-    {{.PluralName}} []*{{$.StructName}} `json:"{{toLower .PluralName}}" gorm:"column:{{toLower .PluralName}}"`
+    {{.Name}} *{{$.StructName}} `json:"{{.JSONName}}" gorm:"foreignKey:{{.Name}}Id;references:Id"`
+    {{.PluralName}} []*{{$.StructName}} `json:"{{toLower .PluralName}}" gorm:"foreignKey:{{.Name}}Id;references:Id"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
     {{- end}}
@@ -217,5 +217,5 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
 
 // Preload preloads all the model's relationships
 func (item *{{.StructName}}) Preload(db *gorm.DB) *gorm.DB {
-    return db
+    return db{{range .Fields}}{{if or (eq .Relationship "belongs_to") (eq .Relationship "has_one") (eq .Relationship "has_many") (eq .Relationship "many2many") (eq .Type "self_reference")}}.Preload("{{.Name}}"){{if eq .Type "self_reference"}}.Preload("{{.PluralName}}"){{end}}{{end}}{{end}}
 }
