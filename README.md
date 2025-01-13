@@ -1,9 +1,7 @@
-
 # Base - Command Line Tool for the Base Framework
 
 Base is a powerful command-line tool designed to streamline development with the Base framework.
 It offers scaffolding, module generation, and utilities to accelerate Go application development.
-You can to seed data, import JSON files, and more with a few simple commands.
 
 ## Table of Contents
 
@@ -11,13 +9,15 @@ You can to seed data, import JSON files, and more with a few simple commands.
 - [Getting Started](#getting-started)
 - [Commands](#commands)
   - [`base new`](#base-new)
-  - [`base g`](#base-generate-or-base-g)
+  - [`base generate` or `base g`](#base-generate-or-base-g)
+  - [`base destroy` or `base d`](#base-destroy-or-base-d)
   - [`base start` or `base s`](#base-start-or-base-s)
   - [`base update`](#base-update)
+  - [`base upgrade`](#base-upgrade)
 - [Examples](#examples)
   - [Generating a New Project](#generating-a-new-project)
   - [Generating Modules](#generating-modules)
-  - [Seeding Data](#seeding-data)
+  - [Working with Image Uploads](#working-with-image-uploads)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -77,16 +77,29 @@ base g <module-name> [field:type ...] [options]
 
 **Supported Field Types**:
 - **Primitive Types**: `string`, `text`, `int`, `bool`, `float`, `time`
-- **Relationships**: `belongsTo`, `hasOne`, `hasMany`
+- **Relationships**: `belongsTo`, `hasOne`, `hasMany`, `attachment`
 
 **Example**:
 ```bash
-base g User name:string email:string password:string profile:hasOne:Profile
+base g User name:string email:string posts:hasMany:Post
 ```
+
+---
 
 ### `base destroy` or `base d`
 
 Destroy a module and its associated files.
+
+**Usage**:
+```bash
+base d <module-name>
+```
+
+**Example**:
+```bash
+base d User
+```
+
 ---
 
 ### `base start` or `base s`
@@ -102,16 +115,55 @@ base s
 
 ### `base update`
 
-Update the Base Core package to the latest version.
+Update the Base framework's core components in your project. This command:
+- Updates the core directory with the latest version
+- Maintains your custom modifications
+- Updates core interfaces and utilities
+- Preserves your application code
 
 **Usage**:
 ```bash
 base update
 ```
 
+**What Gets Updated**:
+- Core interfaces and types
+- Base utilities and helpers
+- Storage system components
+- Authentication system
+- Database utilities
+- Event system
+- Logging system
+- Middleware components
+- Error handling
+- Configuration management
+- Testing utilities
+
+**Example Output**:
+```bash
+$ base update
+Updating Base framework components...
+✓ Backing up current core directory
+✓ Downloading latest core components
+✓ Updating interfaces and types
+✓ Updating utilities and helpers
+✓ Preserving custom modifications
+✓ Cleaning up temporary files
+Update completed successfully!
+```
+
+**Note**: This command only updates the framework's core components. To update the CLI tool itself, use `base upgrade`.
+
+---
+
 ### `base upgrade`
 
 Upgrade the Base CLI tool to the latest version.
+
+**Usage**:
+```bash
+base upgrade
+```
 
 ---
 
@@ -119,121 +171,222 @@ Upgrade the Base CLI tool to the latest version.
 
 ### Generating a New Project
 
-Create a new project called `myapp`:
-
 ```bash
-base new myapp
-cd myapp
-go mod tidy
-```
+# Create a new project named 'blog'
+base new blog
 
----
+# Change into the project directory
+cd blog
+
+# Start the development server
+base s
+```
 
 ### Generating Modules
 
-#### Blog System Example:
+Base provides a powerful module generation system that supports various field types and relationships.
 
+#### Basic Module with Simple Fields
 ```bash
-# Generate User module
-base g User name:string email:string password:string
+# Generate a basic module with string and text fields
+base g Post title:string content:text
 
-# Generate Post module
-base g Post title:string content:text published_at:time author:belongsTo:User
-
-# Generate Comment module
-base g Comment content:text user:belongsTo:User post:belongsTo:Post
-
-# Generate Category module with admin interface
-base g Category name:string description:text --admin
+# Generate a module with various field types
+base g Product \
+  name:string \
+  description:text \
+  price:float \
+  quantity:int \
+  is_active:bool \
+  published_at:time
 ```
 
----
-
-### Seeding Data
-
-Base CLI automatically generates seed files for each module. To seed your database with initial data, use:
-
+#### Modules with File Attachments
 ```bash
-base seed
+# Generate a module with image support
+base g Profile \
+  name:string \
+  bio:text \
+  avatar:attachment
+
+# Multiple attachments in one module
+base g Gallery \
+  title:string \
+  description:text \
+  cover:attachment \
+  image:attachment
 ```
 
-To reset and seed fresh data:
-
+#### Modules with Relationships
 ```bash
-base replant
+# One-to-Many Relationship (Category has many Posts)
+base g Category \
+  title:string \
+  content:text \
+  image:attachment \
+  posts:hasMany:Post
+
+# Belongs-To Relationship (Post belongs to Category)
+base g Post \
+  title:string \
+  content:text \
+  image:attachment \
+  category:belongsTo:Category
+
+# One-to-One Relationship
+base g User \
+  name:string \
+  email:string \
+  profile:hasOne:Profile
+
+# Multiple Relationships
+base g Comment \
+  title:string \
+  content:text \
+  user:belongsTo:User \
+  post:belongsTo:Post \
+  replies:hasMany:Comment
 ```
 
-**Important Note on Seeding Relationships**:
-Ensure parent records are seeded before child records. Adjust the order in `app/seed.go` accordingly.
+#### Complex Module Example
+```bash
+# Blog system with all features
+base g User \
+  username:string \
+  email:string \
+  password:string \
+  avatar:attachment \
+  profile:hasOne:Profile \
+  posts:hasMany:Post \
+  comments:hasMany:Comment
 
-Example:
+base g Profile \
+  bio:text \
+  website:string \
+  avatar:attachment \
+  social_links:text \
+  user:belongsTo:User
 
-```go
-func InitializeSeeders() []module.Seeder {
-    return []module.Seeder{
-        &user.UserSeeder{},        // Parent
-        &category.CategorySeeder{},// Independent
-        &post.PostSeeder{},        // Child of User
-        &comment.CommentSeeder{},  // Child of User and Post
-    }
+base g Category \
+  name:string \
+  description:text \
+  image:attachment \
+  parent:belongsTo:Category \
+  subcategories:hasMany:Category \
+  posts:hasMany:Post
+
+base g Post \
+  title:string \
+  content:text \
+  excerpt:text \
+  featured_image:attachment \
+  gallery:attachment \
+  published_at:time \
+  author:belongsTo:User \
+  category:belongsTo:Category \
+  tags:hasMany:Tag \
+  comments:hasMany:Comment
+
+base g Comment \
+  content:text \
+  author:belongsTo:User \
+  post:belongsTo:Post \
+  parent:belongsTo:Comment \
+  replies:hasMany:Comment
+```
+
+Each generated module includes:
+- Model with GORM configuration
+- Service layer with CRUD operations
+- Controller with REST endpoints
+- Automatic migrations
+- Search functionality
+- Pagination
+- File upload endpoints (for attachment fields)
+- Relationship handling
+- Type-safe request/response structs
+
+The generated code follows best practices:
+- Clean architecture principles
+- Dependency injection
+- Interface-based design
+- Proper error handling
+- Input validation
+- Secure file handling
+- Efficient database queries
+- Proper relationship loading
+
+### Working with Image Uploads
+
+Base provides a flexible storage system for handling file uploads. You can use different storage providers:
+
+#### 1. Local Storage (Default)
+Files are stored in your local filesystem.
+
+```bash
+# Generate a module with image support
+base g Profile name:string bio:text avatar:attachment
+
+# Configuration in config.yaml
+storage:
+  provider: local
+  path: "./storage"
+  baseURL: "http://localhost:8080/storage"
+```
+
+#### 2. S3 Compatible Storage
+Store files in AWS S3 or any S3-compatible service (like MinIO, DigitalOcean Spaces).
+
+```yaml
+# Configuration in config.yaml
+storage:
+  provider: s3
+  bucket: "my-bucket"
+  region: "us-east-1"
+  endpoint: "https://s3.amazonaws.com"
+  baseURL: "https://my-bucket.s3.amazonaws.com"
+  apiKey: "your-access-key"
+  apiSecret: "your-secret-key"
+```
+
+#### 3. Cloudflare R2
+Store files in Cloudflare R2 with optional CDN support.
+
+```yaml
+# Configuration in config.yaml
+storage:
+  provider: r2
+  bucket: "my-bucket"
+  endpoint: "https://<account-id>.r2.cloudflarestorage.com"
+  baseURL: "https://cdn.example.com"  # If using Cloudflare CDN
+  apiKey: "your-access-key"
+  apiSecret: "your-secret-key"
+```
+
+#### Usage in API
+Once configured, the upload endpoints are automatically available:
+
+```bash
+# Upload an image
+curl -X POST -F "avatar=@image.jpg" http://localhost:8080/api/profiles/1/upload/avatar
+
+# The response includes the file URL
+{
+  "url": "http://localhost:8080/storage/profiles/1/avatar/image.jpg"
 }
 ```
 
----
-### Feeding Data
-Base CLI provides a flexible way to import JSON data into your database. You can map JSON fields to database columns using the `base feed` command.
-
-## Base Feed Command
-
-The `base feed` command imports JSON data into your database with flexible field mapping options.
-
-### Basic Syntax
-
-```bash
-base feed <table_name>[:<json_path>] [field_mappings...]
-```
-
-- `<table_name>`: Database table to insert data into.
-- `<json_path>` (optional): Path to the JSON file.
-- `[field_mappings...]` (optional): Mappings for JSON fields to database columns.
-
-### Usage Examples
-
-1. **Basic usage**:
-   ```bash
-   base feed users
-   ```
-
-2. **Using a custom JSON file**:
-   ```bash
-   base feed users:custom_data/my_users.json
-   ```
-
-3. **Simple field mapping**:
-   ```bash
-   base feed users name:full_name email:user_email
-   ```
-
-4. **Mapping one source to multiple columns**:
-   ```bash
-   base feed users username:full_name username:login_name
-   ```
-
-5. **Concatenating multiple fields**:
-   ```bash
-   base feed users "first_name last_name":full_name email:contact_email
-   ```
-
-6. **Combining all types of mappings**:
-   ```bash
-   base feed users "first_name last_name":full_name username:login username:display_name email:contact_email
-   ```
-
----
+The storage system automatically:
+- Validates file types (default: jpg, jpeg, png, gif)
+- Handles file size limits (default: 10MB)
+- Generates unique filenames
+- Creates optimized versions for images
+- Cleans up old files when updated
+- Provides secure URLs for access
 
 ## Contributing
 
-Contributions are welcome! Follow these steps:
+We welcome contributions to Base! Here's how you can help:
 
 1. Fork the repository.
 2. Create a branch (`git checkout -b feature/AmazingFeature`).
@@ -241,16 +394,6 @@ Contributions are welcome! Follow these steps:
 4. Push to the branch (`git push origin feature/AmazingFeature`).
 5. Open a pull request.
 
-To report issues, use the [GitHub Issues](https://github.com/base-go/cmd/issues) page, and provide detailed information to help us address the issue promptly.
-
----
-
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
-
----
-
-© 2024 Basecode LLC. All rights reserved.
-
-For more information on the Base framework, refer to the official documentation.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
