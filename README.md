@@ -79,7 +79,7 @@ base g <module-name> [field:type ...] [options]
   - `int`: Integer field
   - `float`: Float field
   - `bool`: Boolean field
-  - `time`: Timestamp field
+  - `datetime`: DateTime field (for date and time)
 
 - **Relationships**:
   - `belongsTo`: Many-to-one relationship
@@ -125,7 +125,7 @@ base g Post \
   excerpt:text \
   featured_image:attachment \
   gallery:attachment \
-  published_at:time \
+  published_at:datetime \
   author:belongsTo:User \
   category:belongsTo:Category \
   tags:hasMany:Tag \
@@ -133,7 +133,7 @@ base g Post \
 
 # Generate Tag model
 base g Tag \
-  name:string:unique \
+  name:string \
   posts:hasMany:Post
 
 # Generate Comment model with self-referential relationships
@@ -238,7 +238,7 @@ cd blog
 # Generate the blog system models
 base g User username:string email:string password:string avatar:attachment
 base g Post title:string content:text author:belongsTo:User
-base g Tag name:string:unique posts:hasMany:Post
+base g Tag name:string posts:hasMany:Post
 
 # Start the development server
 base start

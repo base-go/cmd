@@ -6,6 +6,9 @@ import (
     {{- if hasField .Fields "attachment" }}
     "base/core/storage"
     {{- end }}
+    {{- if or (hasField .Fields "time") (hasField .Fields "date") (hasField .Fields "datetime") }}
+    "base/core/types"
+    {{- end }}
 )
 
 // {{.StructName}} represents a {{toLower .StructName}} entity
@@ -23,6 +26,8 @@ type {{.StructName}} struct {
     {{.Name}} string `json:"{{.JSONName}}" gorm:"column:{{.JSONName}};type:text"`
     {{- else if eq .Type "attachment"}}
     {{.Name}} *storage.Attachment `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
+    {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
+    {{.Name}} types.DateTime `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
     {{- end}}
@@ -61,6 +66,8 @@ type {{.StructName}}ListResponse struct {
     {{.Name}} string `json:"{{.JSONName}}"`
     {{- else if eq .Type "attachment"}}
     {{.Name}} *storage.Attachment `json:"{{.JSONName}}"`
+    {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
+    {{.Name}} types.DateTime `json:"{{.JSONName}}"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end}}
@@ -84,6 +91,8 @@ type {{.StructName}}Response struct {
     {{.Name}} string `json:"{{.JSONName}}"`
     {{- else if eq .Type "attachment"}}
     {{.Name}} *storage.Attachment `json:"{{.JSONName}}"`
+    {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
+    {{.Name}} types.DateTime `json:"{{.JSONName}}"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end}}
@@ -104,6 +113,8 @@ type Create{{.StructName}}Request struct {
     {{.Name}} string `json:"{{.JSONName}}" binding:"required"`
     {{- else if eq .Type "attachment"}}
     {{.Name}} *storage.Attachment `json:"{{.JSONName}}" binding:"required"`
+    {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
+    {{.Name}} types.DateTime `json:"{{.JSONName}}"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}" binding:"required"`
     {{- end}}
@@ -121,6 +132,8 @@ type Update{{.StructName}}Request struct {
     {{.Name}} *string `json:"{{.JSONName}},omitempty"`
     {{- else if eq .Type "attachment"}}
     {{.Name}} *storage.Attachment `json:"{{.JSONName}},omitempty"`
+    {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
+    {{.Name}} *types.DateTime `json:"{{.JSONName}},omitempty"`
     {{- else}}
     {{.Name}} *{{.Type}} `json:"{{.JSONName}},omitempty"`
     {{- end}}

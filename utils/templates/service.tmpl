@@ -35,6 +35,8 @@ func (s *{{.StructName}}Service) Create(req *models.Create{{.StructName}}Request
         {{- if not (or (eq .Relationship "has_many") (eq .Relationship "hasMany") (eq .Relationship "has_one") (eq .Relationship "hasOne") (eq .Relationship "attachment"))}}
         {{- if eq .Relationship "belongs_to"}}
         {{.Name}}Id: req.{{.Name}}Id,
+        {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
+        {{.Name}}: req.{{.Name}},
         {{- else}}
         {{.Name}}: req.{{.Name}},
         {{- end}}
@@ -62,6 +64,10 @@ func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName
     {{- if eq .Relationship "belongs_to"}}
     if req.{{.Name}}Id != nil {
         updates["{{.DBName}}"] = *req.{{.Name}}Id
+    }
+    {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
+    if req.{{.Name}} != nil {
+        updates["{{.DBName}}"] = *req.{{.Name}}
     }
     {{- else}}
     if req.{{.Name}} != nil {
