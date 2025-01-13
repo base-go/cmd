@@ -14,6 +14,7 @@ It offers scaffolding, module generation, and utilities to accelerate Go applica
   - [`base start` or `base s`](#base-start-or-base-s)
   - [`base update`](#base-update)
   - [`base upgrade`](#base-upgrade)
+  - [`base version`](#base-version)
 - [Examples](#examples)
   - [Generating a New Project](#generating-a-new-project)
   - [Generating Modules](#generating-modules)
@@ -163,6 +164,25 @@ Upgrade the Base CLI tool to the latest version.
 **Usage**:
 ```bash
 base upgrade
+```
+
+---
+
+### `base version`
+
+Display version information for the Base CLI tool.
+
+**Usage**:
+```bash
+base version
+```
+
+**Example Output**:
+```bash
+Base CLI v1.0.0
+Commit: abc123d
+Built: 2025-01-13 00:55:29
+Go version: go1.21.0
 ```
 
 ---
