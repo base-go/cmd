@@ -62,3 +62,70 @@ func Unzip(src, dest string) error {
 	}
 	return nil
 }
+
+// UpdateInitGo adds the module initialization to init.go
+func UpdateInitGo(packageName, structName string) error {
+	initFile := filepath.Join("app", "init.go")
+	if _, err := os.Stat(initFile); err != nil {
+		return fmt.Errorf("init.go not found: %v", err)
+	}
+
+	content, err := os.ReadFile(initFile)
+	if err != nil {
+		return fmt.Errorf("error reading init.go: %v", err)
+	}
+
+	// Add import if not exists
+	importPath := fmt.Sprintf(`"base/app/%s"`, packageName)
+	contentStr := string(content)
+	if !strings.Contains(contentStr, importPath) {
+		importMarker := "// MODULE_IMPORT_MARKER"
+		markerIndex := strings.Index(contentStr, importMarker)
+		if markerIndex == -1 {
+			return fmt.Errorf("could not find import marker comment in init.go")
+		}
+		// Find the end of the line containing the marker
+		lineEnd := strings.Index(contentStr[markerIndex:], "\n") + markerIndex
+		if lineEnd == -1 {
+			lineEnd = len(contentStr)
+		}
+		newContent := contentStr[:lineEnd+1] + "\t" + importPath + "\n" + contentStr[lineEnd+1:]
+		contentStr = newContent
+	}
+
+	// Create the module initializer line
+	moduleInitializer := fmt.Sprintf(`		"%s": func(db *gorm.DB, router *gin.RouterGroup, log logger.Logger, emitter *emitter.Emitter, activeStorage *storage.ActiveStorage) module.Module {
+			return %s.New%sModule(db, router, log, emitter, activeStorage)
+		},
+
+`, packageName, packageName, structName)
+
+	// Check if the module initializer already exists
+	if strings.Contains(contentStr, fmt.Sprintf(`"%s":`, packageName)) {
+		fmt.Printf("Module initializer for %s already exists in init.go\n", packageName)
+		return nil
+	}
+
+	// Insert the initializer before the marker comment
+	markerComment := "// MODULE_INITIALIZER_MARKER"
+	markerIndex := strings.Index(contentStr, markerComment)
+	if markerIndex == -1 {
+		return fmt.Errorf("could not find marker comment in init.go")
+	}
+
+	// Find the start of the line containing the marker
+	lineStart := strings.LastIndex(contentStr[:markerIndex], "\n") + 1
+
+	// Split the content at the marker line
+	beforeMarker := contentStr[:lineStart]
+	afterMarker := contentStr[lineStart:]
+
+	// Combine all parts
+	newContent := beforeMarker + moduleInitializer + afterMarker
+
+	if err := os.WriteFile(initFile, []byte(newContent), 0644); err != nil {
+		return fmt.Errorf("error writing to init.go: %v", err)
+	}
+
+	return nil
+}

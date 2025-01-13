@@ -1,12 +1,10 @@
 package cmd
 
 import (
+	"base/utils"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
-
-	"base/utils"
 
 	"github.com/spf13/cobra"
 )
@@ -31,7 +29,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 
 	// Convert singular name to snake_case for directory naming
 	dirName := utils.ToSnakeCase(singularName)
-	pluralName := utils.ToPlural(singularName)
+	pluralName := utils.PluralizeClient.Plural(singularName)
 	pluralDirName := utils.ToSnakeCase(pluralName)
 
 	// Use PascalCase for struct naming
@@ -52,110 +50,56 @@ func generateModule(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	// Process fields
+	// Generate field structs
 	fieldStructs := utils.GenerateFieldStructs(fields)
 
-	// Generate files using templates
-	templates := []struct {
-		targetDir  string
-		filename   string
-		template   string
-	}{
-		{
-			targetDir:  filepath.Join("app", "models"),
-			filename:   fmt.Sprintf("%s.go", dirName),
-			template:   "model.tmpl",
-		},
-		{
-			targetDir:  filepath.Join("app", pluralDirName),
-			filename:   "service.go",
-			template:   "service.tmpl",
-		},
-		{
-			targetDir:  filepath.Join("app", pluralDirName),
-			filename:   "controller.go",
-			template:   "controller.tmpl",
-		},
-		{
-			targetDir:  filepath.Join("app", pluralDirName),
-			filename:   "module.go",
-			template:   "module.tmpl",
-		},
-	}
+	// Generate model
+	utils.GenerateFileFromTemplate(
+		filepath.Join("app", "models"),
+		fmt.Sprintf("%s.go", dirName),
+		"model.tmpl",
+		structName,
+		pluralName,
+		"models",
+		fieldStructs,
+	)
 
-	for _, tmpl := range templates {
-		utils.GenerateFileFromTemplate(
-			tmpl.targetDir,
-			tmpl.filename,
-			tmpl.template,
-			structName,
-			pluralName,
-			packageName,
-			fieldStructs,
-		)
-	}
+	// Generate service
+	utils.GenerateFileFromTemplate(
+		filepath.Join("app", pluralDirName),
+		"service.go",
+		"service.tmpl",
+		structName,
+		pluralName,
+		packageName,
+		fieldStructs,
+	)
+
+	// Generate controller
+	utils.GenerateFileFromTemplate(
+		filepath.Join("app", pluralDirName),
+		"controller.go",
+		"controller.tmpl",
+		structName,
+		pluralName,
+		packageName,
+		fieldStructs,
+	)
+
+	// Generate module
+	utils.GenerateFileFromTemplate(
+		filepath.Join("app", pluralDirName),
+		"module.go",
+		"module.tmpl",
+		structName,
+		pluralName,
+		packageName,
+		fieldStructs,
+	)
 
 	// Update init.go
-	if err := updateInitGo(pluralDirName, structName); err != nil {
+	if err := utils.UpdateInitGo(pluralDirName, structName); err != nil {
 		fmt.Printf("Error updating init.go: %v\n", err)
 		return
 	}
-
-	fmt.Printf("Generated module %s with fields: %v\n", structName, fields)
-}
-
-// updateInitGo adds the module initialization to init.go
-func updateInitGo(moduleName, structName string) error {
-	initFile := filepath.Join("app", "init.go")
-
-	// Read existing content
-	content, err := os.ReadFile(initFile)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("error reading init.go: %v", err)
-	}
-
-	// Check if module is already initialized
-	if strings.Contains(string(content), fmt.Sprintf("New%sModule", structName)) {
-		fmt.Printf("Module initializer for %s already exists in init.go\n", strings.ToLower(structName))
-		return nil
-	}
-
-	// Create init.go if it doesn't exist
-	if os.IsNotExist(err) {
-		content = []byte(`package app
-
-import (
-	"github.com/gin-gonic/gin"
-)
-
-// InitializeModules initializes all modules
-func InitializeModules(r *gin.Engine) {
-}
-`)
-	}
-
-	// Find the closing brace of InitializeModules function
-	contentStr := string(content)
-	insertPos := strings.LastIndex(contentStr, "}")
-
-	if insertPos == -1 {
-		return fmt.Errorf("could not find InitializeModules function in init.go")
-	}
-
-	// Add import if needed
-	importStr := fmt.Sprintf(`"%s/app/%s"`, "base", moduleName)
-	if !strings.Contains(contentStr, importStr) {
-		importPos := strings.Index(contentStr, ")")
-		if importPos == -1 {
-			return fmt.Errorf("could not find import section in init.go")
-		}
-		contentStr = contentStr[:importPos] + "\n\t" + importStr + contentStr[importPos:]
-	}
-
-	// Add module initialization
-	initStr := fmt.Sprintf("\t%s.New%sModule(r)\n", moduleName, structName)
-	contentStr = contentStr[:insertPos] + initStr + contentStr[insertPos:]
-
-	// Write back to file
-	return os.WriteFile(initFile, []byte(contentStr), 0644)
 }
