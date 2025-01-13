@@ -7,6 +7,9 @@ import (
 	"strings"
 	"unicode"
 
+	"path/filepath"
+	"regexp"
+
 	"github.com/gertd/go-pluralize"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -151,46 +154,122 @@ func AddModuleInitializer(content []byte, packageName, singularName string) ([]b
 	return []byte(updatedContent), true
 }
 
-func UpdateInitFileForDestroy(pluralName string) error {
-	initFilePath := "app/init.go"
+func UpdateInitFileForDestroy(singularName string) error {
+	// Convert names consistently with generate function
+	dirName := ToSnakeCase(singularName)
+	pluralName := ToPlural(singularName)
+	packageName := ToSnakeCase(pluralName)
 
+	// Paths - use the same paths as generateModule
+	initFilePath := "app/init.go"
+	moduleDir := filepath.Join("app", packageName)
+	modelFile := filepath.Join("app", "models", fmt.Sprintf("%s.go", dirName))
+
+	// Read init.go first
 	content, err := os.ReadFile(initFilePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("error reading init.go: %v", err)
 	}
 
-	importStr := fmt.Sprintf("\"base/app/%s\"", pluralName)
-	content = RemoveImport(content, importStr)
+	contentStr := string(content)
 
-	content = RemoveModuleInitializer(content, pluralName)
+	// Check if module exists in init.go
+	modulePattern := fmt.Sprintf(`"%s":\s*func\(db \*gorm\.DB,`, packageName)
+	if !regexp.MustCompile(modulePattern).MatchString(contentStr) {
+		return fmt.Errorf("module '%s' not found in init.go", packageName)
+	}
 
-	return os.WriteFile(initFilePath, content, 0644)
+	// Remove import while preserving formatting
+	importPath := fmt.Sprintf(`"base/app/%s"`, packageName)
+	importMarker := "// MODULE_IMPORT_MARKER"
+	
+	// Find the marker and remove the import
+	markerIndex := strings.Index(contentStr, importMarker)
+	if markerIndex != -1 {
+		markerEnd := strings.Index(contentStr[markerIndex:], "\n") + markerIndex
+		if markerEnd != -1 {
+			// Look for the import line after the marker
+			remainingContent := contentStr[markerEnd:]
+			importPattern := regexp.MustCompile(`\n\s*` + regexp.QuoteMeta(importPath) + `\n`)
+			contentStr = contentStr[:markerEnd+1] + importPattern.ReplaceAllString(remainingContent, "\n")
+		}
+	}
+
+	// Remove module initializer
+	initializerPattern := fmt.Sprintf(`\n\s*"%s":\s*func\(db \*gorm\.DB,\s*router \*gin\.RouterGroup,\s*log logger\.Logger,\s*emitter \*emitter\.Emitter,\s*activeStorage \*storage\.ActiveStorage\) module\.Module \{[^}]+\},\n`, packageName)
+	re := regexp.MustCompile(initializerPattern)
+	
+	// Find and remove the module initializer
+	contentStr = re.ReplaceAllString(contentStr, "\n")
+
+	// Ensure proper formatting
+	contentStr = regexp.MustCompile(`\n{3,}`).ReplaceAllString(contentStr, "\n\n")
+	contentStr = regexp.MustCompile(`\{\n\n(\s*)//`).ReplaceAllString(contentStr, "{\n$1//")
+	contentStr = regexp.MustCompile(`\n\n(\s*)\}`).ReplaceAllString(contentStr, "\n$1}")
+
+	// Write updated init.go
+	if err := os.WriteFile(initFilePath, []byte(contentStr), 0644); err != nil {
+		return fmt.Errorf("error writing to init.go: %v", err)
+	}
+
+	// Try to remove module directory
+	if _, err := os.Stat(moduleDir); err == nil {
+		if err := os.RemoveAll(moduleDir); err != nil {
+			fmt.Printf("Warning: could not remove module directory %s: %v\n", moduleDir, err)
+		} else {
+			fmt.Printf("Removed module directory: %s\n", moduleDir)
+		}
+	}
+
+	// Try to remove model file
+	if _, err := os.Stat(modelFile); err == nil {
+		if err := os.Remove(modelFile); err != nil {
+			fmt.Printf("Warning: could not remove model file %s: %v\n", modelFile, err)
+		} else {
+			fmt.Printf("Removed model file: %s\n", modelFile)
+		}
+	}
+
+	fmt.Printf("Successfully removed module '%s'\n", packageName)
+	return nil
 }
 
 func RemoveImport(content []byte, importStr string) []byte {
-	lines := bytes.Split(content, []byte("\n"))
-	var newLines [][]byte
-
-	for _, line := range lines {
-		if !bytes.Contains(line, []byte(importStr)) {
-			newLines = append(newLines, line)
+	contentStr := string(content)
+	importIndex := strings.Index(contentStr, importStr)
+	if importIndex != -1 {
+		// Find the start of the line
+		lineStart := strings.LastIndex(contentStr[:importIndex], "\n") + 1
+		// Find the end of the line
+		lineEnd := strings.Index(contentStr[importIndex:], "\n") + importIndex
+		if lineEnd == -1 {
+			lineEnd = len(contentStr)
 		}
+		// Remove the line
+		contentStr = contentStr[:lineStart] + contentStr[lineEnd:]
 	}
-
-	return bytes.Join(newLines, []byte("\n"))
+	return []byte(contentStr)
 }
 
 func RemoveModuleInitializer(content []byte, pluralName string) []byte {
-	lines := bytes.Split(content, []byte("\n"))
-	var newLines [][]byte
-
-	for _, line := range lines {
-		if !bytes.Contains(line, []byte(fmt.Sprintf(`"%s":`, pluralName))) {
-			newLines = append(newLines, line)
+	contentStr := string(content)
+	// Look for the module initializer
+	moduleStr := fmt.Sprintf(`"%s":`, pluralName)
+	initializerStart := strings.Index(contentStr, moduleStr)
+	if initializerStart != -1 {
+		// Find the start of the line
+		lineStart := strings.LastIndex(contentStr[:initializerStart], "\n") + 1
+		// Find the end of the module block (closing brace followed by comma)
+		initializerEnd := strings.Index(contentStr[initializerStart:], "},") + initializerStart + 2
+		if initializerEnd > initializerStart {
+			// Remove any trailing newline
+			if len(contentStr) > initializerEnd && contentStr[initializerEnd] == '\n' {
+				initializerEnd++
+			}
+			contentStr = contentStr[:lineStart] + contentStr[initializerEnd:]
 		}
 	}
-
-	return bytes.Join(newLines, []byte("\n"))
+	return []byte(contentStr)
 }
 
 func AddImport(content []byte, importStr string) ([]byte, bool) {
