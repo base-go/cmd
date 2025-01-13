@@ -62,7 +62,14 @@ func PrintUpdateMessage() {
 		return
 	}
 
-	fmt.Printf("\n📦 Update available! %s → %s\n", CommitHash[:8], latestCommit)
+	currentHash := CommitHash
+	if currentHash == "unknown" || len(currentHash) < 8 {
+		currentHash = "dev"
+	} else {
+		currentHash = currentHash[:8]
+	}
+
+	fmt.Printf("\n📦 Update available! %s → %s\n", currentHash, latestCommit)
 	fmt.Printf("Run: base upgrade\n")
 	fmt.Printf("Latest changes: %s\n\n", url)
 }
