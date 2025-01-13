@@ -290,3 +290,31 @@ func AddImport(content []byte, importStr string) ([]byte, bool) {
 
 	return updatedContent, true
 }
+
+func GetRequiredImports(fields []FieldStruct) map[string][]string {
+	modelImports := []string{
+		"time",
+		"github.com/google/uuid",
+	}
+	serviceImports := []string{
+		"context",
+		"errors",
+		"fmt",
+	}
+
+	// Add conditional imports based on field types
+	if HasFieldType(fields, "*storage.File") {
+		modelImports = append(modelImports,
+			"gorm.io/gorm",
+			"base/core/storage",
+		)
+		serviceImports = append(serviceImports,
+			"mime/multipart",
+		)
+	}
+
+	return map[string][]string{
+		"model":   modelImports,
+		"service": serviceImports,
+	}
+}

@@ -35,17 +35,22 @@ type FieldStruct struct {
 	Relationship    string
 }
 
-// Update GenerateFileFromTemplate to include sort field information
+// GenerateFileFromTemplate generates a file from a template
 func GenerateFileFromTemplate(dir, filename, templateFile, singularName, pluralName, packageName string, fields []FieldStruct) {
-	tmplContent, err := TemplateFS.ReadFile(templateFile)
+	// Read template file
+	tmplContent, err := os.ReadFile(templateFile)
 	if err != nil {
 		fmt.Printf("Error reading template %s: %v\n", templateFile, err)
 		return
 	}
 
+	// Create template with functions
 	funcMap := template.FuncMap{
-		"toLower": strings.ToLower,
-		"toTitle": cases.Title(language.Und).String,
+		"toLower":     strings.ToLower,
+		"toTitle":     cases.Title(language.Und).String,
+		"ToSnakeCase": ToSnakeCase,
+		"ToPascalCase": ToPascalCase,
+		"ToPlural":    PluralizeClient.Plural,
 	}
 
 	tmpl, err := template.New(filepath.Base(templateFile)).Funcs(funcMap).Parse(string(tmplContent))
@@ -54,29 +59,43 @@ func GenerateFileFromTemplate(dir, filename, templateFile, singularName, pluralN
 		return
 	}
 
-	data := map[string]interface{}{
-		"PackageName":           packageName,
-		"StructName":            singularName,
-		"LowerStructName":       strings.ToLower(singularName[:1]) + singularName[1:],
-		"PluralName":            pluralName,
-		"RouteName":             ToKebabCase(pluralName),
-		"Fields":                fields,
-		"TableName":             ToSnakeCase(pluralName),
-		"LowerPluralStructName": strings.ToLower(pluralName),
+	// Create target directory if it doesn't exist
+	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+		fmt.Printf("Error creating directory %s: %v\n", dir, err)
+		return
 	}
 
-	filePath := filepath.Join(dir, filename)
-	file, err := os.Create(filePath)
+	// Create target file
+	targetFile := filepath.Join(dir, filename)
+	file, err := os.Create(targetFile)
 	if err != nil {
-		fmt.Printf("Error creating file %s: %v\n", filePath, err)
+		fmt.Printf("Error creating file %s: %v\n", targetFile, err)
 		return
 	}
 	defer file.Close()
 
-	err = tmpl.Execute(file, data)
-	if err != nil {
-		fmt.Printf("Error executing template for %s: %v\n", filename, err)
+	// Prepare template data
+	data := struct {
+		StructName string
+		PluralName string
+		PackageName string
+		Fields []FieldStruct
+		HasImageField bool
+	}{
+		StructName:   singularName,
+		PluralName:   pluralName,
+		PackageName:  packageName,
+		Fields:       fields,
+		HasImageField: HasFieldType(fields, "*storage.Attachment"),
 	}
+
+	// Execute template
+	if err := tmpl.Execute(file, data); err != nil {
+		fmt.Printf("Error executing template for %s: %v\n", targetFile, err)
+		return
+	}
+
+	fmt.Printf("Generated %s\n", targetFile)
 }
 
 // GenerateFieldStructs processes the fields and returns a slice of FieldStruct
@@ -84,63 +103,73 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 	var fieldStructs []FieldStruct
 	for _, field := range fields {
 		parts := strings.Split(field, ":")
-		if len(parts) >= 2 {
-			name := ToPascalCase(parts[0])
-			fieldType := parts[1]
-			jsonName := ToSnakeCase(parts[0])
-			dbName := ToSnakeCase(parts[0])
-			var associatedType, associatedTable, pluralType, relationship string
-			goType := GetGoType(fieldType)
-			switch strings.ToLower(fieldType) {
-			case "belongsto", "belongs_to":
-				relationship = "belongs_to"
-				if len(parts) > 2 {
-					associatedType = ToPascalCase(parts[2])
-					goType = "*" + associatedType
-					jsonName += "_id"
-					dbName += "_id"
-				}
-			case "hasone", "has_one":
-				relationship = "has_one"
-				if len(parts) > 2 {
-					associatedType = ToPascalCase(parts[2])
-					goType = "*" + associatedType
-					jsonName = ToSnakeCase(name)
-				}
-			case "hasmany", "has_many":
-				relationship = "has_many"
-				if len(parts) > 2 {
-					associatedType = ToPascalCase(parts[2])
-					pluralType = PluralizeClient.Plural(ToLower(parts[2]))
-					goType = "[]*" + associatedType
-					jsonName = ToSnakeCase(PluralizeClient.Plural(name))
-					associatedTable = ToSnakeCase(pluralType)
-				}
-			case "attachment":
-				relationship = "attachment"
-				goType = "*storage.Attachment"
-			case "sort":
-				relationship = "sort"
-				goType = "int"
-				// Ensure the field name ends with Order if it doesn't already
-				if !strings.HasSuffix(name, "Order") {
-					name = name + "Order"
-					jsonName = ToSnakeCase(name)
-					dbName = ToSnakeCase(name)
-				}
-			}
-			fieldStruct := FieldStruct{
-				Name:            name,
-				Type:            goType,
-				JSONName:        jsonName,
-				DBName:          dbName,
-				AssociatedType:  associatedType,
-				AssociatedTable: associatedTable,
-				PluralType:      pluralType,
-				Relationship:    relationship,
-			}
-			fieldStructs = append(fieldStructs, fieldStruct)
+		if len(parts) != 2 {
+			continue
 		}
+		fieldName := ToPascalCase(parts[0])
+		fieldType := parts[1]
+
+		// Convert common types to Go types
+		goType := fieldType
+		relationship := ""
+		var associatedType string
+		var associatedTable string
+		var pluralType string
+
+		switch fieldType {
+		case "string", "text":
+			goType = "string"
+		case "int":
+			goType = "int"
+		case "bool":
+			goType = "bool"
+		case "float":
+			goType = "float64"
+		case "time":
+			goType = "time.Time"
+		case "attachment":
+			goType = "*storage.Attachment"
+			relationship = "attachment"
+		}
+
+		// Check for relationships
+		if strings.HasPrefix(fieldType, "belongs_to:") {
+			relationship = "belongs_to"
+			associatedType = strings.TrimPrefix(fieldType, "belongs_to:")
+			associatedTable = ToSnakeCase(PluralizeClient.Plural(associatedType))
+			goType = "uint"
+		} else if strings.HasPrefix(fieldType, "has_many:") {
+			relationship = "has_many"
+			associatedType = strings.TrimPrefix(fieldType, "has_many:")
+			associatedTable = ToSnakeCase(PluralizeClient.Plural(associatedType))
+			pluralType = PluralizeClient.Plural(associatedType)
+			goType = fmt.Sprintf("[]*%s", associatedType)
+		} else if strings.HasPrefix(fieldType, "has_one:") {
+			relationship = "has_one"
+			associatedType = strings.TrimPrefix(fieldType, "has_one:")
+			associatedTable = ToSnakeCase(PluralizeClient.Plural(associatedType))
+			goType = fmt.Sprintf("*%s", associatedType)
+		}
+
+		fieldStructs = append(fieldStructs, FieldStruct{
+			Name:            fieldName,
+			Type:            goType,
+			JSONName:        ToSnakeCase(fieldName),
+			DBName:          ToSnakeCase(fieldName),
+			AssociatedType:  associatedType,
+			AssociatedTable: associatedTable,
+			PluralType:      pluralType,
+			Relationship:    relationship,
+		})
 	}
 	return fieldStructs
+}
+
+func HasFieldType(fields []FieldStruct, fieldType string) bool {
+	for _, field := range fields {
+		if field.Type == fieldType {
+			return true
+		}
+	}
+	return false
 }

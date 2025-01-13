@@ -55,6 +55,15 @@ func generateModule(cmd *cobra.Command, args []string) {
 	// Process fields
 	fieldStructs := utils.GenerateFieldStructs(fields)
 
+	// Get the absolute path to the templates directory
+	execPath, err := os.Executable()
+	if err != nil {
+		fmt.Printf("Error getting executable path: %v\n", err)
+		return
+	}
+	baseDir := filepath.Dir(filepath.Dir(execPath))
+	templatesDir := filepath.Join(baseDir, "cmd", "utils", "templates")
+
 	// Generate files using templates
 	templates := []struct {
 		targetDir    string
@@ -64,22 +73,22 @@ func generateModule(cmd *cobra.Command, args []string) {
 		{
 			targetDir:    filepath.Join("app", "models"),
 			filename:     fmt.Sprintf("%s.go", dirName),
-			templateFile: "templates/model.tmpl",
+			templateFile: filepath.Join(templatesDir, "model.tmpl"),
 		},
 		{
 			targetDir:    filepath.Join("app", pluralDirName),
 			filename:     "service.go",
-			templateFile: "templates/service.tmpl",
+			templateFile: filepath.Join(templatesDir, "service.tmpl"),
 		},
 		{
 			targetDir:    filepath.Join("app", pluralDirName),
 			filename:     "controller.go",
-			templateFile: "templates/controller.tmpl",
+			templateFile: filepath.Join(templatesDir, "controller.tmpl"),
 		},
 		{
 			targetDir:    filepath.Join("app", pluralDirName),
 			filename:     "module.go",
-			templateFile: "templates/module.tmpl",
+			templateFile: filepath.Join(templatesDir, "module.tmpl"),
 		},
 	}
 

@@ -3,7 +3,11 @@ package models
 import (
     "time"
     "gorm.io/gorm"
+    {{- range .Fields}}
+    {{- if eq .Relationship "attachment"}}
     "base/core/storage"
+    {{- end}}
+    {{- end}}
 )
 
 // {{.StructName}} represents a {{toLower .StructName}} entity

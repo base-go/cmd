@@ -16,6 +16,9 @@ type Module struct {
     DB         *gorm.DB
     Controller *{{.StructName}}Controller
     Service    *{{.StructName}}Service
+    {{- if .HasImageField}}
+    ActiveStorage *storage.ActiveStorage
+    {{- end}}
 }
 
 func New{{.StructName}}Module(db *gorm.DB, router *gin.RouterGroup, log logger.Logger, emitter *emitter.Emitter, activeStorage *storage.ActiveStorage) module.Module {
@@ -30,13 +33,20 @@ func New{{.StructName}}Module(db *gorm.DB, router *gin.RouterGroup, log logger.L
     {{- end}}
     {{- end}}
 
+    {{- if .HasImageField}}
     service := New{{.StructName}}Service(db, activeStorage)
+    {{- else}}
+    service := New{{.StructName}}Service(db)
+    {{- end}}
     controller := New{{.StructName}}Controller(service)
 
     m := &Module{
         DB:         db,
         Controller: controller,
         Service:    service,
+        {{- if .HasImageField}}
+        ActiveStorage: activeStorage,
+        {{- end}}
     }
 
     m.Routes(router)

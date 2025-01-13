@@ -29,19 +29,12 @@ func startApplication(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// Check if we're in a Base project by looking for main.go in the base directory
-	mainPath := filepath.Join(cwd, "base", "main.go")
+	// Check if we're in a Base project by looking for main.go
+	mainPath := filepath.Join(cwd, "main.go")
 	if _, err := os.Stat(mainPath); os.IsNotExist(err) {
 		fmt.Println("Error: Base project structure not found.")
 		fmt.Println("Make sure you are in the root directory of your Base project.")
 		fmt.Println("Expected to find main.go at:", mainPath)
-		return
-	}
-
-	// Change to the base directory
-	err = os.Chdir(filepath.Join(cwd, "base"))
-	if err != nil {
-		fmt.Printf("Error changing to base directory: %v\n", err)
 		return
 	}
 
@@ -50,10 +43,10 @@ func startApplication(cmd *cobra.Command, args []string) {
 	goCmd := exec.Command("go", "run", "main.go")
 	goCmd.Stdout = os.Stdout
 	goCmd.Stderr = os.Stderr
-	goCmd.Dir = filepath.Join(cwd, "base")
+	goCmd.Dir = cwd
 
 	if err := goCmd.Run(); err != nil {
-		fmt.Printf("Error starting the application: %v\n", err)
+		fmt.Printf("Error running application: %v\n", err)
 		return
 	}
 }
