@@ -159,8 +159,9 @@ func upgradeBase(cmd *cobra.Command, args []string) {
 	fmt.Println("Installing the tool...")
 	if err := os.Rename("base", binaryPath); err != nil {
 		fmt.Printf("Error installing binary: %v\n", err)
-		fmt.Println("You may need to run with sudo privileges:")
-		fmt.Println("sudo base upgrade")
+		fmt.Println("\nTo upgrade Base CLI, please run the following command in your terminal:")
+		fmt.Println("  sudo base upgrade")
+		fmt.Println("\nThis requires sudo privileges to replace the existing binary.")
 		return
 	}
 
