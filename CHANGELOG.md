@@ -36,6 +36,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed Swagger documentation triggering unnecessary rebuilds in hot reload mode
 - Fixed version information display in CLI output
 
+## [v1.0.5] - 2025-01-14
+
+### Added
+- PowerShell installation script for Windows users
+- Support for multiple platforms (Windows, macOS, Linux) in installation scripts
+- Automated release script for creating new releases
+- Support for multiple architectures (amd64, arm64)
+
+### Changed
+- Improved upgrade command to use GitHub release assets
+- Updated installation process to use pre-built binaries
+- Enhanced version command to show release notes
+- Simplified installation instructions in README
+
+### Fixed
+- Version information display in CLI output
+- Binary installation paths for different operating systems
+- Upgrade process on Windows systems
+
 ## [1.0.0] - 2024-01-13
 
 ### Added
@@ -56,4 +75,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic project structure
 
 [Unreleased]: https://github.com/base-go/cmd/compare/v1.0.0...HEAD
+[v1.0.5]: https://github.com/base-go/cmd/releases/tag/v1.0.5
 [1.0.0]: https://github.com/base-go/cmd/releases/tag/v1.0.0
