@@ -16,19 +16,19 @@ type {{.StructName}} struct {
     Id        uint           `json:"id" gorm:"primaryKey"`
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to"}}
-    {{.Name}}ID uint `json:"{{.JSONName}}_id" gorm:"column:{{.JSONName}}_id"`
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}ID"`
+    {{.Name}}Id uint `json:"{{.JSONName}}_id" gorm:"column:{{.JSONName}}_id"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}Id"`
     {{- else if eq .Relationship "has_one"}}
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}ID"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id"`
     {{- else if eq .Relationship "has_many"}}
-    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}ID"`
+    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id"`
     {{- else if eq .Relationship "many2many"}}
     {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"many2many:{{toLower $.StructName}}_{{toLower .PluralName}}"`
     {{- else if eq .Type "text"}}
     {{.Name}} string `json:"{{.JSONName}}" gorm:"column:{{.JSONName}};type:text"`
     {{- else if eq .Type "attachment"}}
-    {{.Name}}ID *uint `json:"{{.JSONName}}_id" gorm:"column:{{.JSONName}}_id"`
-    {{.Name}} *storage.Attachment `json:"{{.JSONName}}" gorm:"foreignKey:{{.Name}}ID"`
+    {{.Name}}Id *uint `json:"{{.JSONName}}_id" gorm:"column:{{.JSONName}}_id"`
+    {{.Name}} *storage.Attachment `json:"{{.JSONName}}" gorm:"foreignKey:{{.Name}}Id"`
     {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
     {{.Name}} types.DateTime `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
     {{- else}}
@@ -59,7 +59,7 @@ type {{.StructName}}ListResponse struct {
     Id        uint      `json:"id"`
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to"}}
-    {{.Name}}ID uint `json:"{{.JSONName}}_id"`
+    {{.Name}}Id uint `json:"{{.JSONName}}_id"`
     {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
     {{- else if eq .Relationship "has_one"}}
     {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
@@ -70,7 +70,7 @@ type {{.StructName}}ListResponse struct {
     {{- else if eq .Type "text"}}
     {{.Name}} string `json:"{{.JSONName}}"`
     {{- else if eq .Type "attachment"}}
-    {{.Name}}ID *uint `json:"{{.JSONName}}_id"`
+    {{.Name}}Id *uint `json:"{{.JSONName}}_id"`
     {{.Name}} *storage.Attachment `json:"{{.JSONName}}"`
     {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
     {{.Name}} types.DateTime `json:"{{.JSONName}}"`
@@ -87,7 +87,7 @@ type {{.StructName}}Response struct {
     Id        uint      `json:"id"`
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to"}}
-    {{.Name}}ID uint `json:"{{.JSONName}}_id"`
+    {{.Name}}Id uint `json:"{{.JSONName}}_id"`
     {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
     {{- else if eq .Relationship "has_one"}}
     {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty"`
@@ -98,7 +98,7 @@ type {{.StructName}}Response struct {
     {{- else if eq .Type "text"}}
     {{.Name}} string `json:"{{.JSONName}}"`
     {{- else if eq .Type "attachment"}}
-    {{.Name}}ID *uint `json:"{{.JSONName}}_id"`
+    {{.Name}}Id *uint `json:"{{.JSONName}}_id"`
     {{.Name}} *storage.Attachment `json:"{{.JSONName}}"`
     {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
     {{.Name}} types.DateTime `json:"{{.JSONName}}"`
@@ -115,15 +115,15 @@ type {{.StructName}}Response struct {
 type Create{{.StructName}}Request struct {
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to"}}
-    {{.Name}}ID uint `json:"{{.JSONName}}_id" binding:"required"`
+    {{.Name}}Id uint `json:"{{.JSONName}}_id" binding:"required"`
     {{- else if eq .Relationship "has_many"}}
-    {{.Name}}IDs []uint `json:"{{.JSONName}}_ids"`
+    {{.Name}}Ids []uint `json:"{{.JSONName}}_ids"`
     {{- else if eq .Relationship "many2many"}}
-    {{.Name}}IDs []uint `json:"{{.JSONName}}_ids"`
+    {{.Name}}Ids []uint `json:"{{.JSONName}}_ids"`
     {{- else if eq .Type "text"}}
     {{.Name}} string `json:"{{.JSONName}}" binding:"required"`
     {{- else if eq .Type "attachment"}}
-    {{.Name}}ID *uint `json:"{{.JSONName}}_id"`
+    {{.Name}}Id *uint `json:"{{.JSONName}}_id"`
     {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
     {{.Name}} types.DateTime `json:"{{.JSONName}}"`
     {{- else}}
@@ -136,15 +136,15 @@ type Create{{.StructName}}Request struct {
 type Update{{.StructName}}Request struct {
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to"}}
-    {{.Name}}ID *uint `json:"{{.JSONName}}_id,omitempty"`
+    {{.Name}}Id *uint `json:"{{.JSONName}}_id,omitempty"`
     {{- else if eq .Relationship "has_many"}}
-    {{.Name}}IDs []uint `json:"{{.JSONName}}_ids,omitempty"`
+    {{.Name}}Ids []uint `json:"{{.JSONName}}_ids,omitempty"`
     {{- else if eq .Relationship "many2many"}}
-    {{.Name}}IDs []uint `json:"{{.JSONName}}_ids,omitempty"`
+    {{.Name}}Ids []uint `json:"{{.JSONName}}_ids,omitempty"`
     {{- else if eq .Type "text"}}
     {{.Name}} *string `json:"{{.JSONName}},omitempty"`
     {{- else if eq .Type "attachment"}}
-    {{.Name}}ID *uint `json:"{{.JSONName}}_id,omitempty"`
+    {{.Name}}Id *uint `json:"{{.JSONName}}_id,omitempty"`
     {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
     {{.Name}} *types.DateTime `json:"{{.JSONName}},omitempty"`
     {{- else}}
@@ -162,10 +162,10 @@ func (item *{{.StructName}}) ToListResponse() *{{.StructName}}ListResponse {
         Id: item.Id,
         {{- range .Fields}}
         {{- if eq .Relationship "belongs_to"}}
-        {{.Name}}ID: item.{{.Name}}ID,
+        {{.Name}}Id: item.{{.Name}}Id,
         {{.Name}}: item.{{.Name}},
         {{- else if eq .Type "attachment"}}
-        {{.Name}}ID: item.{{.Name}}ID,
+        {{.Name}}Id: item.{{.Name}}Id,
         {{.Name}}: item.{{.Name}},
         {{- else}}
         {{.Name}}: item.{{.Name}},
@@ -185,10 +185,10 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
         Id: item.Id,
         {{- range .Fields}}
         {{- if eq .Relationship "belongs_to"}}
-        {{.Name}}ID: item.{{.Name}}ID,
+        {{.Name}}Id: item.{{.Name}}Id,
         {{.Name}}: item.{{.Name}},
         {{- else if eq .Type "attachment"}}
-        {{.Name}}ID: item.{{.Name}}ID,
+        {{.Name}}Id: item.{{.Name}}Id,
         {{.Name}}: item.{{.Name}},
         {{- else}}
         {{.Name}}: item.{{.Name}},
