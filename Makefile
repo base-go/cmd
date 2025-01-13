@@ -1,22 +1,26 @@
 # Build variables
 BINARY_NAME=base
-VERSION=$(shell git describe --tags --always --dirty)
-COMMIT_HASH=$(shell git rev-parse --short HEAD)
-BUILD_DATE=$(shell date -u '+%Y-%m-%d %H:%M:%S')
+VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+COMMIT_HASH=$(shell git rev-parse HEAD 2>/dev/null || echo "unknown")
+BUILD_DATE=$(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 GO_VERSION=$(shell go version | cut -d ' ' -f 3)
 
 # LDFLAGS for version information
-LDFLAGS=-ldflags "-X base/version.Version=${VERSION} \
-                  -X base/version.CommitHash=${COMMIT_HASH} \
-                  -X base/version.BuildDate=${BUILD_DATE} \
-                  -X base/version.GoVersion=${GO_VERSION}"
+LDFLAGS=-ldflags "-X 'github.com/base-go/cmd/version.Version=${VERSION}' \
+                  -X 'github.com/base-go/cmd/version.CommitHash=${COMMIT_HASH}' \
+                  -X 'github.com/base-go/cmd/version.BuildDate=${BUILD_DATE}' \
+                  -X 'github.com/base-go/cmd/version.GoVersion=${GO_VERSION}'"
 
-.PHONY: all build clean install test
+.PHONY: all build clean install test dev
 
 all: clean build
 
 build:
 	@echo "Building Base CLI..."
+	@echo "Version: ${VERSION}"
+	@echo "Commit: ${COMMIT_HASH}"
+	@echo "Build Date: ${BUILD_DATE}"
+	@echo "Go Version: ${GO_VERSION}"
 	go build ${LDFLAGS} -o ${BINARY_NAME}
 
 clean:
@@ -25,7 +29,13 @@ clean:
 
 install: build
 	@echo "Installing..."
-	mv ${BINARY_NAME} ${GOPATH}/bin/${BINARY_NAME}
+	mkdir -p ${HOME}/.base
+	mv ${BINARY_NAME} ${HOME}/.base/${BINARY_NAME}
+
+dev: clean
+	@echo "Building for development..."
+	go build -o ${BINARY_NAME}
+	./${BINARY_NAME} version
 
 test:
 	@echo "Running tests..."
@@ -56,3 +66,16 @@ release-major:
 	@echo "New version: ${NEW_VERSION}"
 	git tag -a ${NEW_VERSION} -m "Release ${NEW_VERSION}"
 	git push origin ${NEW_VERSION}
+
+# Development helpers
+.PHONY: fmt lint
+
+fmt:
+	@echo "Formatting code..."
+	go fmt ./...
+	find . -name "*.go" -exec goimports -w {} \;
+
+lint:
+	@echo "Linting code..."
+	go vet ./...
+	golint ./...
