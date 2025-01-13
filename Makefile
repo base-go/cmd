@@ -6,10 +6,10 @@ BUILD_DATE=$(shell date -u '+%Y-%m-%d %H:%M:%S')
 GO_VERSION=$(shell go version | cut -d ' ' -f 3)
 
 # LDFLAGS for version information
-LDFLAGS=-ldflags "-X github.com/flakerimi/base/cmd/version.Version=${VERSION} \
-                  -X github.com/flakerimi/base/cmd/version.CommitHash=${COMMIT_HASH} \
-                  -X github.com/flakerimi/base/cmd/version.BuildDate=${BUILD_DATE} \
-                  -X github.com/flakerimi/base/cmd/version.GoVersion=${GO_VERSION}"
+LDFLAGS=-ldflags "-X base/version.Version=${VERSION} \
+                  -X base/version.CommitHash=${COMMIT_HASH} \
+                  -X base/version.BuildDate=${BUILD_DATE} \
+                  -X base/version.GoVersion=${GO_VERSION}"
 
 .PHONY: all build clean install test
 

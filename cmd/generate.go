@@ -55,40 +55,31 @@ func generateModule(cmd *cobra.Command, args []string) {
 	// Process fields
 	fieldStructs := utils.GenerateFieldStructs(fields)
 
-	// Get the absolute path to the templates directory
-	execPath, err := os.Executable()
-	if err != nil {
-		fmt.Printf("Error getting executable path: %v\n", err)
-		return
-	}
-	baseDir := filepath.Dir(filepath.Dir(execPath))
-	templatesDir := filepath.Join(baseDir, "cmd", "utils", "templates")
-
 	// Generate files using templates
 	templates := []struct {
-		targetDir    string
-		filename     string
-		templateFile string
+		targetDir  string
+		filename   string
+		template   string
 	}{
 		{
-			targetDir:    filepath.Join("app", "models"),
-			filename:     fmt.Sprintf("%s.go", dirName),
-			templateFile: filepath.Join(templatesDir, "model.tmpl"),
+			targetDir:  filepath.Join("app", "models"),
+			filename:   fmt.Sprintf("%s.go", dirName),
+			template:   "model.tmpl",
 		},
 		{
-			targetDir:    filepath.Join("app", pluralDirName),
-			filename:     "service.go",
-			templateFile: filepath.Join(templatesDir, "service.tmpl"),
+			targetDir:  filepath.Join("app", pluralDirName),
+			filename:   "service.go",
+			template:   "service.tmpl",
 		},
 		{
-			targetDir:    filepath.Join("app", pluralDirName),
-			filename:     "controller.go",
-			templateFile: filepath.Join(templatesDir, "controller.tmpl"),
+			targetDir:  filepath.Join("app", pluralDirName),
+			filename:   "controller.go",
+			template:   "controller.tmpl",
 		},
 		{
-			targetDir:    filepath.Join("app", pluralDirName),
-			filename:     "module.go",
-			templateFile: filepath.Join(templatesDir, "module.tmpl"),
+			targetDir:  filepath.Join("app", pluralDirName),
+			filename:   "module.go",
+			template:   "module.tmpl",
 		},
 	}
 
@@ -96,7 +87,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 		utils.GenerateFileFromTemplate(
 			tmpl.targetDir,
 			tmpl.filename,
-			tmpl.templateFile,
+			tmpl.template,
 			structName,
 			pluralName,
 			packageName,
@@ -105,69 +96,66 @@ func generateModule(cmd *cobra.Command, args []string) {
 	}
 
 	// Update init.go
-	initFile := filepath.Join("app", "init.go")
-	if _, err := os.Stat(initFile); err == nil {
-		content, err := os.ReadFile(initFile)
-		if err != nil {
-			fmt.Printf("Error reading init.go: %v\n", err)
-			return
-		}
-
-		// Add import if not exists
-		importPath := fmt.Sprintf(`"base/app/%s"`, packageName)
-		contentStr := string(content)
-		if !strings.Contains(contentStr, importPath) {
-			importMarker := "// MODULE_IMPORT_MARKER"
-			markerIndex := strings.Index(contentStr, importMarker)
-			if markerIndex == -1 {
-				fmt.Println("Could not find import marker comment in init.go")
-				return
-			}
-			// Find the end of the line containing the marker
-			lineEnd := strings.Index(contentStr[markerIndex:], "\n") + markerIndex
-			if lineEnd == -1 {
-				lineEnd = len(contentStr)
-			}
-			newContent := contentStr[:lineEnd+1] + "\t" + importPath + "\n" + contentStr[lineEnd+1:]
-			contentStr = newContent
-		}
-
-		// Create the module initializer line
-		moduleInitializer := fmt.Sprintf(`		"%s": func(db *gorm.DB, router *gin.RouterGroup, log logger.Logger, emitter *emitter.Emitter, activeStorage *storage.ActiveStorage) module.Module {
-			return %s.New%sModule(db, router, log, emitter, activeStorage)
-		},
-
-`, packageName, packageName, structName)
-
-		// Check if the module initializer already exists
-		if strings.Contains(contentStr, fmt.Sprintf(`"%s":`, packageName)) {
-			fmt.Printf("Module initializer for %s already exists in init.go\n", packageName)
-			return
-		}
-
-		// Insert the initializer before the marker comment
-		markerComment := "// MODULE_INITIALIZER_MARKER"
-		markerIndex := strings.Index(contentStr, markerComment)
-		if markerIndex == -1 {
-			fmt.Println("Could not find marker comment in init.go")
-			return
-		}
-
-		// Find the start of the line containing the marker
-		lineStart := strings.LastIndex(contentStr[:markerIndex], "\n") + 1
-
-		// Split the content at the marker line
-		beforeMarker := contentStr[:lineStart]
-		afterMarker := contentStr[lineStart:]
-
-		// Combine all parts
-		newContent := beforeMarker + moduleInitializer + afterMarker
-
-		if err := os.WriteFile(initFile, []byte(newContent), 0644); err != nil {
-			fmt.Printf("Error writing to init.go: %v\n", err)
-			return
-		}
+	if err := updateInitGo(pluralDirName, structName); err != nil {
+		fmt.Printf("Error updating init.go: %v\n", err)
+		return
 	}
 
-	fmt.Printf("Successfully generated %s module\n", structName)
+	fmt.Printf("Generated module %s with fields: %v\n", structName, fields)
+}
+
+// updateInitGo adds the module initialization to init.go
+func updateInitGo(moduleName, structName string) error {
+	initFile := filepath.Join("app", "init.go")
+
+	// Read existing content
+	content, err := os.ReadFile(initFile)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("error reading init.go: %v", err)
+	}
+
+	// Check if module is already initialized
+	if strings.Contains(string(content), fmt.Sprintf("New%sModule", structName)) {
+		fmt.Printf("Module initializer for %s already exists in init.go\n", strings.ToLower(structName))
+		return nil
+	}
+
+	// Create init.go if it doesn't exist
+	if os.IsNotExist(err) {
+		content = []byte(`package app
+
+import (
+	"github.com/gin-gonic/gin"
+)
+
+// InitializeModules initializes all modules
+func InitializeModules(r *gin.Engine) {
+}
+`)
+	}
+
+	// Find the closing brace of InitializeModules function
+	contentStr := string(content)
+	insertPos := strings.LastIndex(contentStr, "}")
+
+	if insertPos == -1 {
+		return fmt.Errorf("could not find InitializeModules function in init.go")
+	}
+
+	// Add import if needed
+	importStr := fmt.Sprintf(`"%s/app/%s"`, "base", moduleName)
+	if !strings.Contains(contentStr, importStr) {
+		importPos := strings.Index(contentStr, ")")
+		if importPos == -1 {
+			return fmt.Errorf("could not find import section in init.go")
+		}
+		contentStr = contentStr[:importPos] + "\n\t" + importStr + contentStr[importPos:]
+	}
+
+	// Add module initialization
+	initStr := fmt.Sprintf("\t%s.New%sModule(r)\n", moduleName, structName)
+	contentStr = contentStr[:insertPos] + initStr + contentStr[insertPos:]
+
+	// Write back to file
+	return os.WriteFile(initFile, []byte(contentStr), 0644)
 }

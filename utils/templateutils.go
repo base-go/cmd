@@ -52,8 +52,8 @@ func GenerateFileFromTemplate(dir, filename, templateName, singularName, pluralN
 		"hasField":    func(fields []FieldStruct, fieldType string) bool {
 			return HasFieldType(fields, fieldType)
 		},
-		"ToPascalCase": ToPascalCase,
 		"ToPlural":    PluralizeClient.Plural,
+		"ToPascalCase": ToPascalCase,
 	}
 
 	tmpl, err := template.New(templateName).Funcs(funcMap).Parse(string(tmplContent))
@@ -80,17 +80,17 @@ func GenerateFileFromTemplate(dir, filename, templateName, singularName, pluralN
 
 	// Execute template
 	data := struct {
-		StructName  string
-		PluralName string
-		Package    string
-		Fields     []FieldStruct
+		StructName    string
+		PluralName   string
+		Package      string
+		Fields       []FieldStruct
 		HasImageField bool
 	}{
-		StructName:  singularName,
-		PluralName: pluralName,
-		Package:    packageName,
-		Fields:     fields,
-		HasImageField: HasFieldType(fields, "*storage.Attachment"),
+		StructName:    singularName,
+		PluralName:   pluralName,
+		Package:      packageName,
+		Fields:       fields,
+		HasImageField: HasFieldType(fields, "attachment"),
 	}
 
 	err = tmpl.Execute(f, data)
@@ -118,53 +118,40 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 			DBName:   ToSnakeCase(parts[0]),
 		}
 
-		// Convert common types to Go types
-		goType := parts[1]
-		relationship := ""
-		var associatedType string
-		var associatedTable string
-		var pluralType string
-
+		// Handle relationships and field types
 		switch parts[1] {
 		case "string", "text":
-			goType = "string"
+			fieldStruct.Type = "string"
 		case "int":
-			goType = "int"
-		case "bool":
-			goType = "bool"
+			fieldStruct.Type = "int"
 		case "float":
-			goType = "float64"
+			fieldStruct.Type = "float64"
+		case "bool":
+			fieldStruct.Type = "bool"
 		case "time":
-			goType = "time.Time"
+			fieldStruct.Type = "time.Time"
 		case "attachment":
-			goType = "*storage.Attachment"
-			relationship = "attachment"
+			fieldStruct.Type = "*storage.Attachment"
+		default:
+			// Check for relationships
+			if strings.Contains(parts[1], "belongs_to:") {
+				fieldStruct.Type = "uint"
+				fieldStruct.Relationship = "belongs_to"
+				fieldStruct.AssociatedType = strings.TrimPrefix(parts[1], "belongs_to:")
+				fieldStruct.AssociatedTable = ToSnakeCase(PluralizeClient.Plural(fieldStruct.AssociatedType))
+			} else if strings.Contains(parts[1], "has_many:") {
+				fieldStruct.Relationship = "has_many"
+				fieldStruct.AssociatedType = strings.TrimPrefix(parts[1], "has_many:")
+				fieldStruct.AssociatedTable = ToSnakeCase(PluralizeClient.Plural(fieldStruct.AssociatedType))
+				fieldStruct.PluralType = PluralizeClient.Plural(fieldStruct.AssociatedType)
+				fieldStruct.Type = fmt.Sprintf("[]*%s", fieldStruct.AssociatedType)
+			} else if strings.Contains(parts[1], "has_one:") {
+				fieldStruct.Relationship = "has_one"
+				fieldStruct.AssociatedType = strings.TrimPrefix(parts[1], "has_one:")
+				fieldStruct.AssociatedTable = ToSnakeCase(PluralizeClient.Plural(fieldStruct.AssociatedType))
+				fieldStruct.Type = fmt.Sprintf("*%s", fieldStruct.AssociatedType)
+			}
 		}
-
-		// Check for relationships
-		if strings.HasPrefix(parts[1], "belongs_to:") {
-			relationship = "belongs_to"
-			associatedType = strings.TrimPrefix(parts[1], "belongs_to:")
-			associatedTable = ToSnakeCase(PluralizeClient.Plural(associatedType))
-			goType = "uint"
-		} else if strings.HasPrefix(parts[1], "has_many:") {
-			relationship = "has_many"
-			associatedType = strings.TrimPrefix(parts[1], "has_many:")
-			associatedTable = ToSnakeCase(PluralizeClient.Plural(associatedType))
-			pluralType = PluralizeClient.Plural(associatedType)
-			goType = fmt.Sprintf("[]*%s", associatedType)
-		} else if strings.HasPrefix(parts[1], "has_one:") {
-			relationship = "has_one"
-			associatedType = strings.TrimPrefix(parts[1], "has_one:")
-			associatedTable = ToSnakeCase(PluralizeClient.Plural(associatedType))
-			goType = fmt.Sprintf("*%s", associatedType)
-		}
-
-		fieldStruct.Type = goType
-		fieldStruct.Relationship = relationship
-		fieldStruct.AssociatedType = associatedType
-		fieldStruct.AssociatedTable = associatedTable
-		fieldStruct.PluralType = pluralType
 
 		fieldStructs = append(fieldStructs, fieldStruct)
 	}
