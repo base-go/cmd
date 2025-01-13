@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"base/utils"
 
@@ -34,11 +36,16 @@ func destroyModule(cmd *cobra.Command, args []string) {
 	}
 
 	// Prompt for confirmation with Y preselected
+	reader := bufio.NewReader(os.Stdin)
 	fmt.Printf("Are you sure you want to destroy the '%s' module? [Y/n] ", singularName)
-	var response string
-	fmt.Scanln(&response)
-	
-	if response != "" && response != "Y" && response != "y" {
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Printf("Error reading input: %v\n", err)
+		return
+	}
+
+	response = strings.TrimSpace(strings.ToLower(response))
+	if response != "" && response != "y" {
 		fmt.Println("Operation cancelled.")
 		return
 	}
@@ -62,8 +69,5 @@ func destroyModule(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	fmt.Printf("Successfully destroyed module '%s':\n", singularName)
-	fmt.Printf("- Removed directory: %s\n", moduleDir)
-	fmt.Printf("- Removed model file: app/models/%s.go\n", utils.ToSnakeCase(singularName))
-	fmt.Printf("- Updated app/init.go\n")
+	fmt.Printf("Successfully destroyed module '%s'.\n", singularName)
 }
