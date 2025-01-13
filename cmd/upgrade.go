@@ -1,9 +1,13 @@
 package cmd
 
 import (
+	"base/version"
 	"fmt"
 	"os"
 	"os/exec"
+	"time"
+
+	"runtime"
 
 	"github.com/spf13/cobra"
 )
@@ -52,6 +56,15 @@ func upgradeBase(cmd *cobra.Command, args []string) {
 	runCmd := exec.Command("bash", tmpFile.Name())
 	runCmd.Stdout = os.Stdout
 	runCmd.Stderr = os.Stderr
+
+	// Set environment variables for version information
+	runCmd.Env = append(os.Environ(),
+		fmt.Sprintf("VERSION=%s", version.Version),
+		fmt.Sprintf("COMMIT_HASH=%s", version.CommitHash),
+		fmt.Sprintf("BUILD_DATE=%s", time.Now().Format(time.RFC3339)),
+		fmt.Sprintf("GO_VERSION=%s", runtime.Version()),
+	)
+
 	if err := runCmd.Run(); err != nil {
 		fmt.Printf("Error updating Base: %v\n", err)
 		return

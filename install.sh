@@ -12,6 +12,18 @@ REPO_URL="https://github.com/base-go/cmd/archive/main.zip"
 INSTALL_DIR="$HOME/.base"
 BIN_PATH="/usr/local/bin"
 
+# Set version information
+VERSION=${VERSION:-"1.0.0"}
+COMMIT_HASH=${COMMIT_HASH:-$(curl -s https://api.github.com/repos/base-go/cmd/commits/main | grep '"sha"' | head -n 1 | cut -d'"' -f4)}
+BUILD_DATE=${BUILD_DATE:-$(date -u '+%Y-%m-%dT%H:%M:%SZ')}
+GO_VERSION=${GO_VERSION:-$(go version | cut -d' ' -f3)}
+
+echo "Version information:"
+echo "Version: $VERSION"
+echo "Commit: $COMMIT_HASH"
+echo "Build Date: $BUILD_DATE"
+echo "Go Version: $GO_VERSION"
+
 # Step 3: Download and extract the repository
 if [ -d "$INSTALL_DIR" ]; then
   echo "Directory $INSTALL_DIR already exists. Removing existing directory."
@@ -34,9 +46,14 @@ echo "Current directory: $(pwd)"
 
 go mod tidy || { echo "Failed to tidy module."; exit 1; }
 
-# Step 5: Build the tool
+# Step 5: Build the tool with version information
 echo "Building the tool..."
-go build -v -o base || { echo "Failed to build the tool."; exit 1; }
+go build -v \
+  -ldflags "-X 'base/version.Version=$VERSION' \
+            -X 'base/version.CommitHash=$COMMIT_HASH' \
+            -X 'base/version.BuildDate=$BUILD_DATE' \
+            -X 'base/version.GoVersion=$GO_VERSION'" \
+  -o base || { echo "Failed to build the tool."; exit 1; }
 
 # Step 6: Install the binary
 echo "Installing the tool..."
