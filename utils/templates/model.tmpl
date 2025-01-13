@@ -27,7 +27,7 @@ type {{.StructName}} struct {
     {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
     {{- else if eq .Relationship "has_many"}}
     {{- if eq .AssociatedType $.StructName}}
-    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}Id;references:Id"`
+    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
     {{- else}}
     {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
     {{- end}}
