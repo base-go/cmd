@@ -3,8 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"base/version"
-
+	"github.com/base-go/cmd/version"
 	"github.com/spf13/cobra"
 )
 

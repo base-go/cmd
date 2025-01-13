@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"base/cmd"
+	"github.com/base-go/cmd/cmd"
 )
 
 func main() {

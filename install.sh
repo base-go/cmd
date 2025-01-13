@@ -49,10 +49,10 @@ go mod tidy || { echo "Failed to tidy module."; exit 1; }
 # Step 5: Build the tool with version information
 echo "Building the tool..."
 go build -v \
-  -ldflags "-X 'base/version.Version=$VERSION' \
-            -X 'base/version.CommitHash=$COMMIT_HASH' \
-            -X 'base/version.BuildDate=$BUILD_DATE' \
-            -X 'base/version.GoVersion=$GO_VERSION'" \
+  -ldflags "-X 'github.com/base-go/cmd/cmd.Version=$VERSION' \
+            -X 'github.com/base-go/cmd/cmd.CommitHash=$COMMIT_HASH' \
+            -X 'github.com/base-go/cmd/cmd.BuildDate=$BUILD_DATE' \
+            -X 'github.com/base-go/cmd/cmd.GoVersion=$GO_VERSION'" \
   -o base || { echo "Failed to build the tool."; exit 1; }
 
 # Step 6: Install the binary

@@ -1,8 +1,7 @@
 package cmd
 
 import (
-	"base/version"
-
+	"github.com/base-go/cmd/version"
 	"github.com/spf13/cobra"
 )
 

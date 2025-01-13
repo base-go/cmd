@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"base/version"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,6 +8,7 @@ import (
 
 	"runtime"
 
+	"github.com/base-go/cmd/version"
 	"github.com/spf13/cobra"
 )
 
