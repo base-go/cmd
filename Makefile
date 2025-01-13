@@ -21,7 +21,8 @@ build:
 	@echo "Commit: ${COMMIT_HASH}"
 	@echo "Build Date: ${BUILD_DATE}"
 	@echo "Go Version: ${GO_VERSION}"
-	go build ${LDFLAGS} -o ${BINARY_NAME}
+	@echo "Build command: go build ${LDFLAGS} -o ${BINARY_NAME}"
+	go build -v ${LDFLAGS} -o ${BINARY_NAME}
 
 clean:
 	@echo "Cleaning..."
