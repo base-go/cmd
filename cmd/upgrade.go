@@ -1,20 +1,33 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/base-go/cmd/version"
 	"github.com/spf13/cobra"
 )
 
+type GithubRelease struct {
+	TagName string `json:"tag_name"`
+	Assets  []struct {
+		Name               string `json:"name"`
+		BrowserDownloadURL string `json:"browser_download_url"`
+	} `json:"assets"`
+	ZipballURL string `json:"zipball_url"`
+}
+
 var upgradeCmd = &cobra.Command{
 	Use:   "upgrade",
 	Short: "Upgrade Base to the latest version",
-	Long:  `Upgrade Base to the latest version by re-running the installation script.`,
+	Long:  `Upgrade Base to the latest version from the latest GitHub release.`,
 	Run:   upgradeBase,
 }
 
@@ -26,6 +39,28 @@ func upgradeBase(cmd *cobra.Command, args []string) {
 	fmt.Println("Upgrading Base to the latest version...")
 	fmt.Println("Version information:")
 	fmt.Println(version.GetBuildInfo())
+
+	// Get latest release info from GitHub
+	resp, err := http.Get("https://api.github.com/repos/base-go/cmd/releases/latest")
+	if err != nil {
+		fmt.Printf("Error checking latest version: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	var release GithubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		fmt.Printf("Error parsing release info: %v\n", err)
+		return
+	}
+
+	// Compare versions
+	currentVersion := strings.TrimPrefix(version.Version, "v")
+	latestVersion := strings.TrimPrefix(release.TagName, "v")
+	if currentVersion == latestVersion {
+		fmt.Printf("You are already on the latest version (%s)\n", version.Version)
+		return
+	}
 
 	// Get user's home directory
 	home, err := os.UserHomeDir()
@@ -58,13 +93,9 @@ func upgradeBase(cmd *cobra.Command, args []string) {
 	}
 
 	// Download the latest version
-	fmt.Println("Downloading the repository...")
-	downloadURL := "https://github.com/base-go/cmd/archive/refs/heads/main.zip"
-	downloadCmd := exec.Command("curl", "-L", downloadURL, "-o", zipPath)
-	downloadCmd.Stdout = os.Stdout
-	downloadCmd.Stderr = os.Stderr
-	if err := downloadCmd.Run(); err != nil {
-		fmt.Printf("Error downloading repository: %v\n", err)
+	fmt.Printf("Downloading version %s...\n", release.TagName)
+	if err := downloadFile(zipPath, release.ZipballURL); err != nil {
+		fmt.Printf("Error downloading release: %v\n", err)
 		return
 	}
 
@@ -78,8 +109,28 @@ func upgradeBase(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	// Find the extracted directory (it will have a prefix)
+	entries, err := os.ReadDir(baseDir)
+	if err != nil {
+		fmt.Printf("Error reading base directory: %v\n", err)
+		return
+	}
+
+	var extractedDir string
+	for _, entry := range entries {
+		if entry.IsDir() && strings.HasPrefix(entry.Name(), "base-go-cmd-") {
+			extractedDir = filepath.Join(baseDir, entry.Name())
+			break
+		}
+	}
+
+	if extractedDir == "" {
+		fmt.Println("Error: Could not find extracted directory")
+		return
+	}
+
 	// Change to the extracted directory
-	if err := os.Chdir(extractPath); err != nil {
+	if err := os.Chdir(extractedDir); err != nil {
 		fmt.Printf("Error changing directory: %v\n", err)
 		return
 	}
@@ -113,5 +164,22 @@ func upgradeBase(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	fmt.Println("Base CLI has been successfully upgraded!")
+	fmt.Printf("Base CLI has been successfully upgraded to version %s!\n", release.TagName)
+}
+
+func downloadFile(filepath string, url string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	out, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, resp.Body)
+	return err
 }
