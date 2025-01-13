@@ -65,25 +65,89 @@ base new myapp
 
 ### `base generate` or `base g`
 
-Generate a new module with specified fields and options.
+Generate a new module with specified fields and relationships.
 
 **Usage**:
 ```bash
 base g <module-name> [field:type ...] [options]
 ```
 
-- `<module-name>`: Name of the module (e.g., `User`, `Post`)
-- `[field:type ...]`: List of fields with types
-- `[options]`: Additional flags, such as `--admin` for generating an admin interface
+**Field Types**:
+- **Basic Types**:
+  - `string`: String field
+  - `text`: Text field (for longer content)
+  - `int`: Integer field
+  - `float`: Float field
+  - `bool`: Boolean field
+  - `time`: Timestamp field
 
-**Supported Field Types**:
-- **Primitive Types**: `string`, `text`, `int`, `bool`, `float`, `time`
-- **Relationships**: `belongsTo`, `hasOne`, `hasMany`, `attachment`
+- **Relationships**:
+  - `belongsTo`: Many-to-one relationship
+  - `hasOne`: One-to-one relationship
+  - `hasMany`: One-to-many relationship
+  
+- **Special Types**:
+  - `attachment`: File attachment (handled by storage system)
 
-**Example**:
+**Example - Blog System**:
 ```bash
-base g User name:string email:string posts:hasMany:Post
+# Generate User model with relationships
+base g User \
+  username:string \
+  email:string \
+  password:string \
+  avatar:attachment \
+  profile:hasOne:Profile \
+  posts:hasMany:Post \
+  comments:hasMany:Comment
+
+# Generate Profile model
+base g Profile \
+  bio:text \
+  website:string \
+  avatar:attachment \
+  social_links:text \
+  user:belongsTo:User
+
+# Generate Category model with self-referential relationships
+base g Category \
+  name:string \
+  description:text \
+  image:attachment \
+  parent:belongsTo:Category \
+  subcategories:hasMany:Category \
+  posts:hasMany:Post
+
+# Generate Post model with multiple relationships
+base g Post \
+  title:string \
+  content:text \
+  excerpt:text \
+  featured_image:attachment \
+  gallery:attachment \
+  published_at:time \
+  author:belongsTo:User \
+  category:belongsTo:Category \
+  tags:hasMany:Tag \
+  comments:hasMany:Comment
+
+# Generate Comment model with self-referential relationships
+base g Comment \
+  content:text \
+  author:belongsTo:User \
+  post:belongsTo:Post \
+  parent:belongsTo:Comment \
+  replies:hasMany:Comment
 ```
+
+This will generate:
+- Models with proper GORM tags and relationships
+- Services with CRUD operations
+- Controllers with RESTful endpoints
+- Response/Request structs
+- Proper handling of circular dependencies
+- File upload handling for attachments
+- Automatic preloading of relationships
 
 ---
 
@@ -116,44 +180,12 @@ base s
 
 ### `base update`
 
-Update the Base framework's core components in your project. This command:
-- Updates the core directory with the latest version
-- Maintains your custom modifications
-- Updates core interfaces and utilities
-- Preserves your application code
+Update the Base framework's core components in your project.
 
 **Usage**:
 ```bash
 base update
 ```
-
-**What Gets Updated**:
-- Core interfaces and types
-- Base utilities and helpers
-- Storage system components
-- Authentication system
-- Database utilities
-- Event system
-- Logging system
-- Middleware components
-- Error handling
-- Configuration management
-- Testing utilities
-
-**Example Output**:
-```bash
-$ base update
-Updating Base framework components...
-✓ Backing up current core directory
-✓ Downloading latest core components
-✓ Updating interfaces and types
-✓ Updating utilities and helpers
-✓ Preserving custom modifications
-✓ Cleaning up temporary files
-Update completed successfully!
-```
-
-**Note**: This command only updates the framework's core components. To update the CLI tool itself, use `base upgrade`.
 
 ---
 
@@ -198,221 +230,39 @@ base new blog
 # Change into the project directory
 cd blog
 
+# Generate the blog system models
+base g User username:string email:string password:string avatar:attachment
+base g Post title:string content:text author:belongsTo:User
+
 # Start the development server
-base s
+base start
 ```
-
-### Generating Modules
-
-Base provides a powerful module generation system that supports various field types and relationships.
-
-#### Basic Module with Simple Fields
-```bash
-# Generate a basic module with string and text fields
-base g Post title:string content:text
-
-# Generate a module with various field types
-base g Product \
-  name:string \
-  description:text \
-  price:float \
-  quantity:int \
-  is_active:bool \
-  published_at:time
-```
-
-#### Modules with File Attachments
-```bash
-# Generate a module with image support
-base g Profile \
-  name:string \
-  bio:text \
-  avatar:attachment
-
-# Multiple attachments in one module
-base g Gallery \
-  title:string \
-  description:text \
-  cover:attachment \
-  image:attachment
-```
-
-#### Modules with Relationships
-```bash
-# One-to-Many Relationship (Category has many Posts)
-base g Category \
-  title:string \
-  content:text \
-  image:attachment \
-  posts:hasMany:Post
-
-# Belongs-To Relationship (Post belongs to Category)
-base g Post \
-  title:string \
-  content:text \
-  image:attachment \
-  category:belongsTo:Category
-
-# One-to-One Relationship
-base g User \
-  name:string \
-  email:string \
-  profile:hasOne:Profile
-
-# Multiple Relationships
-base g Comment \
-  title:string \
-  content:text \
-  user:belongsTo:User \
-  post:belongsTo:Post \
-  replies:hasMany:Comment
-```
-
-#### Complex Module Example
-```bash
-# Blog system with all features
-base g User \
-  username:string \
-  email:string \
-  password:string \
-  avatar:attachment \
-  profile:hasOne:Profile \
-  posts:hasMany:Post \
-  comments:hasMany:Comment
-
-base g Profile \
-  bio:text \
-  website:string \
-  avatar:attachment \
-  social_links:text \
-  user:belongsTo:User
-
-base g Category \
-  name:string \
-  description:text \
-  image:attachment \
-  parent:belongsTo:Category \
-  subcategories:hasMany:Category \
-  posts:hasMany:Post
-
-base g Post \
-  title:string \
-  content:text \
-  excerpt:text \
-  featured_image:attachment \
-  gallery:attachment \
-  published_at:time \
-  author:belongsTo:User \
-  category:belongsTo:Category \
-  tags:hasMany:Tag \
-  comments:hasMany:Comment
-
-base g Comment \
-  content:text \
-  author:belongsTo:User \
-  post:belongsTo:Post \
-  parent:belongsTo:Comment \
-  replies:hasMany:Comment
-```
-
-Each generated module includes:
-- Model with GORM configuration
-- Service layer with CRUD operations
-- Controller with REST endpoints
-- Automatic migrations
-- Search functionality
-- Pagination
-- File upload endpoints (for attachment fields)
-- Relationship handling
-- Type-safe request/response structs
-
-The generated code follows best practices:
-- Clean architecture principles
-- Dependency injection
-- Interface-based design
-- Proper error handling
-- Input validation
-- Secure file handling
-- Efficient database queries
-- Proper relationship loading
 
 ### Working with Image Uploads
 
-Base provides a flexible storage system for handling file uploads. You can use different storage providers:
-
-#### 1. Local Storage (Default)
-Files are stored in your local filesystem.
+The `attachment` type automatically handles file uploads:
 
 ```bash
-# Generate a module with image support
-base g Profile name:string bio:text avatar:attachment
-
-# Configuration in config.yaml
-storage:
-  provider: local
-  path: "./storage"
-  baseURL: "http://localhost:8080/storage"
+base g Product \
+  name:string \
+  description:text \
+  image:attachment \
+  gallery:attachment
 ```
 
-#### 2. S3 Compatible Storage
-Store files in AWS S3 or any S3-compatible service (like MinIO, DigitalOcean Spaces).
+This generates:
+- File upload handling in controllers
+- Storage system integration
+- Image processing capabilities
+- Proper JSON serialization
 
-```yaml
-# Configuration in config.yaml
-storage:
-  provider: s3
-  bucket: "my-bucket"
-  region: "us-east-1"
-  endpoint: "https://s3.amazonaws.com"
-  baseURL: "https://my-bucket.s3.amazonaws.com"
-  apiKey: "your-access-key"
-  apiSecret: "your-secret-key"
-```
-
-#### 3. Cloudflare R2
-Store files in Cloudflare R2 with optional CDN support.
-
-```yaml
-# Configuration in config.yaml
-storage:
-  provider: r2
-  bucket: "my-bucket"
-  endpoint: "https://<account-id>.r2.cloudflarestorage.com"
-  baseURL: "https://cdn.example.com"  # If using Cloudflare CDN
-  apiKey: "your-access-key"
-  apiSecret: "your-secret-key"
-```
-
-#### Usage in API
-Once configured, the upload endpoints are automatically available:
-
-```bash
-# Upload an image
-curl -X POST -F "avatar=@image.jpg" http://localhost:8080/api/profiles/1/upload/avatar
-
-# The response includes the file URL
-{
-  "url": "http://localhost:8080/storage/profiles/1/avatar/image.jpg"
-}
-```
-
-The storage system automatically:
-- Validates file types (default: jpg, jpeg, png, gif)
-- Handles file size limits (default: 10MB)
-- Generates unique filenames
-- Creates optimized versions for images
-- Cleans up old files when updated
-- Provides secure URLs for access
+---
 
 ## Contributing
 
-We welcome contributions to Base! Here's how you can help:
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
-1. Fork the repository.
-2. Create a branch (`git checkout -b feature/AmazingFeature`).
-3. Commit your changes (`git commit -m 'Add AmazingFeature'`).
-4. Push to the branch (`git push origin feature/AmazingFeature`).
-5. Open a pull request.
+---
 
 ## License
 
