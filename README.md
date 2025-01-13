@@ -19,6 +19,7 @@ It offers scaffolding, module generation, and utilities to accelerate Go applica
   - [Generating Modules](#generating-modules)
   - [Generating a New Project](#generating-a-new-project)
   - [Working with Image Uploads](#working-with-image-uploads)
+  - [Blog Example](#blog-example)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -91,16 +92,15 @@ base g <module-name> [field:type ...] [options]
 
 **Example - Blog System**:
 ```bash
-# Generate Category model with self-referential relationships
+# Generate Category model
 base g Category \
   name:string \
   description:text \
   image:attachment \
   parent:belongsTo:Category \
-  subcategories:hasMany:Category \
   posts:hasMany:Post
 
-# Generate Post model with multiple relationships
+# Generate Post model
 base g Post \
   title:string \
   content:text \
@@ -108,23 +108,20 @@ base g Post \
   featured_image:attachment \
   gallery:attachment \
   published_at:datetime \
-  author:belongsTo:User \
+  author:belongsTo:users.User \
   category:belongsTo:Category \
-  tags:hasMany:Tag \
   comments:hasMany:Comment
 
 # Generate Tag model
 base g Tag \
   name:string \
-  posts:hasMany:Post
+  slug:string
 
-# Generate Comment model with self-referential relationships
+# Generate Comment model
 base g Comment \
   content:text \
-  author:belongsTo:User \
-  post:belongsTo:Post \
-  parent:belongsTo:Comment \
-  replies:hasMany:Comment
+  author:belongsTo:users.User \
+  post:belongsTo:Post
 ```
 
 This will generate:
@@ -132,7 +129,6 @@ This will generate:
 - Services with CRUD operations
 - Controllers with RESTful endpoints
 - Response/Request structs
-- Proper handling of circular dependencies
 - File upload handling for attachments
 - Automatic preloading of relationships
 
@@ -245,8 +241,7 @@ base g Post \
   content:text \
   image:attachment \
   category:belongsTo:Category \
-  comments:hasMany:Comment \
-  tags:hasMany:Tag
+  comments:hasMany:Comment
 ```
 
 Note: User authentication and authorization are built into `github.com/base-go/base` - no need to generate them.
@@ -271,8 +266,8 @@ cd blog
 
 # Generate the blog system models
 base g Category name:string description:text image:attachment
-base g Post title:string content:text author:belongsTo:User
-base g Tag name:string posts:hasMany:Post
+base g Post title:string content:text author:belongsTo:users.User
+base g Tag name:string slug:string
 
 # Start the development server
 base start
@@ -295,6 +290,52 @@ This generates:
 - Storage system integration
 - Image processing capabilities
 - Proper JSON serialization
+
+### Blog Example
+
+To create a blog system with categories, posts, tags, and comments:
+
+```bash
+# Generate Category model
+base g Category \
+  name:string \
+  description:text \
+  image:attachment \
+  parent:belongsTo:Category \
+  posts:hasMany:Post
+
+# Generate Post model
+base g Post \
+  title:string \
+  content:text \
+  excerpt:text \
+  featured_image:attachment \
+  gallery:attachment \
+  published_at:datetime \
+  author:belongsTo:users.User \
+  category:belongsTo:Category \
+  comments:hasMany:Comment
+
+# Generate Tag model
+base g Tag \
+  name:string \
+  slug:string
+
+# Generate Comment model
+base g Comment \
+  content:text \
+  author:belongsTo:users.User \
+  post:belongsTo:Post
+```
+
+This will create:
+- Category model with simple parent-child relationship
+- Post model with category, author, and comments
+- Tag model with simple slug field
+- Simple comment system for posts
+- Full CRUD operations for all models
+- RESTful API endpoints
+- Swagger documentation
 
 ---
 

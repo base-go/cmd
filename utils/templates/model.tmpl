@@ -30,10 +30,10 @@ type {{.StructName}} struct {
 
     {{- /* ---------- BELONGS TO ---------- */}}
     {{- if eq .Relationship "belongs_to"}}
-        // The foreign key field (e.g. ParentId)
+        // Foreign key field
         {{.Name}}Id uint `json:"{{.JSONName}}_id"`
 
-        // Actual belongs-to relationship
+        // Actual relation
         {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"foreignKey:{{.Name}}Id;references:Id"`
 
     {{- /* ---------- HAS ONE ---------- */}}
@@ -42,8 +42,10 @@ type {{.StructName}} struct {
 
     {{- /* ---------- HAS MANY ---------- */}}
     {{- else if eq .Relationship "has_many"}}
-        {{- /* If this is self-referencing (Category -> subcategories), use ParentId; otherwise use e.g. CategoryId */}}
+        {{- /* If has_many is self-referencing, we assume a 'ParentId' style key. 
+               If you want a different naming convention, you can customize here. */}}
         {{- if eq .AssociatedType $.StructName}}
+            // Self-referencing has-many
             {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"foreignKey:ParentId;references:Id"`
         {{- else}}
             {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
@@ -55,8 +57,9 @@ type {{.StructName}} struct {
 
     {{- /* ---------- SELF REFERENCE (CLI type "self_reference") ---------- */}}
     {{- else if eq .Type "self_reference"}}
+        // e.g. ParentId
         {{.Name}}Id uint `json:"{{.JSONName}}_id"`
-        {{.Name}}   *{{$.StructName}}    `json:"{{.JSONName}}" gorm:"foreignKey:{{.Name}}Id;references:Id"`
+        {{.Name}}   *{{$.StructName}}   `json:"{{.JSONName}}" gorm:"foreignKey:{{.Name}}Id;references:Id"`
         {{.PluralName}} []*{{$.StructName}} `json:"{{toLower .PluralName}}" gorm:"foreignKey:{{.Name}}Id;references:Id"`
 
     {{- /* ---------- ATTACHMENT ---------- */}}
@@ -76,7 +79,7 @@ type {{.StructName}} struct {
     {{- else}}
         {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end}}
-    {{- end}}
+    {{- end}} // end range Fields
 
     CreatedAt time.Time      `json:"created_at"`
     UpdatedAt time.Time      `json:"updated_at"`
@@ -104,7 +107,7 @@ type {{.StructName}}ListResponse struct {
     {{- range .Fields}}
 
     {{- if eq .Relationship "belongs_to"}}
-    {{.Name}}Id uint              `json:"{{.JSONName}}_id"`
+    {{.Name}}Id uint             `json:"{{.JSONName}}_id"`
     {{.Name}}   *{{.AssociatedType}} `json:"{{.JSONName}}"`
 
     {{- else if eq .Relationship "has_one"}}
@@ -144,7 +147,7 @@ type {{.StructName}}Response struct {
     {{- range .Fields}}
 
     {{- if eq .Relationship "belongs_to"}}
-    {{.Name}}Id uint              `json:"{{.JSONName}}_id"`
+    {{.Name}}Id uint             `json:"{{.JSONName}}_id"`
     {{.Name}}   *{{.AssociatedType}} `json:"{{.JSONName}}"`
 
     {{- else if eq .Relationship "has_one"}}
@@ -283,6 +286,7 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
 func (item *{{.StructName}}) Preload(db *gorm.DB) *gorm.DB {
     return db
         {{- range .Fields}}
+            {{- /* If it's a relationship (belongs_to, has_one, has_many, many2many, or self_reference), Preload it */}}
             {{- if or (eq .Relationship "belongs_to") (eq .Relationship "has_one") (eq .Relationship "has_many") (eq .Relationship "many2many") (eq .Type "self_reference")}}
                 .Preload("{{.Name}}"
                     {{- if eq .Type "self_reference"}}
