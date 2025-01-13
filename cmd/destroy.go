@@ -33,6 +33,16 @@ func destroyModule(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	// Prompt for confirmation with Y preselected
+	fmt.Printf("Are you sure you want to destroy the '%s' module? [Y/n] ", singularName)
+	var response string
+	fmt.Scanln(&response)
+	
+	if response != "" && response != "Y" && response != "y" {
+		fmt.Println("Operation cancelled.")
+		return
+	}
+
 	// Delete module directory
 	if err := os.RemoveAll(moduleDir); err != nil {
 		fmt.Printf("Error removing directory %s: %v\n", moduleDir, err)

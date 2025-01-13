@@ -19,6 +19,7 @@ It offers scaffolding, module generation, and utilities to accelerate Go applica
   - [Generating a New Project](#generating-a-new-project)
   - [Generating Modules](#generating-modules)
   - [Working with Image Uploads](#working-with-image-uploads)
+- [Base Blog Modules](#base-blog-modules)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -261,6 +262,89 @@ This generates:
 - Storage system integration
 - Image processing capabilities
 - Proper JSON serialization
+
+---
+
+## Base Blog Modules
+
+The Base framework comes with a set of pre-built modules designed for building blog applications:
+
+### Core Modules
+
+1. **Post Module**
+   - Full CRUD operations for blog posts
+   - Support for rich text content
+   - Image attachments
+   - Relationships with categories, tags, and comments
+
+2. **Category Module**
+   - Hierarchical category structure
+   - Parent-child relationships
+   - Post categorization
+   - Description and image support
+
+3. **Comment Module**
+   - Nested comment structure
+   - Parent-child relationships for replies
+   - Author and post associations
+   - Content management
+
+4. **User Module**
+   - User authentication and authorization
+   - Profile management
+   - Role-based access control
+   - Activity tracking
+
+5. **Profile Module**
+   - Extended user information
+   - Avatar management
+   - Social media links
+   - Bio and personal details
+
+6. **Tag Module**
+   - Post tagging system
+   - Tag management
+   - Tag-based post filtering
+   - Tag cloud generation
+
+### Module Generation
+
+To generate these modules in your project, use:
+
+```bash
+# Generate a single module
+base g module post
+base g module category
+base g module comment
+base g module user
+base g module profile
+base g module tag
+
+# Generate all blog modules at once
+base g blog
+```
+
+### Module Removal
+
+To remove modules from your project:
+
+```bash
+# Remove a module
+base d post
+base d category
+base d comment
+base d user
+base d profile
+base d tag
+```
+
+Each module includes:
+- Models with proper relationships
+- Controllers with RESTful endpoints
+- Services with business logic
+- Migration support
+- Swagger documentation
+- Test templates
 
 ---
 
