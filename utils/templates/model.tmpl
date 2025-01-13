@@ -16,19 +16,19 @@ type {{.StructName}} struct {
     Id        uint           `json:"id" gorm:"primaryKey"`
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to"}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id" gorm:"column:{{.JSONName}}_id"`
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}Id"`
+    {{.Name}}Id uint `json:"{{.JSONName}}_id" gorm:"column:{{.JSONName}}_id;foreignKey:{{.Name}}Id;references:Id"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}Id;references:Id"`
     {{- else if eq .Relationship "has_one"}}
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id"`
+    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
     {{- else if eq .Relationship "has_many"}}
-    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id"`
+    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
     {{- else if eq .Relationship "many2many"}}
     {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}},omitempty" gorm:"many2many:{{toLower $.StructName}}_{{toLower .PluralName}}"`
     {{- else if eq .Type "text"}}
     {{.Name}} string `json:"{{.JSONName}}" gorm:"column:{{.JSONName}};type:text"`
     {{- else if eq .Type "attachment"}}
     {{.Name}}Id *uint `json:"{{.JSONName}}_id" gorm:"column:{{.JSONName}}_id"`
-    {{.Name}} *storage.Attachment `json:"{{.JSONName}}" gorm:"foreignKey:{{.Name}}Id"`
+    {{.Name}} *storage.Attachment `json:"{{.JSONName}}" gorm:"foreignKey:{{.Name}}Id;references:Id"`
     {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
     {{.Name}} types.DateTime `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
     {{- else}}
