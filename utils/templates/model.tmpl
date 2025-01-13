@@ -2,6 +2,7 @@ package models
 
 import (
     "time"
+
     "gorm.io/gorm"
     {{- if hasField .Fields "attachment" }}
     "base/core/storage"
@@ -20,32 +21,52 @@ import (
 
 // {{.StructName}} represents a {{toLower .StructName}} entity
 type {{.StructName}} struct {
-    Id        uint           `json:"id" gorm:"primaryKey"`
+    Id uint `json:"id" gorm:"primaryKey"`
+
     {{- range .Fields}}
+
+    {{/* ================ BELONGS_TO ================ */}}
     {{- if eq .Relationship "belongs_to"}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id" gorm:"column:{{.JSONName}}_id"`
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"foreignKey:{{.Name}}Id;references:Id"`
+        {{.Name}}Id uint `json:"{{.JSONName}}_id"`
+        {{.Name}}   *{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"foreignKey:{{.Name}}Id;references:Id"`
+
+    {{/* ================ HAS_ONE ================ */}}
     {{- else if eq .Relationship "has_one"}}
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
+        {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
+
+    {{/* ================ HAS_MANY ================ */}}
     {{- else if eq .Relationship "has_many"}}
-    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
+        {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
+
+    {{/* ================ MANY2MANY ================ */}}
     {{- else if eq .Relationship "many2many"}}
-    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"many2many:{{toLower $.StructName}}_{{toLower .PluralName}}"`
-    {{- else if eq .Type "text"}}
-    {{.Name}} string `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
-    {{- else if eq .Type "attachment"}}
-    {{.Name}}Id *uint `json:"{{.JSONName}}_id" gorm:"column:{{.JSONName}}_id"`
-    {{.Name}} *storage.Attachment `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}Id;references:Id"`
-    {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
-    {{.Name}} types.DateTime `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
+        {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}" gorm:"many2many:{{toLower $.StructName}}_{{toLower .PluralName}}"`
+
+    {{/* ================ SELF_REFERENCE ================ */}}
     {{- else if eq .Type "self_reference"}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id" gorm:"column:{{.JSONName}}_id"`
-    {{.Name}} *{{$.StructName}} `json:"{{.JSONName}}" gorm:"foreignKey:{{.Name}}Id;references:Id"`
-    {{.PluralName}} []*{{$.StructName}} `json:"{{toLower .PluralName}}" gorm:"foreignKey:{{.Name}}Id;references:Id"`
+        {{.Name}}Id     uint            `json:"{{.JSONName}}_id"`
+        {{.Name}}       *{{$.StructName}} `json:"{{.JSONName}}" gorm:"foreignKey:{{.Name}}Id;references:Id"`
+        {{.PluralName}} []*{{$.StructName}} `json:"{{toLower .PluralName}}" gorm:"foreignKey:{{.Name}}Id;references:Id"`
+
+    {{/* ================ ATTACHMENT (FILE/IMAGE) ================ */}}
+    {{- else if eq .Type "attachment"}}
+        {{.Name}}Id *uint              `json:"{{.JSONName}}_id"`
+        {{.Name}}   *storage.Attachment `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}Id;references:Id"`
+
+    {{/* ================ TIME/DATE/DATETIME ================ */}}
+    {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
+        {{.Name}} types.DateTime `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
+
+    {{/* ================ TEXT (STRING) ================ */}}
+    {{- else if eq .Type "text"}}
+        {{.Name}} string `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
+
+    {{/* ================ DEFAULT FIELDS (INT, FLOAT, BOOL, ETC.) ================ */}}
     {{- else}}
-    {{.Name}} {{.Type}} `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
+        {{.Name}} {{.Type}} `json:"{{.JSONName}}" gorm:"column:{{.JSONName}}"`
     {{- end}}
     {{- end}}
+
     CreatedAt time.Time      `json:"created_at"`
     UpdatedAt time.Time      `json:"updated_at"`
     DeletedAt gorm.DeletedAt `json:"deleted_at,omitempty" gorm:"index"`
@@ -67,64 +88,64 @@ func (item *{{.StructName}}) GetModelName() string {
 
 // {{.StructName}}ListResponse represents the list view response
 type {{.StructName}}ListResponse struct {
-    Id        uint      `json:"id"`
+    Id uint `json:"id"`
+
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to"}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id"`
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}"`
+        {{.Name}}Id uint              `json:"{{.JSONName}}_id"`
+        {{.Name}}   *{{.AssociatedType}} `json:"{{.JSONName}}"`
     {{- else if eq .Relationship "has_one"}}
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}"`
+        {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}"`
     {{- else if eq .Relationship "has_many"}}
-    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}"`
+        {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}"`
     {{- else if eq .Relationship "many2many"}}
-    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}"`
-    {{- else if eq .Type "text"}}
-    {{.Name}} string `json:"{{.JSONName}}"`
+        {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}"`
     {{- else if eq .Type "attachment"}}
-    {{.Name}}Id *uint `json:"{{.JSONName}}_id"`
-    {{.Name}} *storage.Attachment `json:"{{.JSONName}},omitempty"`
-    {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
-    {{.Name}} types.DateTime `json:"{{.JSONName}}"`
+        {{.Name}}Id *uint              `json:"{{.JSONName}}_id"`
+        {{.Name}}   *storage.Attachment `json:"{{.JSONName}},omitempty"`
     {{- else if eq .Type "self_reference"}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id"`
-    {{.Name}} *{{$.StructName}} `json:"{{.JSONName}}"`
-    {{.PluralName}} []*{{$.StructName}} `json:"{{toLower .PluralName}}"`
+        {{.Name}}Id     uint            `json:"{{.JSONName}}_id"`
+        {{.Name}}       *{{$.StructName}} `json:"{{.JSONName}}"`
+        {{.PluralName}} []*{{$.StructName}} `json:"{{toLower .PluralName}}"`
+    {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
+        {{.Name}} types.DateTime `json:"{{.JSONName}}"`
     {{- else}}
-    {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
+        {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end}}
     {{- end}}
+
     CreatedAt time.Time `json:"created_at"`
     UpdatedAt time.Time `json:"updated_at"`
 }
 
 // {{.StructName}}Response represents the detailed view response
 type {{.StructName}}Response struct {
-    Id        uint      `json:"id"`
+    Id uint `json:"id"`
+
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to"}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id"`
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}"`
+        {{.Name}}Id uint              `json:"{{.JSONName}}_id"`
+        {{.Name}}   *{{.AssociatedType}} `json:"{{.JSONName}}"`
     {{- else if eq .Relationship "has_one"}}
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}"`
+        {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}"`
     {{- else if eq .Relationship "has_many"}}
-    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}"`
+        {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}"`
     {{- else if eq .Relationship "many2many"}}
-    {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}"`
-    {{- else if eq .Type "text"}}
-    {{.Name}} string `json:"{{.JSONName}}"`
+        {{.Name}} []*{{.AssociatedType}} `json:"{{.JSONName}}"`
     {{- else if eq .Type "attachment"}}
-    {{.Name}}Id *uint `json:"{{.JSONName}}_id"`
-    {{.Name}} *storage.Attachment `json:"{{.JSONName}},omitempty"`
-    {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
-    {{.Name}} types.DateTime `json:"{{.JSONName}}"`
+        {{.Name}}Id *uint              `json:"{{.JSONName}}_id"`
+        {{.Name}}   *storage.Attachment `json:"{{.JSONName}},omitempty"`
     {{- else if eq .Type "self_reference"}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id"`
-    {{.Name}} *{{$.StructName}} `json:"{{.JSONName}}"`
-    {{.PluralName}} []*{{$.StructName}} `json:"{{toLower .PluralName}}"`
+        {{.Name}}Id     uint            `json:"{{.JSONName}}_id"`
+        {{.Name}}       *{{$.StructName}} `json:"{{.JSONName}}"`
+        {{.PluralName}} []*{{$.StructName}} `json:"{{toLower .PluralName}}"`
+    {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
+        {{.Name}} types.DateTime `json:"{{.JSONName}}"`
     {{- else}}
-    {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
+        {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end}}
     {{- end}}
+
     CreatedAt time.Time      `json:"created_at"`
     UpdatedAt time.Time      `json:"updated_at"`
     DeletedAt gorm.DeletedAt `json:"deleted_at,omitempty"`
@@ -133,48 +154,52 @@ type {{.StructName}}Response struct {
 // Create{{.StructName}}Request represents the create request
 type Create{{.StructName}}Request struct {
     {{- range .Fields}}
+
     {{- if eq .Relationship "belongs_to"}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id" binding:"required"`
-    {{.Name}} *{{.AssociatedType}} `json:"{{.JSONName}}" binding:"required"`
+        {{.Name}}Id uint              `json:"{{.JSONName}}_id" binding:"required"`
+        {{.Name}}   *{{.AssociatedType}} `json:"{{.JSONName}}" binding:"required"`
     {{- else if eq .Relationship "has_many"}}
-    {{.Name}}Ids []uint `json:"{{.JSONName}}_ids"`
+        {{.Name}}Ids []uint `json:"{{.JSONName}}_ids"`
     {{- else if eq .Relationship "many2many"}}
-    {{.Name}}Ids []uint `json:"{{.JSONName}}_ids"`
-    {{- else if eq .Type "text"}}
-    {{.Name}} string `json:"{{.JSONName}}" binding:"required"`
+        {{.Name}}Ids []uint `json:"{{.JSONName}}_ids"`
     {{- else if eq .Type "attachment"}}
-    {{.Name}}Id *uint `json:"{{.JSONName}}_id"`
+        {{.Name}}Id *uint `json:"{{.JSONName}}_id"`
+    {{- else if eq .Type "text"}}
+        {{.Name}} string `json:"{{.JSONName}}" binding:"required"`
     {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
-    {{.Name}} types.DateTime `json:"{{.JSONName}}"`
+        {{.Name}} types.DateTime `json:"{{.JSONName}}"`
     {{- else if eq .Type "self_reference"}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id"`
-    {{.Name}} *{{$.StructName}} `json:"{{.JSONName}}" binding:"required"`
+        {{.Name}}Id uint            `json:"{{.JSONName}}_id"`
+        {{.Name}}   *{{$.StructName}} `json:"{{.JSONName}}" binding:"required"`
     {{- else}}
-    {{.Name}} {{.Type}} `json:"{{.JSONName}}" binding:"required"`
+        {{.Name}} {{.Type}} `json:"{{.JSONName}}" binding:"required"`
     {{- end}}
+
     {{- end}}
 }
 
 // Update{{.StructName}}Request represents the update request
 type Update{{.StructName}}Request struct {
     {{- range .Fields}}
+
     {{- if eq .Relationship "belongs_to"}}
-    {{.Name}}Id *uint `json:"{{.JSONName}}_id,omitempty"`
+        {{.Name}}Id *uint `json:"{{.JSONName}}_id,omitempty"`
     {{- else if eq .Relationship "has_many"}}
-    {{.Name}}Ids []uint `json:"{{.JSONName}}_ids,omitempty"`
+        {{.Name}}Ids []uint `json:"{{.JSONName}}_ids,omitempty"`
     {{- else if eq .Relationship "many2many"}}
-    {{.Name}}Ids []uint `json:"{{.JSONName}}_ids,omitempty"`
-    {{- else if eq .Type "text"}}
-    {{.Name}} *string `json:"{{.JSONName}},omitempty"`
+        {{.Name}}Ids []uint `json:"{{.JSONName}}_ids,omitempty"`
     {{- else if eq .Type "attachment"}}
-    {{.Name}}Id *uint `json:"{{.JSONName}}_id,omitempty"`
+        {{.Name}}Id *uint `json:"{{.JSONName}}_id,omitempty"`
+    {{- else if eq .Type "text"}}
+        {{.Name}} *string `json:"{{.JSONName}},omitempty"`
     {{- else if or (eq .Type "time") (eq .Type "date") (eq .Type "datetime")}}
-    {{.Name}} *types.DateTime `json:"{{.JSONName}},omitempty"`
+        {{.Name}} *types.DateTime `json:"{{.JSONName}},omitempty"`
     {{- else if eq .Type "self_reference"}}
-    {{.Name}}Id *uint `json:"{{.JSONName}}_id,omitempty"`
+        {{.Name}}Id *uint `json:"{{.JSONName}}_id,omitempty"`
     {{- else}}
-    {{.Name}} *{{.Type}} `json:"{{.JSONName}},omitempty"`
+        {{.Name}} *{{.Type}} `json:"{{.JSONName}},omitempty"`
     {{- end}}
+
     {{- end}}
 }
 
@@ -183,13 +208,14 @@ func (item *{{.StructName}}) ToListResponse() *{{.StructName}}ListResponse {
     if item == nil {
         return nil
     }
+
     return &{{.StructName}}ListResponse{
         Id: item.Id,
         {{- range .Fields}}
-        {{.Name}}: item.{{.Name}},
-        {{- if eq .Relationship "belongs_to"}}
-        {{.Name}}Id: item.{{.Name}}Id,
-        {{- end}}
+            {{.Name}}: item.{{.Name}},
+            {{- if eq .Relationship "belongs_to"}}
+            {{.Name}}Id: item.{{.Name}}Id,
+            {{- end}}
         {{- end}}
         CreatedAt: item.CreatedAt,
         UpdatedAt: item.UpdatedAt,
@@ -201,13 +227,14 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
     if item == nil {
         return nil
     }
+
     return &{{.StructName}}Response{
         Id: item.Id,
         {{- range .Fields}}
-        {{.Name}}: item.{{.Name}},
-        {{- if eq .Relationship "belongs_to"}}
-        {{.Name}}Id: item.{{.Name}}Id,
-        {{- end}}
+            {{.Name}}: item.{{.Name}},
+            {{- if eq .Relationship "belongs_to"}}
+            {{.Name}}Id: item.{{.Name}}Id,
+            {{- end}}
         {{- end}}
         CreatedAt: item.CreatedAt,
         UpdatedAt: item.UpdatedAt,
@@ -217,5 +244,6 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
 
 // Preload preloads all the model's relationships
 func (item *{{.StructName}}) Preload(db *gorm.DB) *gorm.DB {
+    // Preload any relationship or self-reference
     return db{{range .Fields}}{{if or (eq .Relationship "belongs_to") (eq .Relationship "has_one") (eq .Relationship "has_many") (eq .Relationship "many2many") (eq .Type "self_reference")}}.Preload("{{.Name}}"){{if eq .Type "self_reference"}}.Preload("{{.PluralName}}"){{end}}{{end}}{{end}}
 }
