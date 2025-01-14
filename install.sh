@@ -86,8 +86,13 @@ if [ "$OS" = "windows" ]; then
     # On Windows, copy to bin directory
     cp "$INSTALL_DIR/$BINARY_NAME" "$BIN_DIR/"
 else
-    # On Unix systems, create symlink
-    ln -sf "$INSTALL_DIR/$BINARY_NAME" "$BIN_DIR/$BINARY_NAME"
+    # On Unix systems, create symlink with sudo
+    echo "Creating symlink in $BIN_DIR (requires sudo)..."
+    if ! sudo ln -sf "$INSTALL_DIR/$BINARY_NAME" "$BIN_DIR/$BINARY_NAME"; then
+        echo "Error: Failed to create symlink. Please run the install script with sudo:"
+        echo "curl -sSL https://raw.githubusercontent.com/base-go/cmd/main/install.sh | sudo bash"
+        exit 1
+    fi
 fi
 
 # Cleanup
