@@ -47,6 +47,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed polymorphic association tags in model generation
 - Fixed attachment field validation in create/update requests
 
+## [v1.0.12] - 2025-01-14
+
+### Added
+- Optional Swagger documentation generation with `--docs` flag
+- Support for specialized attachment types (`image` and `file`) with validation
+- Type-specific file validation (size limits and allowed extensions)
+
+### Changed
+- Made Swagger documentation generation optional (use `--docs` flag)
+- Updated installation path to use /usr/local/bin
+- Improved version information handling
+- Enhanced attachment field generation to avoid duplicates
+
+### Fixed
+- Fixed version information display in CLI
+- Fixed duplicate field generation in attachment handling
+- Fixed polymorphic association tags in model generation
+- Fixed attachment field validation in create/update requests
+
 ## [v1.0.5] - 2025-01-14
 
 ### Added
@@ -86,5 +105,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic project structure
 
 [Unreleased]: https://github.com/base-go/cmd/compare/v1.0.0...HEAD
+[v1.0.12]: https://github.com/base-go/cmd/releases/tag/v1.0.12
 [v1.0.5]: https://github.com/base-go/cmd/releases/tag/v1.0.5
 [1.0.0]: https://github.com/base-go/cmd/releases/tag/v1.0.0
