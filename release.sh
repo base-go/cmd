@@ -13,7 +13,7 @@ VERSION="v$1"
 BUILD_DATE=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 GO_VERSION=$(go version | cut -d' ' -f3)
 COMMIT_HASH=$(git rev-parse HEAD)
-PLATFORMS=("darwin_amd64" "linux_amd64" "windows_amd64")
+PLATFORMS=("darwin_amd64" "darwin_arm64" "linux_amd64" "windows_amd64")
 
 echo "Creating release $VERSION..."
 
