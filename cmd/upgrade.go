@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -39,6 +42,73 @@ func getLatestRelease() (*Release, error) {
 	return &release, nil
 }
 
+func extractTarGz(gzipStream io.Reader, targetPath string) error {
+	uncompressedStream, err := gzip.NewReader(gzipStream)
+	if err != nil {
+		return err
+	}
+	defer uncompressedStream.Close()
+
+	tarReader := tar.NewReader(uncompressedStream)
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		if header.Typeflag == tar.TypeReg {
+			outFile, err := os.Create(targetPath)
+			if err != nil {
+				return err
+			}
+			defer outFile.Close()
+
+			if _, err := io.Copy(outFile, tarReader); err != nil {
+				return err
+			}
+			return os.Chmod(targetPath, 0755)
+		}
+	}
+	return nil
+}
+
+func extractZip(zipFile *os.File, targetPath string) error {
+	stat, err := zipFile.Stat()
+	if err != nil {
+		return err
+	}
+
+	reader, err := zip.NewReader(zipFile, stat.Size())
+	if err != nil {
+		return err
+	}
+
+	for _, file := range reader.File {
+		if !file.FileInfo().IsDir() {
+			rc, err := file.Open()
+			if err != nil {
+				return err
+			}
+			defer rc.Close()
+
+			outFile, err := os.Create(targetPath)
+			if err != nil {
+				return err
+			}
+			defer outFile.Close()
+
+			if _, err := io.Copy(outFile, rc); err != nil {
+				return err
+			}
+			return os.Chmod(targetPath, 0755)
+		}
+	}
+	return nil
+}
+
 func downloadAndInstall(url, targetPath string) error {
 	resp, err := http.Get(url)
 	if err != nil {
@@ -50,18 +120,59 @@ func downloadAndInstall(url, targetPath string) error {
 		return fmt.Errorf("bad status: %s", resp.Status)
 	}
 
-	out, err := os.Create(targetPath)
+	// Create a temporary file for the archive
+	tmpDir := os.TempDir()
+	tmpArchive := filepath.Join(tmpDir, "base-archive")
+	out, err := os.Create(tmpArchive)
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer func() {
+		out.Close()
+		os.Remove(tmpArchive)
+	}()
 
-	_, err = io.Copy(out, resp.Body)
+	if _, err = io.Copy(out, resp.Body); err != nil {
+		return err
+	}
+	out.Close()
+
+	// Reopen the file for reading
+	archiveFile, err := os.Open(tmpArchive)
+	if err != nil {
+		return err
+	}
+	defer archiveFile.Close()
+
+	// Extract based on file type
+	if strings.HasSuffix(url, ".zip") {
+		return extractZip(archiveFile, targetPath)
+	} else if strings.HasSuffix(url, ".tar.gz") {
+		return extractTarGz(archiveFile, targetPath)
+	}
+
+	return fmt.Errorf("unsupported archive format")
+}
+
+func copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
 	if err != nil {
 		return err
 	}
 
-	return os.Chmod(targetPath, 0755)
+	return os.Chmod(dst, 0755)
 }
 
 var upgradeCmd = &cobra.Command{
@@ -88,10 +199,16 @@ var upgradeCmd = &cobra.Command{
 		osName := runtime.GOOS
 		archName := runtime.GOARCH
 		assetPrefix := fmt.Sprintf("base_%s_%s", osName, archName)
+		var assetSuffix string
+		if osName == "windows" {
+			assetSuffix = ".zip"
+		} else {
+			assetSuffix = ".tar.gz"
+		}
 
 		var downloadURL string
 		for _, asset := range release.Assets {
-			if strings.HasPrefix(asset.Name, assetPrefix) {
+			if strings.HasPrefix(asset.Name, assetPrefix) && strings.HasSuffix(asset.Name, assetSuffix) {
 				downloadURL = asset.BrowserDownloadURL
 				break
 			}
@@ -111,11 +228,11 @@ var upgradeCmd = &cobra.Command{
 			return
 		}
 
-		// Create a temporary file for the download
+		// Create a temporary file for the binary
 		tmpDir := os.TempDir()
 		tmpFile := filepath.Join(tmpDir, "base-new")
 
-		// Download the new version
+		// Download and extract the new version
 		if err := downloadAndInstall(downloadURL, tmpFile); err != nil {
 			fmt.Printf("Error downloading update: %v\n", err)
 			return
@@ -134,27 +251,6 @@ var upgradeCmd = &cobra.Command{
 
 		fmt.Printf("Successfully upgraded to version %s!\n", latestVersion)
 	},
-}
-
-func copyFile(src, dst string) error {
-	sourceFile, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer sourceFile.Close()
-
-	destFile, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer destFile.Close()
-
-	_, err = io.Copy(destFile, sourceFile)
-	if err != nil {
-		return err
-	}
-
-	return os.Chmod(dst, 0755)
 }
 
 func init() {
