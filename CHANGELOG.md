@@ -5,47 +5,21 @@ All notable changes to the Base CLI tool will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v1.0.13] - 2025-01-14
 
 ### Added
-- Support for attachment field type in module generation
-- New `feed` command for importing data from JSON files
-- Improved error messages in the `start` command
-- Hot reload functionality using Air in `start` command
-- Automatic `.air.toml` configuration generation
-- Comprehensive documentation for hot reload feature in README
-- Support for specialized attachment types (`image` and `file`) with validation
-- Optional Swagger documentation generation with `--docs` flag
-- Improved attachment handling with proper GORM polymorphic associations
-- Type-specific file validation (size limits and allowed extensions)
-
-### Changed
-- Updated module template to handle storage dependency more elegantly
-- Improved search functionality in generated services
-- Fixed path resolution in `start` command
-- Refactored template generation for Air configuration
-- Improved error handling in `start` command
-- Enhanced code organization with dedicated Air utilities
-- Improved Swagger documentation generation in hot reload mode
-- Added proper version tagging and build information
-- Made Swagger documentation generation optional (use `--docs` flag)
-- Updated attachment field generation to avoid duplicates
-- Improved GORM tags for polymorphic associations
-- Enhanced module template for better attachment configuration
+- Cross-platform build support for all architectures (amd64, arm64)
+- New `build-all` make target for building all platform binaries
 
 ### Fixed
-- Fixed directory path resolution in `start` command
-- Fixed SQL query generation for search functionality
-- Fixed storage handling in module generation
-- Fixed "(no value) used as value" error in template generation
-- Improved error handling in Air configuration setup
-- Updated Air installation to use new repository (github.com/air-verse/air)
-- Fixed hot reload loop by excluding docs directory and improving process management
-- Fixed Swagger documentation triggering unnecessary rebuilds in hot reload mode
-- Fixed version information display in CLI output
-- Fixed duplicate field generation in attachment handling
-- Fixed polymorphic association tags in model generation
-- Fixed attachment field validation in create/update requests
+- Version string handling in Makefile to avoid double 'v' prefix
+- Upgrade command now properly handles compressed binaries (.tar.gz, .zip)
+- Installation path now matches install.sh behavior
+- Binary architecture detection for M1/M2 Macs
+
+### Changed
+- Improved release process to support all platforms consistently
+- Installation now uses ~/.base directory for binary storage
 
 ## [v1.0.12] - 2025-01-14
 
@@ -104,7 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Model layer with GORM integration
 - Basic project structure
 
-[Unreleased]: https://github.com/base-go/cmd/compare/v1.0.0...HEAD
+[v1.0.13]: https://github.com/base-go/cmd/releases/tag/v1.0.13
 [v1.0.12]: https://github.com/base-go/cmd/releases/tag/v1.0.12
 [v1.0.5]: https://github.com/base-go/cmd/releases/tag/v1.0.5
 [1.0.0]: https://github.com/base-go/cmd/releases/tag/v1.0.0
