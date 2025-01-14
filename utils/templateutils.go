@@ -176,7 +176,7 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 		}
 
 		// Check for attachment fields
-		if fieldType == "attachment" {
+		if fieldType == "attachment" || fieldType == "image" || fieldType == "file" {
 			relationship = "attachment"
 			fieldType = "*storage.Attachment"
 			
@@ -189,6 +189,19 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 				Relationship: "",
 			}
 			fieldStructs = append(fieldStructs, idField)
+
+			// Add the attachment field with proper GORM tags
+			fieldStruct := FieldStruct{
+				Name:         ToPascalCase(name),
+				Type:         fieldType,
+				JSONName:     ToSnakeCase(name),
+				DBName:       ToSnakeCase(name),
+				Relationship: relationship,
+				RelatedModel: "storage.Attachment",
+				AssociatedType: fieldType, // Store the original type (image/file) for validation
+			}
+			fieldStructs = append(fieldStructs, fieldStruct)
+			continue
 		}
 
 		fieldStruct := FieldStruct{

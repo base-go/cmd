@@ -23,12 +23,19 @@ type Module struct {
 
 func New{{.StructName}}Module(db *gorm.DB, router *gin.RouterGroup, log logger.Logger, emitter *emitter.Emitter, activeStorage *storage.ActiveStorage) module.Module {
     {{- range .Fields}}
-    {{- if eq .Relationship "attachment"}}
-    // Register attachment configuration for {{toLower $.StructName}}.{{toLower .Name}}
+    {{- if eq .AssociatedType "image"}}
+    // Register image attachment configuration for {{.Name}}
     activeStorage.RegisterAttachment("{{toLower $.StructName}}", storage.AttachmentConfig{
-        MaxFileSize:       10 * 1024 * 1024, // 10MB
-        AllowedExtensions: []string{".jpg", ".jpeg", ".png", ".gif"},
-        Field:            "{{toLower .Name}}",
+        Field:             "{{.JSONName}}",
+        MaxFileSize:       5 * 1024 * 1024, // 5MB
+        AllowedExtensions: []string{".jpg", ".jpeg", ".png", ".gif", ".webp"},
+    })
+    {{- else if eq .AssociatedType "file"}}
+    // Register file attachment configuration for {{.Name}}
+    activeStorage.RegisterAttachment("{{toLower $.StructName}}", storage.AttachmentConfig{
+        Field:             "{{.JSONName}}",
+        MaxFileSize:       50 * 1024 * 1024, // 50MB
+        AllowedExtensions: []string{".pdf", ".doc", ".docx", ".xls", ".xlsx", ".zip", ".rar"},
     })
     {{- end}}
     {{- end}}
