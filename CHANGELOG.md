@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgrade command now properly handles compressed binaries (.tar.gz, .zip)
 - Installation path now matches install.sh behavior
 - Binary architecture detection for M1/M2 Macs
+- Fixed unused variable in upgrade command
 
 ### Changed
 - Improved release process to support all platforms consistently

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -175,6 +176,14 @@ func copyFile(src, dst string) error {
 	return os.Chmod(dst, 0755)
 }
 
+func runWithSudo(command string, args ...string) error {
+	cmd := exec.Command("sudo", append([]string{command}, args...)...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
 var upgradeCmd = &cobra.Command{
 	Use:   "upgrade",
 	Short: "Upgrade Base CLI to the latest version",
@@ -221,13 +230,6 @@ var upgradeCmd = &cobra.Command{
 
 		fmt.Printf("Downloading version %s...\n", latestVersion)
 
-		// Get the current executable path
-		execPath, err := os.Executable()
-		if err != nil {
-			fmt.Printf("Error getting executable path: %v\n", err)
-			return
-		}
-
 		// Create a temporary file for the binary
 		tmpDir := os.TempDir()
 		tmpFile := filepath.Join(tmpDir, "base-new")
@@ -238,15 +240,43 @@ var upgradeCmd = &cobra.Command{
 			return
 		}
 
-		// Replace the old binary
-		if err := os.Rename(tmpFile, execPath); err != nil {
-			// If direct rename fails (e.g., on Windows), try copy and remove
-			if err := copyFile(tmpFile, execPath); err != nil {
-				fmt.Printf("Error installing update: %v\n", err)
-				os.Remove(tmpFile)
-				return
-			}
+		// Make the temporary file executable
+		if err := os.Chmod(tmpFile, 0755); err != nil {
+			fmt.Printf("Error making binary executable: %v\n", err)
 			os.Remove(tmpFile)
+			return
+		}
+
+		// Get the installation directory
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			fmt.Printf("Error getting home directory: %v\n", err)
+			os.Remove(tmpFile)
+			return
+		}
+
+		baseDir := filepath.Join(homeDir, ".base")
+		baseBin := filepath.Join(baseDir, "base")
+
+		// Create .base directory if it doesn't exist
+		if err := os.MkdirAll(baseDir, 0755); err != nil {
+			fmt.Printf("Error creating base directory: %v\n", err)
+			os.Remove(tmpFile)
+			return
+		}
+
+		// Move the new binary to .base directory
+		if err := os.Rename(tmpFile, baseBin); err != nil {
+			fmt.Printf("Error moving binary: %v\n", err)
+			os.Remove(tmpFile)
+			return
+		}
+
+		// Update the symlink with sudo
+		fmt.Println("Updating system symlink (requires sudo)...")
+		if err := runWithSudo("ln", "-sf", baseBin, "/usr/local/bin/base"); err != nil {
+			fmt.Printf("Error updating symlink. Please run manually:\nsudo ln -sf %s /usr/local/bin/base\n", baseBin)
+			return
 		}
 
 		fmt.Printf("Successfully upgraded to version %s!\n", latestVersion)
