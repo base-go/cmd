@@ -3,6 +3,7 @@ package version
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Masterminds/semver/v3"
 	"io"
 	"net/http"
 	"strings"
@@ -12,7 +13,7 @@ import (
 // Version information
 var (
 	// Version is the current version of Base CLI
-	Version = "1.1.1"
+	Version = "1.1.2"
 
 	// CommitHash is the git commit hash at build time
 	CommitHash = "unknown"
@@ -90,12 +91,20 @@ func HasUpdate(current, latest string) bool {
 	if current == "dev" {
 		return true
 	}
-	// If versions are equal, there's no update
-	if current == latest {
+
+	// Parse versions
+	v1, err := semver.NewVersion(current)
+	if err != nil {
 		return false
 	}
-	// Compare versions (you might want to add semantic version comparison here)
-	return current != latest
+
+	v2, err := semver.NewVersion(latest)
+	if err != nil {
+		return false
+	}
+
+	// Compare versions
+	return v1.LessThan(v2)
 }
 
 // FormatUpdateMessage returns a formatted update message
