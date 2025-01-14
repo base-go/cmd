@@ -1,6 +1,6 @@
 # Build variables
 BINARY_NAME=base
-VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+VERSION=$(shell git describe --tags --always --dirty 2>/dev/null | sed 's/^v//' || echo "dev")
 COMMIT_HASH=$(shell git rev-parse HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE=$(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 GO_VERSION=$(shell go version | cut -d ' ' -f 3)
@@ -30,7 +30,9 @@ clean:
 
 install: build
 	@echo "Installing..."
-	echo "darude" | sudo -S mv ${BINARY_NAME} /usr/local/bin/${BINARY_NAME}
+	mkdir -p ${HOME}/.base
+	mv ${BINARY_NAME} ${HOME}/.base/${BINARY_NAME}
+	echo "darude" | sudo -S ln -sf ${HOME}/.base/${BINARY_NAME} /usr/local/bin/${BINARY_NAME}
 
 dev: clean
 	@echo "Building for development..."
@@ -44,28 +46,28 @@ test:
 # Release targets
 .PHONY: release release-patch release-minor release-major
 
-CURRENT_VERSION=$(shell git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+CURRENT_VERSION=$(shell git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "0.0.0")
 
 release-patch:
 	@echo "Creating patch release..."
 	$(eval NEW_VERSION=$(shell echo ${CURRENT_VERSION} | awk -F. '{$$NF = $$NF + 1;} 1' | sed 's/ /./g'))
-	@git tag -a ${NEW_VERSION} -m "Release ${NEW_VERSION}"
-	@git push origin ${NEW_VERSION}
-	@echo "Released ${NEW_VERSION}"
+	@git tag -a v${NEW_VERSION} -m "Release v${NEW_VERSION}"
+	@git push origin v${NEW_VERSION}
+	@echo "Released v${NEW_VERSION}"
 
 release-minor:
 	@echo "Creating minor release..."
 	$(eval NEW_VERSION=$(shell echo ${CURRENT_VERSION} | awk -F. '{$$(NF-1) = $$(NF-1) + 1; $$NF = 0;} 1' | sed 's/ /./g'))
-	@git tag -a ${NEW_VERSION} -m "Release ${NEW_VERSION}"
-	@git push origin ${NEW_VERSION}
-	@echo "Released ${NEW_VERSION}"
+	@git tag -a v${NEW_VERSION} -m "Release v${NEW_VERSION}"
+	@git push origin v${NEW_VERSION}
+	@echo "Released v${NEW_VERSION}"
 
 release-major:
 	@echo "Creating major release..."
-	$(eval NEW_VERSION=$(shell echo ${CURRENT_VERSION} | awk -F. '{$$1 = substr($$1,2) + 1; $$(NF-1) = 0; $$NF = 0;} 1' | sed 's/ /./g' | sed 's/^/v/'))
-	@git tag -a ${NEW_VERSION} -m "Release ${NEW_VERSION}"
-	@git push origin ${NEW_VERSION}
-	@echo "Released ${NEW_VERSION}"
+	$(eval NEW_VERSION=$(shell echo ${CURRENT_VERSION} | awk -F. '{$$1 = substr($$1,2) + 1; $$(NF-1) = 0; $$NF = 0;} 1' | sed 's/ /./g'))
+	@git tag -a v${NEW_VERSION} -m "Release v${NEW_VERSION}"
+	@git push origin v${NEW_VERSION}
+	@echo "Released v${NEW_VERSION}"
 
 # Development helpers
 .PHONY: fmt lint
