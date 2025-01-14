@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/base-go/cmd/version"
 	"github.com/spf13/cobra"
 )
 
@@ -67,7 +68,7 @@ func extractTarGz(gzipStream io.Reader, targetPath string) error {
 			if runtime.GOOS == "windows" {
 				expectedName = "base.exe"
 			}
-			
+
 			if baseName == expectedName {
 				outFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
 				if err != nil {
@@ -199,17 +200,17 @@ var upgradeCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Checking for updates...")
 
-		release, err := getLatestRelease()
+		release, err := version.CheckLatestVersion()
 		if err != nil {
 			fmt.Printf("Error checking for updates: %v\n", err)
 			return
 		}
 
-		currentVersion := "1.1.0" // Current version
+		info := version.GetBuildInfo()
 		latestVersion := strings.TrimPrefix(release.TagName, "v")
 
-		if currentVersion == latestVersion {
-			fmt.Printf("You're already using the latest version (%s)\n", currentVersion)
+		if info.Version == latestVersion {
+			fmt.Printf("You're already using the latest version (%s)\n", info.Version)
 			return
 		}
 
@@ -321,7 +322,7 @@ var upgradeCmd = &cobra.Command{
 			// On Unix systems, create symlink with sudo
 			fmt.Println("Creating symlink in /usr/local/bin (requires sudo)...")
 			if err := runWithSudo("ln", "-sf", destPath, filepath.Join(binDir, binaryName)); err != nil {
-				fmt.Printf("Error updating symlink. Please run manually:\nsudo ln -sf %s %s\n", 
+				fmt.Printf("Error updating symlink. Please run manually:\nsudo ln -sf %s %s\n",
 					destPath, filepath.Join(binDir, binaryName))
 				return
 			}

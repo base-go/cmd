@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/base-go/cmd/version"
 	"github.com/spf13/cobra"
 )
@@ -13,7 +16,18 @@ It provides scaffolding, code generation, and development utilities.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		// Skip version check for version and upgrade commands
 		if cmd.Name() != "version" && cmd.Name() != "upgrade" {
-			version.PrintUpdateMessage()
+			if release, err := version.CheckLatestVersion(); err == nil {
+				info := version.GetBuildInfo()
+				latestVersion := strings.TrimPrefix(release.TagName, "v")
+				if version.HasUpdate(info.Version, latestVersion) {
+					fmt.Print(version.FormatUpdateMessage(
+						info.Version,
+						latestVersion,
+						release.HTMLURL,
+						release.Body,
+					))
+				}
+			}
 		}
 	},
 }

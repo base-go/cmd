@@ -11,16 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved cross-platform upgrade command with better Windows support
 - OS-specific binary handling (base.exe for Windows)
 - Better error handling and user feedback during upgrade
+- Centralized version management in version package
 
 ### Changed
 - Unified installation behavior between install.sh and upgrade command
 - Enhanced directory structure handling for different operating systems
 - Improved sudo handling for Unix systems
+- Consolidated version handling across all commands
 
 ### Fixed
 - Windows installation path now uses correct user profile directory
 - Binary permissions are now properly set during upgrade
 - Symlink handling improved for Unix systems
+- Version consistency across version and upgrade commands
 
 ## [v1.0.14] - 2025-01-14
 
