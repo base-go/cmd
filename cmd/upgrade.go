@@ -60,20 +60,29 @@ func extractTarGz(gzipStream io.Reader, targetPath string) error {
 			return err
 		}
 
+		// We're looking for the binary file which should be named "base" or "base.exe"
 		if header.Typeflag == tar.TypeReg {
-			outFile, err := os.Create(targetPath)
-			if err != nil {
-				return err
+			baseName := filepath.Base(header.Name)
+			expectedName := "base"
+			if runtime.GOOS == "windows" {
+				expectedName = "base.exe"
 			}
-			defer outFile.Close()
+			
+			if baseName == expectedName {
+				outFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+				if err != nil {
+					return err
+				}
+				defer outFile.Close()
 
-			if _, err := io.Copy(outFile, tarReader); err != nil {
-				return err
+				if _, err := io.Copy(outFile, tarReader); err != nil {
+					return err
+				}
+				return nil
 			}
-			return os.Chmod(targetPath, 0755)
 		}
 	}
-	return nil
+	return fmt.Errorf("binary not found in archive")
 }
 
 func extractZip(zipFile *os.File, targetPath string) error {
@@ -196,7 +205,7 @@ var upgradeCmd = &cobra.Command{
 			return
 		}
 
-		currentVersion := "1.0.0" // Replace with actual current version
+		currentVersion := "1.1.0" // Current version
 		latestVersion := strings.TrimPrefix(release.TagName, "v")
 
 		if currentVersion == latestVersion {
@@ -240,6 +249,14 @@ var upgradeCmd = &cobra.Command{
 			return
 		}
 
+		// Verify the binary is executable and matches our architecture
+		execCmd := exec.Command(tmpFile, "version")
+		if err := execCmd.Run(); err != nil {
+			fmt.Printf("Error verifying binary: %v\n", err)
+			os.Remove(tmpFile)
+			return
+		}
+
 		// Make the temporary file executable
 		if err := os.Chmod(tmpFile, 0755); err != nil {
 			fmt.Printf("Error making binary executable: %v\n", err)
@@ -247,36 +264,67 @@ var upgradeCmd = &cobra.Command{
 			return
 		}
 
-		// Get the installation directory
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			fmt.Printf("Error getting home directory: %v\n", err)
+		// Get the installation directory and binary name based on OS
+		var installDir, binDir, binaryName string
+		if runtime.GOOS == "windows" {
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				fmt.Printf("Error getting home directory: %v\n", err)
+				os.Remove(tmpFile)
+				return
+			}
+			installDir = filepath.Join(homeDir, ".base")
+			binDir = filepath.Join(homeDir, "bin")
+			binaryName = "base.exe"
+		} else {
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				fmt.Printf("Error getting home directory: %v\n", err)
+				os.Remove(tmpFile)
+				return
+			}
+			installDir = filepath.Join(homeDir, ".base")
+			binDir = "/usr/local/bin"
+			binaryName = "base"
+		}
+
+		// Create installation directories
+		if err := os.MkdirAll(installDir, 0755); err != nil {
+			fmt.Printf("Error creating installation directory: %v\n", err)
 			os.Remove(tmpFile)
 			return
 		}
 
-		baseDir := filepath.Join(homeDir, ".base")
-		baseBin := filepath.Join(baseDir, "base")
-
-		// Create .base directory if it doesn't exist
-		if err := os.MkdirAll(baseDir, 0755); err != nil {
-			fmt.Printf("Error creating base directory: %v\n", err)
+		if err := os.MkdirAll(binDir, 0755); err != nil && !os.IsExist(err) {
+			fmt.Printf("Error: Unable to create %s directory. Please run with sudo\n", binDir)
 			os.Remove(tmpFile)
 			return
 		}
 
-		// Move the new binary to .base directory
-		if err := os.Rename(tmpFile, baseBin); err != nil {
+		destPath := filepath.Join(installDir, binaryName)
+
+		// Move the new binary to installation directory
+		if err := os.Rename(tmpFile, destPath); err != nil {
 			fmt.Printf("Error moving binary: %v\n", err)
 			os.Remove(tmpFile)
 			return
 		}
 
-		// Update the symlink with sudo
-		fmt.Println("Updating system symlink (requires sudo)...")
-		if err := runWithSudo("ln", "-sf", baseBin, "/usr/local/bin/base"); err != nil {
-			fmt.Printf("Error updating symlink. Please run manually:\nsudo ln -sf %s /usr/local/bin/base\n", baseBin)
-			return
+		// Create symlink or copy based on OS
+		if runtime.GOOS == "windows" {
+			// On Windows, copy to bin directory
+			if err := copyFile(destPath, filepath.Join(binDir, binaryName)); err != nil {
+				fmt.Printf("Error copying binary to bin directory: %v\n", err)
+				return
+			}
+		} else {
+			// On Unix systems, create symlink with sudo
+			fmt.Println("Creating symlink in /usr/local/bin (requires sudo)...")
+			if err := runWithSudo("ln", "-sf", destPath, filepath.Join(binDir, binaryName)); err != nil {
+				fmt.Printf("Error updating symlink. Please run manually:\nsudo ln -sf %s %s\n", 
+					destPath, filepath.Join(binDir, binaryName))
+				return
+			}
 		}
 
 		fmt.Printf("Successfully upgraded to version %s!\n", latestVersion)

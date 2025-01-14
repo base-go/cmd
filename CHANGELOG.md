@@ -5,6 +5,23 @@ All notable changes to the Base CLI tool will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.1.0] - 2025-01-14
+
+### Added
+- Improved cross-platform upgrade command with better Windows support
+- OS-specific binary handling (base.exe for Windows)
+- Better error handling and user feedback during upgrade
+
+### Changed
+- Unified installation behavior between install.sh and upgrade command
+- Enhanced directory structure handling for different operating systems
+- Improved sudo handling for Unix systems
+
+### Fixed
+- Windows installation path now uses correct user profile directory
+- Binary permissions are now properly set during upgrade
+- Symlink handling improved for Unix systems
+
 ## [v1.0.14] - 2025-01-14
 
 ### Fixed
@@ -85,6 +102,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Model layer with GORM integration
 - Basic project structure
 
+[v1.1.0]: https://github.com/base-go/cmd/releases/tag/v1.1.0
 [v1.0.14]: https://github.com/base-go/cmd/releases/tag/v1.0.14
 [v1.0.13]: https://github.com/base-go/cmd/releases/tag/v1.0.13
 [v1.0.12]: https://github.com/base-go/cmd/releases/tag/v1.0.12
