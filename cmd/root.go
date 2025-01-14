@@ -19,6 +19,7 @@ It provides scaffolding, code generation, and development utilities.`,
 			if release, err := version.CheckLatestVersion(); err == nil {
 				info := version.GetBuildInfo()
 				latestVersion := strings.TrimPrefix(release.TagName, "v")
+				// Only show update message if there's actually an update
 				if version.HasUpdate(info.Version, latestVersion) {
 					fmt.Print(version.FormatUpdateMessage(
 						info.Version,
@@ -26,7 +27,11 @@ It provides scaffolding, code generation, and development utilities.`,
 						release.HTMLURL,
 						release.Body,
 					))
+				} else {
+					fmt.Printf("\n✨ You're up to date! Using the latest version %s\n", info.Version)
 				}
+			} else {
+				fmt.Println("Failed to check for updates:", err)
 			}
 		}
 	},

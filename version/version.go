@@ -12,7 +12,7 @@ import (
 // Version information
 var (
 	// Version is the current version of Base CLI
-	Version = "1.1.0"
+	Version = "1.1.1"
 
 	// CommitHash is the git commit hash at build time
 	CommitHash = "unknown"
@@ -90,6 +90,11 @@ func HasUpdate(current, latest string) bool {
 	if current == "dev" {
 		return true
 	}
+	// If versions are equal, there's no update
+	if current == latest {
+		return false
+	}
+	// Compare versions (you might want to add semantic version comparison here)
 	return current != latest
 }
 

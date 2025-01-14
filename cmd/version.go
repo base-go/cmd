@@ -29,6 +29,8 @@ var versionCmd = &cobra.Command{
 				release.HTMLURL,
 				release.Body,
 			))
+		} else {
+			fmt.Printf("\n✨ You're up to date! Using the latest version %s\n", info.Version)
 		}
 	},
 }
