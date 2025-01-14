@@ -65,8 +65,12 @@ func ensureSwagInstalled() error {
 
 func generateSwaggerDocs(cwd string) error {
 	fmt.Println("Generating Swagger documentation...")
-	//swag init --parseDependency --parseInternal --parseVendor --parseDepth 1
-	cmd := exec.Command("swag", "init", "--parseDependency", "--parseInternal", "--parseVendor", "--parseDepth", "1")
+	cmd := exec.Command("swag", "init",
+		"--parseDependency",
+		"--parseInternal",
+		"--parseVendor",
+		"--parseDepth", "1",
+		"--generatedTime=false")
 	cmd.Dir = cwd
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
