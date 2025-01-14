@@ -5,6 +5,53 @@ COMMIT_HASH=$(shell git rev-parse HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE=$(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 GO_VERSION=$(shell go version | cut -d ' ' -f 3)
 
+# Detect OS and architecture
+UNAME_S := $(shell uname -s)
+UNAME_M := $(shell uname -m)
+
+# Set GOOS
+ifeq ($(UNAME_S),Darwin)
+    GOOS=darwin
+else ifeq ($(UNAME_S),Linux)
+    GOOS=linux
+else ifneq ($(findstring MINGW,$(UNAME_S)),)
+    GOOS=windows
+    BINARY_NAME=base.exe
+else ifneq ($(findstring MSYS,$(UNAME_S)),)
+    GOOS=windows
+    BINARY_NAME=base.exe
+else
+    $(error Unsupported operating system: $(UNAME_S))
+endif
+
+# Set GOARCH
+ifeq ($(UNAME_M),x86_64)
+    GOARCH=amd64
+else ifeq ($(UNAME_M),amd64)
+    GOARCH=amd64
+else ifeq ($(UNAME_M),arm64)
+    GOARCH=arm64
+else ifeq ($(UNAME_M),aarch64)
+    GOARCH=arm64
+else
+    $(error Unsupported architecture: $(UNAME_M))
+endif
+
+# Cross-compilation targets
+.PHONY: build-all
+build-all: clean
+	@echo "Building for all platforms..."
+	@echo "Building darwin/amd64..."
+	GOOS=darwin GOARCH=amd64 go build ${LDFLAGS} -o dist/base_darwin_amd64
+	@echo "Building darwin/arm64..."
+	GOOS=darwin GOARCH=arm64 go build ${LDFLAGS} -o dist/base_darwin_arm64
+	@echo "Building linux/amd64..."
+	GOOS=linux GOARCH=amd64 go build ${LDFLAGS} -o dist/base_linux_amd64
+	@echo "Building linux/arm64..."
+	GOOS=linux GOARCH=arm64 go build ${LDFLAGS} -o dist/base_linux_arm64
+	@echo "Building windows/amd64..."
+	GOOS=windows GOARCH=amd64 go build ${LDFLAGS} -o dist/base_windows_amd64.exe
+
 # LDFLAGS for version information
 LDFLAGS=-ldflags "-X main.Version=${VERSION} \
                   -X main.CommitHash=${COMMIT_HASH} \
@@ -21,8 +68,10 @@ build:
 	@echo "Commit: ${COMMIT_HASH}"
 	@echo "Build Date: ${BUILD_DATE}"
 	@echo "Go Version: ${GO_VERSION}"
-	@echo "Build command: go build ${LDFLAGS} -o ${BINARY_NAME}"
-	go build -v ${LDFLAGS} -o ${BINARY_NAME}
+	@echo "OS: ${GOOS}"
+	@echo "Architecture: ${GOARCH}"
+	@echo "Build command: GOOS=${GOOS} GOARCH=${GOARCH} go build ${LDFLAGS} -o ${BINARY_NAME}"
+	GOOS=${GOOS} GOARCH=${GOARCH} go build -v ${LDFLAGS} -o ${BINARY_NAME}
 
 clean:
 	@echo "Cleaning..."
