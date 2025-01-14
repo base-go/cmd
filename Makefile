@@ -6,10 +6,10 @@ BUILD_DATE=$(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 GO_VERSION=$(shell go version | cut -d ' ' -f 3)
 
 # LDFLAGS for version information
-LDFLAGS=-ldflags "-X github.com/base-go/cmd/version.Version=${VERSION} \
-                  -X github.com/base-go/cmd/version.CommitHash=${COMMIT_HASH} \
-                  -X github.com/base-go/cmd/version.BuildDate=${BUILD_DATE} \
-                  -X github.com/base-go/cmd/version.GoVersion=${GO_VERSION}"
+LDFLAGS=-ldflags "-X main.Version=${VERSION} \
+                  -X main.CommitHash=${COMMIT_HASH} \
+                  -X main.BuildDate=${BUILD_DATE} \
+                  -X main.GoVersion=${GO_VERSION}"
 
 .PHONY: all build clean install test dev
 
@@ -30,8 +30,7 @@ clean:
 
 install: build
 	@echo "Installing..."
-	mkdir -p ${HOME}/.base
-	mv ${BINARY_NAME} ${HOME}/.base/${BINARY_NAME}
+	echo "darude" | sudo -S mv ${BINARY_NAME} /usr/local/bin/${BINARY_NAME}
 
 dev: clean
 	@echo "Building for development..."
