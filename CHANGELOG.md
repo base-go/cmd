@@ -5,6 +5,12 @@ All notable changes to the Base CLI tool will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.0.14] - 2025-01-14
+
+### Fixed
+- Fixed unused variable in upgrade command
+- Improved upgrade process reliability
+
 ## [v1.0.13] - 2025-01-14
 
 ### Added
@@ -79,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Model layer with GORM integration
 - Basic project structure
 
+[v1.0.14]: https://github.com/base-go/cmd/releases/tag/v1.0.14
 [v1.0.13]: https://github.com/base-go/cmd/releases/tag/v1.0.13
 [v1.0.12]: https://github.com/base-go/cmd/releases/tag/v1.0.12
 [v1.0.5]: https://github.com/base-go/cmd/releases/tag/v1.0.5
