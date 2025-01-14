@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Hot reload functionality using Air in `start` command
 - Automatic `.air.toml` configuration generation
 - Comprehensive documentation for hot reload feature in README
+- Support for specialized attachment types (`image` and `file`) with validation
+- Optional Swagger documentation generation with `--docs` flag
+- Improved attachment handling with proper GORM polymorphic associations
+- Type-specific file validation (size limits and allowed extensions)
 
 ### Changed
 - Updated module template to handle storage dependency more elegantly
@@ -24,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced code organization with dedicated Air utilities
 - Improved Swagger documentation generation in hot reload mode
 - Added proper version tagging and build information
+- Made Swagger documentation generation optional (use `--docs` flag)
+- Updated attachment field generation to avoid duplicates
+- Improved GORM tags for polymorphic associations
+- Enhanced module template for better attachment configuration
 
 ### Fixed
 - Fixed directory path resolution in `start` command
@@ -35,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed hot reload loop by excluding docs directory and improving process management
 - Fixed Swagger documentation triggering unnecessary rebuilds in hot reload mode
 - Fixed version information display in CLI output
+- Fixed duplicate field generation in attachment handling
+- Fixed polymorphic association tags in model generation
+- Fixed attachment field validation in create/update requests
 
 ## [v1.0.5] - 2025-01-14
 

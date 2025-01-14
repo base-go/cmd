@@ -12,6 +12,7 @@ import (
 
 var (
 	hotReload bool
+	docs      bool
 )
 
 var startCmd = &cobra.Command{
@@ -25,6 +26,7 @@ var startCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(startCmd)
 	startCmd.Flags().BoolVarP(&hotReload, "hot-reload", "r", false, "Enable hot reloading using air")
+	startCmd.Flags().BoolVarP(&docs, "docs", "d", false, "Generate Swagger documentation")
 }
 
 func ensureAirInstalled() error {
@@ -81,7 +83,7 @@ func startApplication(cmd *cobra.Command, args []string) {
 	// Get the current working directory
 	cwd, err := os.Getwd()
 	if err != nil {
-		fmt.Printf("Error getting current directory: %v\n", err)
+		fmt.Printf("Error getting working directory: %v\n", err)
 		return
 	}
 
@@ -94,28 +96,30 @@ func startApplication(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// Ensure swag is installed and generate docs
-	if err := ensureSwagInstalled(); err != nil {
-		fmt.Printf("Error installing swag: %v\n", err)
-		return
-	}
+	if docs {
+		// Install swag if needed
+		if err := ensureSwagInstalled(); err != nil {
+			fmt.Printf("Error installing swag: %v\n", err)
+			return
+		}
 
-	// Generate Swagger docs before starting the server
-	if err := generateSwaggerDocs(cwd); err != nil {
-		fmt.Printf("Error generating swagger docs: %v\n", err)
-		return
+		// Generate swagger docs
+		if err := generateSwaggerDocs(cwd); err != nil {
+			fmt.Printf("Error generating swagger docs: %v\n", err)
+			return
+		}
 	}
 
 	if hotReload {
-		// Ensure air is installed
+		// Install air if needed
 		if err := ensureAirInstalled(); err != nil {
 			fmt.Printf("Error installing air: %v\n", err)
 			return
 		}
 
-		// Setup air configuration
+		// Setup air config
 		if err := setupAirConfig(cwd); err != nil {
-			fmt.Printf("Error setting up air configuration: %v\n", err)
+			fmt.Printf("Error setting up air config: %v\n", err)
 			return
 		}
 
@@ -132,16 +136,16 @@ func startApplication(cmd *cobra.Command, args []string) {
 			return
 		}
 	} else {
-		// Run without hot reloading
+		// Run normally
 		fmt.Println("Starting the Base application server...")
 		fmt.Println("Tip: Use --hot-reload or -r flag to enable hot reloading")
 
-		goCmd := exec.Command("go", "run", "main.go")
-		goCmd.Stdout = os.Stdout
-		goCmd.Stderr = os.Stderr
-		goCmd.Dir = cwd
+		mainCmd := exec.Command("go", "run", "main.go")
+		mainCmd.Stdout = os.Stdout
+		mainCmd.Stderr = os.Stderr
+		mainCmd.Dir = cwd
 
-		if err := goCmd.Run(); err != nil {
+		if err := mainCmd.Run(); err != nil {
 			fmt.Printf("Error running application: %v\n", err)
 			return
 		}

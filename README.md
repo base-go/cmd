@@ -51,35 +51,28 @@ Generate a new module with fields and relationships.
 base g <module-name> [field:type ...] [options]
 ```
 
-**Field Types**:
-- `string`: String field
-- `text`: Text field (for longer content)
-- `int`: Integer field
-- `float`: Float field
-- `bool`: Boolean field
-- `date`: Date field
-- `datetime`: DateTime field
-- `time`: Time field
-- `attachment`: File upload field
-- `belongsTo`: One-to-one relationship
-- `hasMany`: One-to-many relationship
-- `hasOne`: One-to-one relationship
-- `manyToMany`: Many-to-many relationship
-
 ### `base start` or `base s`
 
-Run your application with hot reload:
+Start the Base application server.
 
+Options:
+- `--hot-reload`, `-r`: Enable hot reloading using air
+- `--docs`, `-d`: Generate Swagger documentation
+
+Examples:
 ```bash
+# Start the server normally
 base start
-```
 
-Features:
-- Automatic rebuild on file changes
-- Supports Go files, templates, HTML, and environment files
-- Excludes common directories like assets, tmp, vendor, and node_modules
-- Clean process management
-- Configurable through `.air.toml`
+# Start with hot reloading
+base start -r
+
+# Start with Swagger documentation
+base start -d
+
+# Start with both hot reloading and Swagger docs
+base start -r -d
+```
 
 ### `base update`
 
@@ -103,6 +96,40 @@ Display version information:
 
 ```bash
 base version
+```
+
+## Field Types
+
+Base supports various field types for model generation:
+
+Basic Types:
+- `string`: String field
+- `int`: Integer field
+- `bool`: Boolean field
+- `float`: Float field
+- `text`: Text field (for longer strings)
+
+Special Types:
+- `image`: Image attachment with validation (5MB limit, image extensions)
+- `file`: File attachment with validation (50MB limit, document extensions)
+- `attachment`: Generic attachment (10MB limit, mixed extensions)
+- `time`: Time field
+- `date`: Date field
+- `datetime`: DateTime field
+
+Relationship Types:
+- `belongs_to`: One-to-one relationship
+- `has_one`: One-to-one relationship
+- `has_many`: One-to-many relationship
+- `many2many`: Many-to-many relationship
+
+Example:
+```bash
+# Generate a post module with title and image
+base g post title:string cover:image
+
+# Generate a document module with title and file attachment
+base g document title:string file:file
 ```
 
 ## Example: Building a Blog System
