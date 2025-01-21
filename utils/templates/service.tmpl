@@ -1,128 +1,158 @@
 package {{toLower .PluralName}}
 
 import (
-    "math"
-    {{- if .HasImageField}}
+    "fmt"
     "mime/multipart"
-    "base/core/storage"
-    {{- end}}
 
     "gorm.io/gorm"
     "base/core/types"
+    "base/core/emitter"
+    "base/core/storage"
+    "base/core/logger"
     "base/app/models"
+)
+
+const (
+    Create{{.StructName}}Event = "{{toLower .PluralName}}.create"
+    Update{{.StructName}}Event = "{{toLower .PluralName}}.update"
+    Delete{{.StructName}}Event = "{{toLower .PluralName}}.delete"
 )
 
 type {{.StructName}}Service struct {
     DB      *gorm.DB
-    {{- if .HasImageField}}
-    storage *storage.ActiveStorage
-    {{- end}}
+    Emitter *emitter.Emitter
+    Storage *storage.ActiveStorage
+    Logger  logger.Logger
 }
 
-func New{{.StructName}}Service(db *gorm.DB{{if .HasImageField}}, activeStorage *storage.ActiveStorage{{end}}) *{{.StructName}}Service {
+func New{{.StructName}}Service(db *gorm.DB, emitter *emitter.Emitter, storage *storage.ActiveStorage, logger logger.Logger) *{{.StructName}}Service {
     return &{{.StructName}}Service{
         DB:      db,
-        {{- if .HasImageField}}
-        storage: activeStorage,
-        {{- end}}
+        Emitter: emitter,
+        Storage: storage,
+        Logger:  logger,
     }
 }
 
 func (s *{{.StructName}}Service) Create(req *models.Create{{.StructName}}Request) (*models.{{.StructName}}, error) {
-    item := models.{{.StructName}}{
+    item := &models.{{.StructName}}{
         {{- range .Fields}}
-        {{- if eq .Relationship "belongs_to"}}
+        {{- if eq .Type "*storage.Attachment"}}
+        // {{.Name}} attachment is handled via separate endpoint
+        {{- else if eq .Relationship "belongs_to"}}
         {{.Name}}Id: req.{{.Name}}Id,
-        {{- else if eq .Relationship "has_many"}}
-        // Has-many relationships are handled after creation
-        {{- else if eq .Relationship "many2many"}}
-        // Many-to-many relationships are handled after creation
-        {{- else if eq .Type "attachment"}}
-        {{.Name}}Id: req.{{.Name}}Id,
-        {{- else}}
+        {{- else if ne .Relationship "has_many"}}
         {{.Name}}: req.{{.Name}},
         {{- end}}
         {{- end}}
     }
 
-    if err := s.DB.Create(&item).Error; err != nil {
-        return nil, err
+    if err := s.DB.Create(item).Error; err != nil {
+        s.Logger.Error("failed to create {{toLower .StructName}}", logger.String("error", err.Error()))
+        return nil, fmt.Errorf("failed to create {{toLower .StructName}}: %w", err)
     }
 
-    // Handle has-many and many-to-many relationships
-    {{- range .Fields}}
-    {{- if eq .Relationship "has_many"}}
-    if len(req.{{.Name}}Ids) > 0 {
-        if err := s.DB.Model(&item).Association("{{.Name}}").Replace(req.{{.Name}}Ids); err != nil {
-            return nil, err
-        }
-    }
-    {{- else if eq .Relationship "many2many"}}
-    if len(req.{{.Name}}Ids) > 0 {
-        if err := s.DB.Model(&item).Association("{{.Name}}").Replace(req.{{.Name}}Ids); err != nil {
-            return nil, err
-        }
-    }
-    {{- end}}
-    {{- end}}
+    // Emit create event
+    s.Emitter.Emit(Create{{.StructName}}Event, item)
 
     return s.GetById(item.Id)
 }
 
 func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName}}Request) (*models.{{.StructName}}, error) {
-    var item models.{{.StructName}}
-    if err := s.DB.First(&item, id).Error; err != nil {
-        return nil, err
+    item := &models.{{.StructName}}{}
+    if err := s.DB.First(item, id).Error; err != nil {
+        s.Logger.Error("failed to find {{toLower .StructName}} for update", 
+            logger.String("error", err.Error()),
+            logger.Int("id", int(id)))
+        return nil, fmt.Errorf("failed to find {{toLower .StructName}}: %w", err)
     }
 
     // Build updates map
     updates := make(map[string]interface{})
     {{- range .Fields}}
-    {{- if eq .Relationship "belongs_to"}}
-    if req.{{.Name}}Id != nil {
-        updates["{{.JSONName}}_id"] = *req.{{.Name}}Id
+    {{- if eq .Type "*storage.Attachment"}}
+    // {{.Name}} attachment is handled via separate endpoint
+    {{- else if eq .Relationship "belongs_to"}}
+    if req.{{.Name}}Id != 0 {
+        updates["{{.JSONName}}_id"] = req.{{.Name}}Id
     }
-    {{- else if eq .Type "attachment"}}
-    if req.{{.Name}}Id != nil {
-        updates["{{.JSONName}}_id"] = *req.{{.Name}}Id
-    }
-    {{- else if not (or (eq .Relationship "has_many") (eq .Relationship "many2many"))}}
-    if req.{{.Name}} != nil {
-        updates["{{.JSONName}}"] = *req.{{.Name}}
+    {{- else if ne .Relationship "has_many"}}
+    if req.{{.Name}} != "" {
+        updates["{{.DBName}}"] = req.{{.Name}}
     }
     {{- end}}
     {{- end}}
 
-    if err := s.DB.Model(&item).Updates(updates).Error; err != nil {
-        return nil, err
+    if err := s.DB.Model(item).Updates(updates).Error; err != nil {
+        s.Logger.Error("failed to update {{toLower .StructName}}", 
+            logger.String("error", err.Error()),
+            logger.Int("id", int(id)))
+        return nil, fmt.Errorf("failed to update {{toLower .StructName}}: %w", err)
     }
 
-    // Handle has-many and many-to-many relationships
+    result, err := s.GetById(item.Id)
+    if err != nil {
+        s.Logger.Error("failed to get updated {{toLower .StructName}}", 
+            logger.String("error", err.Error()),
+            logger.Int("id", int(id)))
+        return nil, fmt.Errorf("failed to get updated {{toLower .StructName}}: %w", err)
+    }
+
+    // Emit update event
+    s.Emitter.Emit(Update{{.StructName}}Event, result)
+
+    return result, nil
+}
+
+func (s *{{.StructName}}Service) Delete(id uint) error {
+    item := &models.{{.StructName}}{}
+    if err := s.DB.First(item, id).Error; err != nil {
+        s.Logger.Error("failed to find {{toLower .StructName}} for deletion", 
+            logger.String("error", err.Error()),
+            logger.Int("id", int(id)))
+        return fmt.Errorf("failed to find {{toLower .StructName}}: %w", err)
+    }
+
+    // Delete file attachments if any
     {{- range .Fields}}
-    {{- if eq .Relationship "has_many"}}
-    if req.{{.Name}}Ids != nil {
-        if err := s.DB.Model(&item).Association("{{.Name}}").Replace(req.{{.Name}}Ids); err != nil {
-            return nil, err
-        }
-    }
-    {{- else if eq .Relationship "many2many"}}
-    if req.{{.Name}}Ids != nil {
-        if err := s.DB.Model(&item).Association("{{.Name}}").Replace(req.{{.Name}}Ids); err != nil {
-            return nil, err
+    {{- if eq .Type "*storage.Attachment"}}
+    if item.{{.Name}} != nil {
+        if err := s.Storage.Delete(item.{{.Name}}); err != nil {
+            s.Logger.Error("failed to delete {{.JSONName}}", 
+                logger.String("error", err.Error()),
+                logger.Int("id", int(id)))
+            return fmt.Errorf("failed to delete {{.JSONName}}: %w", err)
         }
     }
     {{- end}}
     {{- end}}
 
-    return s.GetById(id)
+    if err := s.DB.Delete(item).Error; err != nil {
+        s.Logger.Error("failed to delete {{toLower .StructName}}", 
+            logger.String("error", err.Error()),
+            logger.Int("id", int(id)))
+        return fmt.Errorf("failed to delete {{toLower .StructName}}: %w", err)
+    }
+
+    // Emit delete event
+    s.Emitter.Emit(Delete{{.StructName}}Event, item)
+
+    return nil
 }
 
 func (s *{{.StructName}}Service) GetById(id uint) (*models.{{.StructName}}, error) {
-    var item models.{{.StructName}}
-    if err := item.Preload(s.DB).First(&item, id).Error; err != nil {
-        return nil, err
+    item := &models.{{.StructName}}{}
+    
+    query := item.Preload(s.DB)
+    
+    if err := query.First(item, id).Error; err != nil {
+        s.Logger.Error("failed to get {{toLower .StructName}}", 
+            logger.String("error", err.Error()),
+            logger.Int("id", int(id)))
+        return nil, fmt.Errorf("failed to get {{toLower .StructName}}: %w", err)
     }
-    return &item, nil
+
+    return item, nil
 }
 
 func (s *{{.StructName}}Service) GetAll(page *int, limit *int) (*types.PaginatedResponse, error) {
@@ -132,7 +162,9 @@ func (s *{{.StructName}}Service) GetAll(page *int, limit *int) (*types.Paginated
 
     // Get total count
     if err := query.Count(&total).Error; err != nil {
-        return nil, err
+        s.Logger.Error("failed to count {{toLower .PluralName}}", 
+            logger.String("error", err.Error()))
+        return nil, fmt.Errorf("failed to count {{toLower .PluralName}}: %w", err)
     }
 
     // Apply pagination if provided
@@ -141,84 +173,111 @@ func (s *{{.StructName}}Service) GetAll(page *int, limit *int) (*types.Paginated
         query = query.Offset(offset).Limit(*limit)
     }
 
-    // Get items with preloaded relations
-    if err := (&models.{{.StructName}}{}).Preload(query).Find(&items).Error; err != nil {
-        return nil, err
+    // Preload relationships
+    query = (&models.{{.StructName}}{}).Preload(query)
+
+    // Execute query
+    if err := query.Find(&items).Error; err != nil {
+        s.Logger.Error("failed to get {{toLower .PluralName}}", 
+            logger.String("error", err.Error()))
+        return nil, fmt.Errorf("failed to get {{toLower .PluralName}}: %w", err)
     }
 
     // Convert to response type
-    listItems := make([]*models.{{.StructName}}ListResponse, len(items))
+    responses := make([]*models.{{.StructName}}ListResponse, len(items))
     for i, item := range items {
-        listItems[i] = item.ToListResponse()
+        responses[i] = item.ToListResponse()
     }
 
-    pagination := types.Pagination{
-        Total:      int(total),
-        Page:       *page,
-        PageSize:   *limit,
-        TotalPages: int(math.Ceil(float64(total) / float64(*limit))),
+    // Calculate total pages
+    totalPages := int(math.Ceil(float64(total) / float64(*limit)))
+    if totalPages == 0 {
+        totalPages = 1
     }
 
     return &types.PaginatedResponse{
-        Data:       listItems,
-        Pagination: pagination,
+        Data: responses,
+        Pagination: types.Pagination{
+            Total:      int(total),
+            Page:       *page,
+            PageSize:   *limit,
+            TotalPages: totalPages,
+        },
     }, nil
 }
 
-func (s *{{.StructName}}Service) Delete(id uint) error {
-    var item models.{{.StructName}}
-    if err := s.DB.First(&item, id).Error; err != nil {
-        return err
-    }
-
-    // Begin transaction
-    tx := s.DB.Begin()
-    defer func() {
-        if r := recover(); r != nil {
-            tx.Rollback()
-        }
-    }()
-
-    // Clear associations
-    {{- range .Fields}}
-    {{- if or (eq .Relationship "has_many") (eq .Relationship "many2many")}}
-    if err := tx.Model(&item).Association("{{.Name}}").Clear(); err != nil {
-        tx.Rollback()
-        return err
-    }
-    {{- end}}
-    {{- end}}
-
-    // Delete the item
-    if err := tx.Delete(&item).Error; err != nil {
-        tx.Rollback()
-        return err
-    }
-
-    return tx.Commit().Error
-}
-
-{{- if .HasImageField}}
-{{range .Fields}}
-{{- if eq .Type "attachment"}}
+{{- range .Fields}}
+{{- if eq .Type "*storage.Attachment"}}
+// Upload{{.Name}} uploads a file for the {{$.StructName}}'s {{.Name}} field
 func (s *{{$.StructName}}Service) Upload{{.Name}}(id uint, file *multipart.FileHeader) (*models.{{$.StructName}}, error) {
-    var item models.{{$.StructName}}
-    if err := s.DB.First(&item, id).Error; err != nil {
-        return nil, err
+    item := &models.{{$.StructName}}{}
+    if err := s.DB.First(item, id).Error; err != nil {
+        s.Logger.Error("failed to find {{toLower $.StructName}}", 
+            logger.String("error", err.Error()),
+            logger.Int("id", int(id)))
+        return nil, fmt.Errorf("failed to find {{toLower $.StructName}}: %w", err)
     }
 
-    attachment, err := s.storage.Attach(&item, "{{toLower .Name}}", file)
+    // Delete existing file if any
+    if item.{{.Name}} != nil {
+        if err := s.Storage.Delete(item.{{.Name}}); err != nil {
+            s.Logger.Error("failed to delete existing {{.JSONName}}", 
+                logger.String("error", err.Error()),
+                logger.Int("id", int(id)))
+            return nil, fmt.Errorf("failed to delete existing {{.JSONName}}: %w", err)
+        }
+    }
+
+    // Attach new file
+    attachment, err := s.Storage.Attach(item, "{{.JSONName}}", file)
     if err != nil {
-        return nil, err
+        s.Logger.Error("failed to attach {{.JSONName}}", 
+            logger.String("error", err.Error()),
+            logger.Int("id", int(id)))
+        return nil, fmt.Errorf("failed to attach {{.JSONName}}: %w", err)
     }
 
-    item.{{.Name}} = attachment
-    if err := s.DB.Save(&item).Error; err != nil {
-        return nil, err
+    // Update the model with the new attachment
+    if err := s.DB.Model(item).Association("{{.Name}}").Replace(attachment); err != nil {
+        s.Logger.Error("failed to associate {{.JSONName}}", 
+            logger.String("error", err.Error()),
+            logger.Int("id", int(id)))
+        return nil, fmt.Errorf("failed to associate {{.JSONName}}: %w", err)
     }
 
     return s.GetById(id)
 }
-{{- end}}
+
+// Remove{{.Name}} removes the file from the {{$.StructName}}'s {{.Name}} field
+func (s *{{$.StructName}}Service) Remove{{.Name}}(id uint) (*models.{{$.StructName}}, error) {
+    item := &models.{{$.StructName}}{}
+    if err := s.DB.First(item, id).Error; err != nil {
+        s.Logger.Error("failed to find {{toLower $.StructName}}", 
+            logger.String("error", err.Error()),
+            logger.Int("id", int(id)))
+        return nil, fmt.Errorf("failed to find {{toLower $.StructName}}: %w", err)
+    }
+
+    if item.{{.Name}} == nil {
+        return item, nil
+    }
+
+    if err := s.Storage.Delete(item.{{.Name}}); err != nil {
+        s.Logger.Error("failed to delete {{.JSONName}}", 
+            logger.String("error", err.Error()),
+            logger.Int("id", int(id)))
+        return nil, fmt.Errorf("failed to delete {{.JSONName}}: %w", err)
+    }
+
+    // Clear the association
+    if err := s.DB.Model(item).Association("{{.Name}}").Clear(); err != nil {
+        s.Logger.Error("failed to clear {{.JSONName}} association", 
+            logger.String("error", err.Error()),
+            logger.Int("id", int(id)))
+        return nil, fmt.Errorf("failed to clear {{.JSONName}} association: %w", err)
+    }
+
+    return s.GetById(id)
+}
 {{- end}}
 {{- end}}

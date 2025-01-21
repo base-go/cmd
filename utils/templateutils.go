@@ -7,18 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
-
-	"github.com/gertd/go-pluralize"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 )
-
-// Initialize the pluralize client
-var PluralizeClient *pluralize.Client
-
-func init() {
-	PluralizeClient = pluralize.NewClient()
-}
 
 //go:embed templates/model.tmpl
 var modelTemplate string
@@ -43,6 +32,107 @@ type FieldStruct struct {
 	PluralType      string
 	Relationship    string
 	RelatedModel    string
+	IsRequired      bool
+	GORM            string // Add this field for GORM tags
+
+}
+
+// normalizeRelationship normalizes relationship types to standard format
+func normalizeRelationship(rel string) string {
+	switch rel {
+	case "belongs_to", "belongsTo":
+		return "belongs_to"
+	case "has_many", "hasMany":
+		return "has_many"
+	case "has_one", "hasOne":
+		return "has_one"
+	default:
+		return rel
+	}
+}
+
+func processRelationshipField(name string, relatedModel string, relationship string) []FieldStruct {
+	var fields []FieldStruct
+
+	switch relationship {
+	case "belongs_to", "belongsTo":
+		// Add the relationship field only
+		fields = append(fields, FieldStruct{
+			Name:         ToPascalCase(name),
+			Type:         "*" + relatedModel,
+			JSONName:     ToSnakeCase(name),
+			DBName:       ToSnakeCase(name),
+			Relationship: relationship,
+			RelatedModel: relatedModel,
+			IsRequired:   false,
+		})
+
+	case "has_many", "hasMany":
+		// Add the relationship field
+		fields = append(fields, FieldStruct{
+			Name:         ToPascalCase(name),
+			Type:         "[]*" + relatedModel,
+			JSONName:     ToSnakeCase(name),
+			DBName:       ToSnakeCase(name),
+			Relationship: relationship,
+			RelatedModel: relatedModel,
+			GORM:         fmt.Sprintf("foreignKey:%sId;references:Id", strings.TrimSuffix(ToPascalCase(name), "s")),
+			IsRequired:   false,
+		})
+	}
+
+	return fields
+}
+
+func ProcessField(fieldDef string) []FieldStruct {
+	parts := strings.Split(fieldDef, ":")
+	if len(parts) < 2 {
+		return nil
+	}
+
+	name := parts[0]
+	fieldType := parts[1]
+	var relationship, relatedModel string
+
+	// Check if this is a relationship field
+	if len(parts) >= 3 {
+		relationship = normalizeRelationship(fieldType)
+		relatedModel = parts[2]
+		return processRelationshipField(name, relatedModel, relationship)
+	}
+
+	// Handle attachment fields
+	if fieldType == "attachment" || fieldType == "image" || fieldType == "file" {
+		return []FieldStruct{{
+			Name:         ToPascalCase(name),
+			Type:         "*storage.Attachment",
+			JSONName:     ToSnakeCase(name),
+			DBName:       ToSnakeCase(name),
+			Relationship: "attachment",
+			GORM:         "polymorphic:Model",
+			IsRequired:   false,
+		}}
+	}
+
+	// Handle regular fields
+	return []FieldStruct{{
+		Name:     ToPascalCase(name),
+		Type:     GetGoType(fieldType),
+		JSONName: ToSnakeCase(name),
+		DBName:   ToSnakeCase(name),
+	}}
+}
+
+// GenerateFieldStructs processes all fields and returns a slice of FieldStruct
+func GenerateFieldStructs(fields []string) []FieldStruct {
+	var fieldStructs []FieldStruct
+
+	for _, fieldDef := range fields {
+		processedFields := ProcessField(fieldDef)
+		fieldStructs = append(fieldStructs, processedFields...)
+	}
+
+	return fieldStructs
 }
 
 // GenerateFileFromTemplate generates a file from a template
@@ -65,13 +155,13 @@ func GenerateFileFromTemplate(dir, filename, templateName, structName, pluralNam
 	// Create template with functions
 	funcMap := template.FuncMap{
 		"toLower":     strings.ToLower,
-		"toTitle":     cases.Title(language.Und).String,
+		"toTitle":     ToTitle,
 		"ToSnakeCase": ToSnakeCase,
 		"hasField": func(fields []FieldStruct, fieldType string) bool {
 			return HasFieldType(fields, fieldType)
 		},
 		"ToPascalCase": ToPascalCase,
-		"ToPlural":     PluralizeClient.Plural,
+		"ToPlural":     ToPlural,
 	}
 
 	tmpl, err := template.New(templateName).Funcs(funcMap).Parse(tmplContent)
@@ -132,94 +222,4 @@ func HasFieldType(fields []FieldStruct, fieldType string) bool {
 // HasImageField checks if any field has the image type
 func HasImageField(fields []FieldStruct) bool {
 	return HasFieldType(fields, "*storage.Attachment")
-}
-
-// GenerateFieldStructs processes the fields and returns a slice of FieldStruct
-func GenerateFieldStructs(fields []string) []FieldStruct {
-	var fieldStructs []FieldStruct
-	for _, field := range fields {
-		parts := strings.Split(field, ":")
-		if len(parts) < 2 {
-			continue
-		}
-
-		name := parts[0]
-		fieldType := parts[1]
-		relationship := ""
-		relatedModel := ""
-
-		if len(parts) >= 3 {
-			relationship = fieldType
-			relatedModel = parts[2]
-
-			// First add the ID field for belongs_to relationships
-			if relationship == "belongs_to" || relationship == "belongsTo" {
-				idField := FieldStruct{
-					Name:         ToPascalCase(name) + "Id",
-					Type:         "uint",
-					JSONName:     ToSnakeCase(name) + "_id",
-					DBName:       ToSnakeCase(name) + "_id",
-					Relationship: "",
-				}
-				fieldStructs = append(fieldStructs, idField)
-			}
-
-			// Then add the relationship field with proper type
-			if relationship == "belongs_to" || relationship == "has_one" || relationship == "belongsTo" || relationship == "hasOne" {
-				fieldType = "*" + relatedModel
-			} else if relationship == "has_many" || relationship == "hasMany" || relationship == "manyToMany" || relationship == "many2many" {
-				fieldType = "[]*" + relatedModel
-			}
-		} else {
-			// For non-relationship fields, get the Go type
-			fieldType = GetGoType(fieldType)
-		}
-
-		// Check for attachment fields
-		if fieldType == "attachment" || fieldType == "image" || fieldType == "file" {
-			relationship = "attachment"
-			fieldType = "*storage.Attachment"
-			
-			// Add the ID field for the attachment
-			idField := FieldStruct{
-				Name:         ToPascalCase(name) + "Id",
-				Type:         "*uint",
-				JSONName:     ToSnakeCase(name) + "_id",
-				DBName:       ToSnakeCase(name) + "_id",
-				Relationship: "",
-			}
-			fieldStructs = append(fieldStructs, idField)
-
-			// Add the attachment field with proper GORM tags
-			fieldStruct := FieldStruct{
-				Name:         ToPascalCase(name),
-				Type:         fieldType,
-				JSONName:     ToSnakeCase(name),
-				DBName:       ToSnakeCase(name),
-				Relationship: relationship,
-				RelatedModel: "storage.Attachment",
-				AssociatedType: fieldType, // Store the original type (image/file) for validation
-			}
-			fieldStructs = append(fieldStructs, fieldStruct)
-			continue
-		}
-
-		fieldStruct := FieldStruct{
-			Name:         ToPascalCase(name),
-			Type:         fieldType,
-			JSONName:     ToSnakeCase(name),
-			DBName:       ToSnakeCase(name),
-			Relationship: relationship,
-			RelatedModel: relatedModel,
-		}
-
-		if relationship != "" {
-			fieldStruct.AssociatedType = relatedModel
-			fieldStruct.AssociatedTable = ToSnakeCase(PluralizeClient.Plural(relatedModel))
-			fieldStruct.PluralType = PluralizeClient.Plural(relatedModel)
-		}
-
-		fieldStructs = append(fieldStructs, fieldStruct)
-	}
-	return fieldStructs
 }

@@ -118,10 +118,9 @@ Special Types:
 - `datetime`: DateTime field
 
 Relationship Types:
-- `belongs_to`: One-to-one relationship
-- `has_one`: One-to-one relationship
+- `belongs_to`: One-to-one relationship (with foreign key in this model)
+- `has_one`: One-to-one relationship (with foreign key in the other model)
 - `has_many`: One-to-many relationship
-- `many2many`: Many-to-many relationship
 
 Example:
 ```bash

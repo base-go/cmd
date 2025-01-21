@@ -16,23 +16,22 @@ type Module struct {
     DB         *gorm.DB
     Controller *{{.StructName}}Controller
     Service    *{{.StructName}}Service
-    {{- if .HasImageField}}
-    ActiveStorage *storage.ActiveStorage
-    {{- end}}
+    Logger     *logger.Logger
+    Storage    *storage.ActiveStorage
 }
 
-func New{{.StructName}}Module(db *gorm.DB, router *gin.RouterGroup, log logger.Logger, emitter *emitter.Emitter, activeStorage *storage.ActiveStorage) module.Module {
+func New{{.StructName}}Module(db *gorm.DB, router *gin.RouterGroup, log logger.Logger, emitter *emitter.Emitter, storage *storage.ActiveStorage) module.Module {
     {{- range .Fields}}
     {{- if eq .AssociatedType "image"}}
     // Register image attachment configuration for {{.Name}}
-    activeStorage.RegisterAttachment("{{toLower $.StructName}}", storage.AttachmentConfig{
+    storage.RegisterAttachment("{{toLower $.StructName}}", storage.AttachmentConfig{
         Field:             "{{.JSONName}}",
         MaxFileSize:       5 * 1024 * 1024, // 5MB
         AllowedExtensions: []string{".jpg", ".jpeg", ".png", ".gif", ".webp"},
     })
     {{- else if eq .AssociatedType "file"}}
     // Register file attachment configuration for {{.Name}}
-    activeStorage.RegisterAttachment("{{toLower $.StructName}}", storage.AttachmentConfig{
+    storage.RegisterAttachment("{{toLower $.StructName}}", storage.AttachmentConfig{
         Field:             "{{.JSONName}}",
         MaxFileSize:       50 * 1024 * 1024, // 50MB
         AllowedExtensions: []string{".pdf", ".doc", ".docx", ".xls", ".xlsx", ".zip", ".rar"},
@@ -40,24 +39,16 @@ func New{{.StructName}}Module(db *gorm.DB, router *gin.RouterGroup, log logger.L
     {{- end}}
     {{- end}}
 
-    {{- if .HasImageField}}
-    service := New{{.StructName}}Service(db, activeStorage)
-    {{- else}}
-    service := New{{.StructName}}Service(db)
-    {{- end}}
-    controller := New{{.StructName}}Controller(service, activeStorage)
+    service := New{{.StructName}}Service(db, emitter, storage, log)
+    controller := New{{.StructName}}Controller(service, storage)
 
     m := &Module{
         DB:         db,
-        Controller: controller,
         Service:    service,
-        {{- if .HasImageField}}
-        ActiveStorage: activeStorage,
-        {{- end}}
+        Controller: controller,
+        Logger:     &log,
+        Storage:    storage,
     }
-
-    m.Routes(router)
-    m.Migrate()
 
     return m
 }

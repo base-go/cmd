@@ -15,10 +15,10 @@ import (
 	"golang.org/x/text/language"
 )
 
-var pluralizeClient *pluralize.Client
+var PluralizeClient *pluralize.Client
 
 func init() {
-	pluralizeClient = pluralize.NewClient()
+	PluralizeClient = pluralize.NewClient()
 }
 
 func GetGoType(t string) string {
@@ -49,7 +49,7 @@ func ToTitle(s string) string {
 }
 
 func ToLowerPlural(s string) string {
-	return strings.ToLower(pluralizeClient.Plural(s))
+	return strings.ToLower(PluralizeClient.Plural(s))
 }
 
 func ToSnakeCase(s string) string {
@@ -107,7 +107,7 @@ func splitIntoWords(s string) []string {
 }
 
 func ToPlural(s string) string {
-	return pluralizeClient.Plural(s)
+	return PluralizeClient.Plural(s)
 }
 
 func UpdateInitFile(singularName, pluralName string) error {
@@ -182,7 +182,7 @@ func UpdateInitFileForDestroy(singularName string) error {
 	// Remove import while preserving formatting
 	importPath := fmt.Sprintf(`"base/app/%s"`, packageName)
 	importMarker := "// MODULE_IMPORT_MARKER"
-	
+
 	// Find the marker and remove the import
 	markerIndex := strings.Index(contentStr, importMarker)
 	if markerIndex != -1 {
@@ -198,7 +198,7 @@ func UpdateInitFileForDestroy(singularName string) error {
 	// Remove module initializer
 	initializerPattern := fmt.Sprintf(`\n\s*"%s":\s*func\(db \*gorm\.DB,\s*router \*gin\.RouterGroup,\s*log logger\.Logger,\s*emitter \*emitter\.Emitter,\s*activeStorage \*storage\.ActiveStorage\) module\.Module \{[^}]+\},\n`, packageName)
 	re := regexp.MustCompile(initializerPattern)
-	
+
 	// Find and remove the module initializer
 	contentStr = re.ReplaceAllString(contentStr, "\n")
 

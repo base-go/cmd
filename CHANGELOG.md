@@ -5,6 +5,15 @@ All notable changes to the Base CLI tool will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.1.2] - 2025-01-21
+
+### Fixed
+- Fixed logger interface consistency across modules
+- Fixed attachment deletion in controllers to use direct field access
+- Improved template code to handle logger interfaces correctly
+- Simplified field processing in template generation
+- Removed unused code and simplified relationship handling
+
 ## [v1.1.1] - 2025-01-14
 
 ### Fixed
@@ -112,6 +121,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Model layer with GORM integration
 - Basic project structure
 
+[v1.1.2]: https://github.com/base-go/cmd/releases/tag/v1.1.2
 [v1.1.1]: https://github.com/base-go/cmd/releases/tag/v1.1.1
 [v1.1.0]: https://github.com/base-go/cmd/releases/tag/v1.1.0
 [v1.0.14]: https://github.com/base-go/cmd/releases/tag/v1.0.14

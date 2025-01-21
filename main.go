@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/base-go/cmd/cmd"
+	commands "github.com/base-go/cmd/commands"
 )
 
 func main() {
-	if err := cmd.Execute(); err != nil {
+	if err := commands.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}

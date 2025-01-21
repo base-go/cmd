@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-//go:embed templates/air.tmpl
+//go:embed "templates/air.tmpl"
 var airTemplate string
 
 // GenerateAirFileFromTemplate generates the air.toml configuration file from template
@@ -22,8 +22,9 @@ func GenerateAirFileFromTemplate(dir string) error {
 	}
 	defer f.Close()
 
-	// Write the template content directly
-	if _, err := f.WriteString(airTemplate); err != nil {
+	// Write the template content to the file
+	_, err = f.WriteString(airTemplate)
+	if err != nil {
 		return fmt.Errorf("failed to write template content: %w", err)
 	}
 
