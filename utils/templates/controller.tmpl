@@ -23,27 +23,27 @@ func New{{.StructName}}Controller(service *{{.StructName}}Service, storage *stor
 
 func (c *{{.StructName}}Controller) Routes(router *gin.RouterGroup) {
     // Main CRUD endpoints
-    router.GET("/{{toLower .PluralName}}", c.List)       // Paginated list
-    router.GET("/{{toLower .PluralName}}/all", c.ListAll) // Unpaginated list
-    router.GET("/{{toLower .PluralName}}/:id", c.Get)
-    router.POST("/{{toLower .PluralName}}", c.Create)
-    router.PUT("/{{toLower .PluralName}}/:id", c.Update)
-    router.DELETE("/{{toLower .PluralName}}/:id", c.Delete)
+    router.GET("/{{ToKebabCase .PackageName}}", c.List)       // Paginated list
+    router.GET("/{{ToKebabCase .PackageName}}/all", c.ListAll) // Unpaginated list
+    router.GET("/{{ToKebabCase .PackageName}}/:id", c.Get)
+    router.POST("/{{ToKebabCase .PackageName}}", c.Create)
+    router.PUT("/{{ToKebabCase .PackageName}}/:id", c.Update)
+    router.DELETE("/{{ToKebabCase .PackageName}}/:id", c.Delete)
 
     // File/Image attachment endpoints
     {{- range .Fields}}
     {{- if or (eq .Relationship "attachment") (eq .Relationship "file") (eq .Relationship "image")}}
-    router.PUT("/{{toLower $.PluralName}}/:id/{{toLower .Name}}", c.Upload{{.Name}})
-    router.DELETE("/{{toLower $.PluralName}}/:id/{{toLower .Name}}", c.Delete{{.Name}})
+    router.PUT("/{{ToKebabCase $.PackageName}}/:id/{{ToKebabCase .Name}}", c.Upload{{.Name}})
+    router.DELETE("/{{ToKebabCase $.PackageName}}/:id/{{ToKebabCase .Name}}", c.Delete{{.Name}})
     {{- end}}
     {{- end}}
 
     // HasMany relation endpoints
     {{- range .Fields}}
     {{- if eq .Relationship "hasMany"}}
-    router.GET("/{{toLower $.PluralName}}/:id/{{toLower .Name}}", c.List{{.Name}})
-    router.POST("/{{toLower $.PluralName}}/:id/{{toLower .Name}}", c.Add{{.Name}})
-    router.DELETE("/{{toLower $.PluralName}}/:id/{{toLower .Name}}/:relatedId", c.Remove{{.Name}})
+    router.GET("/{{ToKebabCase $.PackageName}}/:id/{{ToKebabCase .Name}}", c.List{{.Name}})
+    router.POST("/{{ToKebabCase $.PackageName}}/:id/{{ToKebabCase .Name}}", c.Add{{.Name}})
+    router.DELETE("/{{ToKebabCase $.PackageName}}/:id/{{ToKebabCase .Name}}/:relatedId", c.Remove{{.Name}})
     {{- end}}
     {{- end}}
 }
@@ -55,11 +55,11 @@ func (c *{{.StructName}}Controller) Routes(router *gin.RouterGroup) {
 // @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Param {{toLower .PluralName}} body models.Create{{.StructName}}Request true "Create {{.StructName}} request"
+// @Param {{ToKebabCase $.PackageName}} body models.Create{{.StructName}}Request true "Create {{.StructName}} request"
 // @Success 201 {object} models.{{.StructName}}Response
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /{{toLower .PluralName}} [post]
+// @Router /{{ToKebabCase $.PackageName}} [post]
 func (c *{{.StructName}}Controller) Create(ctx *gin.Context) {
     var req models.Create{{.StructName}}Request
     if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -87,7 +87,7 @@ func (c *{{.StructName}}Controller) Create(ctx *gin.Context) {
 // @Success 200 {object} models.{{.StructName}}Response
 // @Failure 400 {object} ErrorResponse
 // @Failure 404 {object} ErrorResponse
-// @Router /{{toLower .PluralName}}/{id} [get]
+// @Router /{{ToKebabCase $.PackageName}}/{id} [get]
 func (c *{{.StructName}}Controller) Get(ctx *gin.Context) {
     id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
     if err != nil {
@@ -105,8 +105,8 @@ func (c *{{.StructName}}Controller) Get(ctx *gin.Context) {
 }
 
 // List{{.PluralName}} godoc
-// @Summary List {{toLower .PluralName}}
-// @Description Get a list of {{toLower .PluralName}}
+// @Summary List {{ToKebabCase $.PackageName}}
+// @Description Get a list of {{ToKebabCase $.PackageName}}
 // @Tags {{.StructName}}
 // @Security ApiKeyAuth
 // @Accept json
@@ -116,7 +116,7 @@ func (c *{{.StructName}}Controller) Get(ctx *gin.Context) {
 // @Success 200 {object} types.PaginatedResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /{{toLower .PluralName}} [get]
+// @Router /{{ToKebabCase $.PackageName}} [get]
 func (c *{{.StructName}}Controller) List(ctx *gin.Context) {
     var page, limit *int
 
@@ -148,15 +148,15 @@ func (c *{{.StructName}}Controller) List(ctx *gin.Context) {
 }
 
 // ListAll{{.PluralName}} godoc
-// @Summary List all {{toLower .PluralName}} without pagination
-// @Description Get a list of all {{toLower .PluralName}} without pagination
+// @Summary List all {{ToKebabCase $.PackageName}} without pagination
+// @Description Get a list of all {{ToKebabCase $.PackageName}} without pagination
 // @Tags {{.StructName}}
 // @Security ApiKeyAuth
 // @Accept json
 // @Produce json
 // @Success 200 {object} types.PaginatedResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /{{toLower .PluralName}}/all [get]
+// @Router /{{ToKebabCase $.PackageName}}/all [get]
 func (c *{{.StructName}}Controller) ListAll(ctx *gin.Context) {
     paginatedResponse, err := c.Service.GetAll(nil, nil)
     if err != nil {
@@ -175,12 +175,12 @@ func (c *{{.StructName}}Controller) ListAll(ctx *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "{{.StructName}} id"
-// @Param {{toLower .PluralName}} body models.Update{{.StructName}}Request true "Update {{.StructName}} request"
+// @Param {{ToKebabCase $.PackageName}} body models.Update{{.StructName}}Request true "Update {{.StructName}} request"
 // @Success 200 {object} models.{{.StructName}}Response
 // @Failure 400 {object} ErrorResponse
 // @Failure 404 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /{{toLower .PluralName}}/{id} [put]
+// @Router /{{ToKebabCase $.PackageName}}/{id} [put]
 func (c *{{.StructName}}Controller) Update(ctx *gin.Context) {
     id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
     if err != nil {
@@ -214,7 +214,7 @@ func (c *{{.StructName}}Controller) Update(ctx *gin.Context) {
 // @Success 200 {object} SuccessResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /{{toLower .PluralName}}/{id} [delete]
+// @Router /{{ToKebabCase $.PackageName}}/{id} [delete]
 func (c *{{.StructName}}Controller) Delete(ctx *gin.Context) {
     id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
     if err != nil {

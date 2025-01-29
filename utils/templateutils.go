@@ -161,6 +161,7 @@ func GenerateFileFromTemplate(dir, filename, templateName, structName, pluralNam
 			return HasFieldType(fields, fieldType)
 		},
 		"ToPascalCase": ToPascalCase,
+		"ToKebabCase":  ToKebabCase,
 		"ToPlural":     ToPlural,
 	}
 
