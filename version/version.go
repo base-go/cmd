@@ -90,6 +90,9 @@ func HasUpdate(current, latest string) bool {
 	if current == "dev" {
 		return true
 	}
+	// Normalize versions by removing 'v' prefix if present
+	current = strings.TrimPrefix(current, "v")
+	latest = strings.TrimPrefix(latest, "v")
 	// If versions are equal, there's no update
 	if current == latest {
 		return false
