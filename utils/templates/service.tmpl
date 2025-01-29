@@ -159,6 +159,15 @@ func (s *{{.StructName}}Service) GetAll(page *int, limit *int) (*types.Paginated
     var items []*models.{{.StructName}}
     var total int64
     query := s.DB.Model(&models.{{.StructName}}{})
+    // Set default values if nil
+	defaultPage := 1
+	defaultLimit := 10
+	if page == nil {
+		page = &defaultPage
+	}
+	if limit == nil {
+		limit = &defaultLimit
+	}
 
     // Get total count
     if err := query.Count(&total).Error; err != nil {
