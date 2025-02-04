@@ -53,6 +53,7 @@ func (c *{{.StructName}}Controller) Routes(router *gin.RouterGroup) {
 // @Description Create a new {{.StructName}} with the input payload
 // @Tags {{.StructName}}
 // @Security ApiKeyAuth
+// @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Param {{ToKebabCase $.PackageName}} body models.Create{{.StructName}}Request true "Create {{.StructName}} request"
@@ -81,6 +82,7 @@ func (c *{{.StructName}}Controller) Create(ctx *gin.Context) {
 // @Description Get a {{.StructName}} by its id
 // @Tags {{.StructName}}
 // @Security ApiKeyAuth
+// @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Param id path int true "{{.StructName}} id"
@@ -109,6 +111,7 @@ func (c *{{.StructName}}Controller) Get(ctx *gin.Context) {
 // @Description Get a list of {{ToKebabCase $.PackageName}}
 // @Tags {{.StructName}}
 // @Security ApiKeyAuth
+// @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Param page query int false "Page number"
@@ -152,6 +155,7 @@ func (c *{{.StructName}}Controller) List(ctx *gin.Context) {
 // @Description Get a list of all {{ToKebabCase $.PackageName}} without pagination
 // @Tags {{.StructName}}
 // @Security ApiKeyAuth
+// @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Success 200 {object} types.PaginatedResponse
@@ -172,6 +176,7 @@ func (c *{{.StructName}}Controller) ListAll(ctx *gin.Context) {
 // @Description Update a {{.StructName}} by its id
 // @Tags {{.StructName}}
 // @Security ApiKeyAuth
+// @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Param id path int true "{{.StructName}} id"
@@ -208,6 +213,7 @@ func (c *{{.StructName}}Controller) Update(ctx *gin.Context) {
 // @Description Delete a {{.StructName}} by its id
 // @Tags {{.StructName}}
 // @Security ApiKeyAuth
+// @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Param id path int true "{{.StructName}} id"
@@ -238,6 +244,7 @@ func (c *{{.StructName}}Controller) Delete(ctx *gin.Context) {
 // @Description Upload or update the {{.Name}} of a {{$.StructName}}
 // @Tags {{$.StructName}}
 // @Security ApiKeyAuth
+// @Security BearerAuth
 // @Accept multipart/form-data
 // @Produce json
 // @Param id path int true "{{$.StructName}} id"
@@ -289,6 +296,7 @@ func (c *{{$.StructName}}Controller) Upload{{.Name}}(ctx *gin.Context) {
 // @Description Delete the {{.Name}} of a {{$.StructName}}
 // @Tags {{$.StructName}}
 // @Security ApiKeyAuth
+// @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Param id path int true "{{$.StructName}} id"
@@ -341,6 +349,7 @@ func (c *{{$.StructName}}Controller) Delete{{.Name}}(ctx *gin.Context) {
 // @Description Get a list of {{.Name}} for a {{$.StructName}}
 // @Tags {{$.StructName}}
 // @Security ApiKeyAuth
+// @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Param id path int true "{{$.StructName}} id"
@@ -391,6 +400,7 @@ func (c *{{$.StructName}}Controller) List{{.Name}}(ctx *gin.Context) {
 // @Description Add {{.Name}} to a {{$.StructName}}
 // @Tags {{$.StructName}}
 // @Security ApiKeyAuth
+// @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Param id path int true "{{$.StructName}} id"
@@ -427,6 +437,7 @@ func (c *{{$.StructName}}Controller) Add{{.Name}}(ctx *gin.Context) {
 // @Description Remove {{.Name}} from a {{$.StructName}}
 // @Tags {{$.StructName}}
 // @Security ApiKeyAuth
+// @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Param id path int true "{{$.StructName}} id"
