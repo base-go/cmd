@@ -5,6 +5,20 @@ All notable changes to the Base CLI tool will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.2.0] - 2025-02-06
+
+### Added
+- New `base package` command for better package management
+  - `base package add [namespace/package]` to install packages from GitHub (e.g., `base package add base-packages/gamification`)
+  - `base package add [URL]` to install packages from any Git repository
+  - `base package remove [package]` to remove installed packages
+- Automatic module initialization in start.go when adding packages
+- List official packages when running `base package add` without arguments
+
+### Changed
+- Reorganized package management commands from `base add` to `base package add/remove`
+- Improved package installation with better error handling and import organization
+
 ## [v1.1.9] - 2025-02-06
 
 ### Added
@@ -157,6 +171,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Model layer with GORM integration
 - Basic project structure
 
+[v1.2.0]: https://github.com/base-go/cmd/releases/tag/v1.2.0
 [v1.1.9]: https://github.com/base-go/cmd/releases/tag/v1.1.9
 [v1.1.8]: https://github.com/base-go/cmd/releases/tag/v1.1.8
 [v1.1.7]: https://github.com/base-go/cmd/releases/tag/v1.1.7
