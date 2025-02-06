@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,22 +25,6 @@ type Asset struct {
 type Release struct {
 	TagName string  `json:"tag_name"`
 	Assets  []Asset `json:"assets"`
-}
-
-func getLatestRelease() (*Release, error) {
-	url := "https://api.github.com/repos/base-go/cmd/releases/latest"
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var release Release
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return nil, err
-	}
-
-	return &release, nil
 }
 
 func extractTarGz(gzipStream io.Reader, targetPath string) error {

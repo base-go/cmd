@@ -107,7 +107,7 @@ type Update{{.StructName}}Request struct {
     {{- else if eq .Relationship "belongs_to"}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id,omitempty"`
     {{- else if ne .Relationship "has_many"}}
-    {{.Name}} string `json:"{{.JSONName}},omitempty"`
+    {{.Name}} {{.Type}}  `json:"{{.JSONName}},omitempty"`
     {{- end}}
     {{- end}}
 }
