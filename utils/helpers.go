@@ -27,7 +27,7 @@ func GetGoType(t string) string {
 		return "int"
 	case "string", "text":
 		return "string"
-	case "datetime", "time":
+	case "datetime", "time", "date":
 		return "types.DateTime"
 	case "float":
 		return "float64"

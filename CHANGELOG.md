@@ -5,6 +5,25 @@ All notable changes to the Base CLI tool will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.2.2] - 2025-03-18
+
+### Changed
+- Updated model template to improve database compatibility:
+  - Changed attachment field gorm tag from `polymorphic:Model` to `foreignKey:ModelId;references:Id`
+  - Updated table name and model name functions to use `ToSnakeCase` instead of `toLower` for proper snake_case formatting
+- Fixed boolean field handling in Update requests to use pointer types
+
+## [v1.2.1] - 2025-03-18
+
+### Fixed
+- Fixed field type handling in service template for Update method:
+  - Boolean fields now use pointer check instead of string comparison
+  - Date/time fields now use IsZero() method for proper validation
+  - Integer and float fields use appropriate zero value checks
+  - String fields continue to use empty string check
+- Updated model template to use pointer types for boolean fields in Update request struct
+- This fixes issues with boolean fields being incorrectly compared to empty strings and compiler errors related to nil checks on non-pointer boolean fields
+
 ## [v1.2.0] - 2025-02-06
 
 ### Added

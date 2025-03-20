@@ -37,7 +37,7 @@ type {{.StructName}} struct {
 
 // TableName returns the table name for the {{.StructName}} model
 func (item *{{.StructName}}) TableName() string {
-    return "{{toLower .PluralName}}"
+    return "{{ToSnakeCase .PluralName}}"
 }
 
 // GetId returns the Id of the model
@@ -47,7 +47,7 @@ func (item *{{.StructName}}) GetId() uint {
 
 // GetModelName returns the model name
 func (item *{{.StructName}}) GetModelName() string {
-    return "{{toLower .StructName}}"
+    return "{{ToSnakeCase .StructName}}"
 }
 
 // {{.StructName}}ListResponse represents the list view response
@@ -107,7 +107,11 @@ type Update{{.StructName}}Request struct {
     {{- else if eq .Relationship "belongs_to"}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id,omitempty"`
     {{- else if ne .Relationship "has_many"}}
+    {{- if eq .Type "bool"}}
+    {{.Name}} *{{.Type}}  `json:"{{.JSONName}},omitempty"`
+    {{- else}}
     {{.Name}} {{.Type}}  `json:"{{.JSONName}},omitempty"`
+    {{- end}}
     {{- end}}
     {{- end}}
 }
