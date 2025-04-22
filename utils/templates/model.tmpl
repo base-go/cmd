@@ -23,7 +23,7 @@ type {{.StructName}} struct {
     DeletedAt gorm.DeletedAt `json:"deleted_at,omitempty" gorm:"index"`
     {{- range .Fields}}
     {{- if eq .Type "*storage.Attachment"}}
-    {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty" gorm:"polymorphic:Model"`
+    {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:ModelId;references:Id"`
     {{- else if eq .Relationship "belongs_to"}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id"`
     {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty"`
