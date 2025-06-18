@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/base-go/cmd/utils"
+	"github.com/BaseTechStack/basecmd/utils"
 	"github.com/spf13/cobra"
 )
 

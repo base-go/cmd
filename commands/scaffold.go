@@ -10,21 +10,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var generateCmd = &cobra.Command{
-	Use:     "generate [name] [field:type...]",
+var scaffoldCmd = &cobra.Command{
+	Use:     "scaffold [name] [field:type...]",
 	Aliases: []string{"g"},
-	Short:   "Generate a new module",
-	Long:    `Generate a new module with the specified name and fields. Use --admin flag to generate admin interface.`,
+	Short:   "scaffold a new module",
+	Long:    `scaffold a new module with the specified name and fields. Use --admin flag to scaffold admin interface.`,
 	Args:    cobra.MinimumNArgs(1),
-	Run:     generateModule,
+	Run:     scaffoldModule,
 }
 
 func init() {
-	rootCmd.AddCommand(generateCmd)
+	rootCmd.AddCommand(scaffoldCmd)
 }
 
-// generateModule generates a new module with the specified name and fields.
-func generateModule(cmd *cobra.Command, args []string) {
+// scaffoldModule scaffolds a new module with the specified name and fields.
+func scaffoldModule(cmd *cobra.Command, args []string) {
 	singularName := args[0]
 	fields := args[1:]
 

@@ -37,10 +37,10 @@ for PLATFORM in "${PLATFORMS[@]}"; do
 
     # Build
     GOOS=$OS GOARCH=$ARCH go build \
-        -ldflags "-X 'github.com/base-go/cmd/version.Version=$VERSION' \
-                  -X 'github.com/base-go/cmd/version.CommitHash=$COMMIT_HASH' \
-                  -X 'github.com/base-go/cmd/version.BuildDate=$BUILD_DATE' \
-                  -X 'github.com/base-go/cmd/version.GoVersion=$GO_VERSION'" \
+        -ldflags "-X 'github.com/BaseTechStack/basecmd/version.Version=$VERSION' \
+                  -X 'github.com/BaseTechStack/basecmd/version.CommitHash=$COMMIT_HASH' \
+                  -X 'github.com/BaseTechStack/basecmd/version.BuildDate=$BUILD_DATE' \
+                  -X 'github.com/BaseTechStack/basecmd/version.GoVersion=$GO_VERSION'" \
         -o "$BINARY"
 
     # Create archive

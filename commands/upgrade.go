@@ -13,7 +13,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/base-go/cmd/version"
+	"github.com/BaseTechStack/basecmd/version"
 	"github.com/spf13/cobra"
 )
 
