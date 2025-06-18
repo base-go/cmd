@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/base-go/cmd/version"
+	"github.com/BaseTechStack/basecmd/version"
 	"github.com/spf13/cobra"
 )
 
@@ -27,8 +27,6 @@ It provides scaffolding, code generation, and development utilities.`,
 						release.HTMLURL,
 						release.Body,
 					))
-				} else {
-					fmt.Printf("\n✨ You're up to date! Using the latest version %s\n", info.Version)
 				}
 			} else {
 				fmt.Println("Failed to check for updates:", err)

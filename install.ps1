@@ -2,7 +2,7 @@
 
 # Function to get the latest release version
 function Get-LatestRelease {
-    $releaseUrl = "https://api.github.com/repos/base-go/cmd/releases/latest"
+    $releaseUrl = "https://api.github.com/repos/BaseTechStack/basecmd/releases/latest"
     try {
         $release = Invoke-RestMethod -Uri $releaseUrl -ErrorAction Stop
         return $release.tag_name
@@ -40,7 +40,7 @@ $version = Get-LatestRelease
 Write-Host "Latest version: $version"
 
 # Download URL
-$downloadUrl = "https://github.com/base-go/cmd/releases/download/$version/base_windows_$arch.zip"
+$downloadUrl = "https://github.com/BaseTechStack/basecmd/releases/download/$version/base_windows_$arch.zip"
 $zipPath = Join-Path $env:TEMP "base.zip"
 $exePath = Join-Path $installDir "base.exe"
 $binPath = Join-Path $binDir "base.exe"

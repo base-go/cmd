@@ -1,4 +1,4 @@
-module github.com/base-go/cmd
+module github.com/BaseTechStack/basecmd
 
 go 1.23.4
 
@@ -13,4 +13,4 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 )
 
-replace github.com/base-go/cmd => ./
+replace github.com/BaseTechStack/basecmd => ./
