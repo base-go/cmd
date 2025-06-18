@@ -52,9 +52,20 @@ echo "OS: $OS"
 echo "Architecture: $ARCH"
 
 # Get the latest release version
-LATEST_RELEASE=$(curl -s https://api.github.com/repos/BaseTechStack/basecmd/releases/latest | grep "tag_name" | cut -d '"' -f 4)
+echo "Fetching latest release information..."
+API_RESPONSE=$(curl -s https://api.github.com/repos/BaseTechStack/basecmd/releases/latest)
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to fetch release information"
+    exit 1
+fi
+
+LATEST_RELEASE=$(echo "$API_RESPONSE" | grep '"tag_name"' | head -n1 | cut -d '"' -f 4)
 if [ -z "$LATEST_RELEASE" ]; then
     echo "Error: Could not determine latest version"
+    echo "API Response debug info:"
+    echo "$API_RESPONSE" | head -n 10
+    echo "Please check if the repository exists and has releases"
+    echo "Repository: https://github.com/BaseTechStack/basecmd"
     exit 1
 fi
 
