@@ -111,6 +111,35 @@ cd - > /dev/null
 rm -rf "$TMP_DIR"
 
 echo "Base CLI has been installed successfully!"
+
+# Install Go dependencies
+echo ""
+echo "Installing Base CLI dependencies..."
+
+# Check if Go is installed
+if command -v go >/dev/null 2>&1; then
+    echo "Installing Air (hot reloading tool)..."
+    if ! go install github.com/air-verse/air@latest 2>/dev/null; then
+        echo "Warning: Failed to install Air. You can install it manually later with:"
+        echo "  go install github.com/air-verse/air@latest"
+    else
+        echo "✓ Air installed successfully"
+    fi
+    
+    echo "Installing Swag (Swagger documentation generator)..."
+    if ! go install github.com/swaggo/swag/cmd/swag@latest 2>/dev/null; then
+        echo "Warning: Failed to install Swag. You can install it manually later with:"
+        echo "  go install github.com/swaggo/swag/cmd/swag@latest"
+    else
+        echo "✓ Swag installed successfully"
+    fi
+else
+    echo "Warning: Go is not installed or not in PATH."
+    echo "Base CLI dependencies (Air and Swag) will be installed automatically when needed."
+    echo "To install Go, visit: https://golang.org/dl/"
+fi
+
+echo ""
 echo "Run 'base --help' to get started"
 
 # Add to PATH for Windows if needed
