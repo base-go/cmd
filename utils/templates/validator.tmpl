@@ -74,7 +74,7 @@ func Validate{{ .StructName }}CreateRequest(req *models.Create{{ .StructName }}R
 	// Collect all struct tag validation errors
 	if err := validate.Struct(req); err != nil {
 		for _, errMsg := range CollectStructValidationErrors(err) {
-			validationErrors.AddError(errMsg)
+			validationErrors.AddError("%s", errMsg)
 		}
 	}
 
@@ -130,7 +130,7 @@ func Validate{{ .StructName }}UpdateRequest(req *models.Update{{ .StructName }}R
 	if req != nil && id != 0 {
 		if err := validate.Struct(req); err != nil {
 			for _, errMsg := range CollectStructValidationErrors(err) {
-				validationErrors.AddError(errMsg)
+				validationErrors.AddError("%s", errMsg)
 			}
 		}
 	}
