@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 var packageCmd = &cobra.Command{
@@ -176,7 +178,7 @@ func addModuleInitializer(packageName string) error {
 	}
 
 	// Convert package name to PascalCase for the struct name
-	structName := strings.Title(packageName)
+	structName := cases.Title(language.AmericanEnglish).String(packageName)
 
 	initializerCode := fmt.Sprintf(`
 	// Initialize %s modules

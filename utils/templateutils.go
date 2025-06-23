@@ -21,6 +21,9 @@ var serviceTemplate string
 //go:embed templates/module.tmpl
 var moduleTemplate string
 
+//go:embed templates/validator.tmpl
+var validatorTemplate string
+
 // FieldStruct represents a field in the model
 type FieldStruct struct {
 	Name            string
@@ -147,6 +150,8 @@ func GenerateFileFromTemplate(dir, filename, templateName, structName, pluralNam
 		tmplContent = serviceTemplate
 	case "module.tmpl":
 		tmplContent = moduleTemplate
+	case "validator.tmpl":
+		tmplContent = validatorTemplate
 	default:
 		fmt.Printf("Unknown template: %s\n", templateName)
 		return

@@ -98,6 +98,17 @@ func generateModule(cmd *cobra.Command, args []string) {
 		fieldStructs,
 	)
 
+	// Generate Validator
+	utils.GenerateFileFromTemplate(
+		filepath.Join("app", pluralDirName),
+		"validator.go",
+		"validator.tmpl",
+		structName,
+		pluralName,
+		packageName,
+		fieldStructs,
+	)
+
 	// Update init.go
 	if err := utils.UpdateInitGo(pluralDirName, structName); err != nil {
 		fmt.Printf("Error updating init.go: %v\n", err)
