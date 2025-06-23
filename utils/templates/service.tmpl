@@ -10,6 +10,7 @@ import (
     "base/core/storage"
     "base/core/logger"
     "base/app/models"
+    "{{.PackageName}}/validators"
 )
 
 const (
@@ -35,6 +36,13 @@ func New{{.StructName}}Service(db *gorm.DB, emitter *emitter.Emitter, storage *s
 }
 
 func (s *{{.StructName}}Service) Create(req *models.Create{{.StructName}}Request) (*models.{{.StructName}}, error) {
+    // Validate request
+    if err := Validate{{.StructName}}CreateRequest(req); err != nil {
+        s.Logger.Error("validation error for {{toLower .StructName}} create", 
+            logger.String("error", err.Error()))
+        return nil, err
+    }
+    
     item := &models.{{.StructName}}{
         {{- range .Fields}}
         {{- if eq .Type "*storage.Attachment"}}
@@ -59,12 +67,25 @@ func (s *{{.StructName}}Service) Create(req *models.Create{{.StructName}}Request
 }
 
 func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName}}Request) (*models.{{.StructName}}, error) {
+    // Validate request and ID
+    if err := Validate{{.StructName}}UpdateRequest(req, id); err != nil {
+        s.Logger.Error("validation error for {{toLower .StructName}} update", 
+            logger.String("error", err.Error()),
+            logger.Int("id", int(id)))
+        return nil, err
+    }
+    
     item := &models.{{.StructName}}{}
     if err := s.DB.First(item, id).Error; err != nil {
         s.Logger.Error("failed to find {{toLower .StructName}} for update", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
         return nil, fmt.Errorf("failed to find {{toLower .StructName}}: %w", err)
+    }
+
+    // Validate request
+    if err := Validate{{.StructName}}UpdateRequest(item); err != nil {
+        return nil, err
     }
 
     // Build updates map
@@ -128,6 +149,14 @@ func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName
 }
 
 func (s *{{.StructName}}Service) Delete(id uint) error {
+    // Validate ID
+    if err := Validate{{.StructName}}DeleteRequest(id); err != nil {
+        s.Logger.Error("validation error for {{toLower .StructName}} delete", 
+            logger.String("error", err.Error()),
+            logger.Int("id", int(id)))
+        return err
+    }
+    
     item := &models.{{.StructName}}{}
     if err := s.DB.First(item, id).Error; err != nil {
         s.Logger.Error("failed to find {{toLower .StructName}} for deletion", 
@@ -164,6 +193,14 @@ func (s *{{.StructName}}Service) Delete(id uint) error {
 }
 
 func (s *{{.StructName}}Service) GetById(id uint) (*models.{{.StructName}}, error) {
+    // Validate ID
+    if err := ValidateID(id); err != nil {
+        s.Logger.Error("validation error for {{toLower .StructName}} get", 
+            logger.String("error", err.Error()),
+            logger.Int("id", int(id)))
+        return nil, err
+    }
+    
     item := &models.{{.StructName}}{}
     
     query := item.Preload(s.DB)

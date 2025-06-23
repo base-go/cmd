@@ -5,6 +5,17 @@ All notable changes to the Base CLI tool will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.2.3] - 2025-06-23
+
+### Added
+- Enhanced validator template to collect and return all validation errors instead of just the first one
+- Added custom ValidationErrors type that implements the error interface for better error handling
+- Improved validation error messages with field name, validation rule, and invalid value information
+
+### Changed
+- Updated service template to use centralized validation from validator template
+- Added validation calls in all CRUD operations (Create, Update, Delete, GetById)
+
 ## [v1.2.2] - 2025-03-18
 
 ### Changed
@@ -190,6 +201,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Model layer with GORM integration
 - Basic project structure
 
+[v1.2.3]: https://github.com/BaseTechStack/basecmd/releases/tag/v1.2.3
+[v1.2.2]: https://github.com/BaseTechStack/basecmd/releases/tag/v1.2.2
+[v1.2.1]: https://github.com/BaseTechStack/basecmd/releases/tag/v1.2.1
 [v1.2.0]: https://github.com/BaseTechStack/basecmd/releases/tag/v1.2.0
 [v1.1.9]: https://github.com/BaseTechStack/basecmd/releases/tag/v1.1.9
 [v1.1.8]: https://github.com/BaseTechStack/basecmd/releases/tag/v1.1.8
