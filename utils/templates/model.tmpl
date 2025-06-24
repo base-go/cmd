@@ -101,6 +101,7 @@ type Create{{.StructName}}Request struct {
 
 // Update{{.StructName}}Request represents the request payload for updating a {{.StructName}}
 type Update{{.StructName}}Request struct {
+    Id uint `json:"id" binding:"required"`
     {{- range .Fields}}
     {{- if eq .Type "*storage.Attachment"}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty"`

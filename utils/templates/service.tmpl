@@ -75,7 +75,7 @@ func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName
         return nil, err
     }
     
-    item := &models.{{.StructName}}{}
+    item := &models.Update{{.StructName}}Request{}
     if err := s.DB.First(item, id).Error; err != nil {
         s.Logger.Error("failed to find {{toLower .StructName}} for update", 
             logger.String("error", err.Error()),
@@ -84,7 +84,7 @@ func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName
     }
 
     // Validate request
-    if err := Validate{{.StructName}}UpdateRequest(item); err != nil {
+    if err := Validate{{.StructName}}UpdateRequest(item, id); err != nil {
         return nil, err
     }
 
