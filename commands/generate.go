@@ -125,6 +125,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 	}
 
 	// Run goimports on the model file
+	modelPath = filepath.Join("app", "models", fmt.Sprintf("%s.go", dirName))
 	if err := exec.Command("goimports", "-w", modelPath).Run(); err != nil {
 		fmt.Printf("Error running goimports on %s: %v\n", modelPath, err)
 	}

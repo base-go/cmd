@@ -99,7 +99,7 @@ func (c *{{.StructName}}Controller) Get(ctx *gin.Context) {
 
     item, err := c.Service.GetById(uint(id))
     if err != nil {
-        ctx.JSON(http.StatusNotFound, ErrorResponse{Error: "Item not found"})
+        ctx.JSON(http.StatusOK, ErrorResponse{Error: "Item not found"})
         return
     }
 
@@ -270,7 +270,7 @@ func (c *{{$.StructName}}Controller) Upload{{.Name}}(ctx *gin.Context) {
     // Get the item first
     item, err := c.Service.GetById(uint(id))
     if err != nil {
-        ctx.JSON(http.StatusNotFound, ErrorResponse{Error: "Item not found"})
+        ctx.JSON(http.StatusOK, ErrorResponse{Error: "Item not found"})
         return
     }
 
@@ -315,7 +315,7 @@ func (c *{{$.StructName}}Controller) Delete{{.Name}}(ctx *gin.Context) {
     // Get the item first
     item, err := c.Service.GetById(uint(id))
     if err != nil {
-        ctx.JSON(http.StatusNotFound, ErrorResponse{Error: "Item not found"})
+        ctx.JSON(http.StatusOK, ErrorResponse{Error: "Item not found"})
         return
     }
 

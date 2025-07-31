@@ -39,10 +39,10 @@ func (s *{{.StructName}}Service) Create(req *models.Create{{.StructName}}Request
         {{- range .Fields}}
         {{- if eq .Type "*storage.Attachment"}}
         // {{.Name}} attachment is handled via separate endpoint
-        {{- else if eq .Relationship "belongs_to"}}
-        {{.Name}}Id: req.{{.Name}}Id,
         {{- else if ne .Relationship "has_many"}}
+        {{- if ne .Relationship "belongs_to"}}
         {{.Name}}: req.{{.Name}},
+        {{- end}}
         {{- end}}
         {{- end}}
     }
@@ -72,11 +72,8 @@ func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName
     {{- range .Fields}}
     {{- if eq .Type "*storage.Attachment"}}
     // {{.Name}} attachment is handled via separate endpoint
-    {{- else if eq .Relationship "belongs_to"}}
-    if req.{{.Name}}Id != 0 {
-        updates["{{.JSONName}}_id"] = req.{{.Name}}Id
-    }
     {{- else if ne .Relationship "has_many"}}
+    {{- if ne .Relationship "belongs_to"}}
     {{- if eq .Type "bool"}}
     // For boolean fields, check if it's included in the request (pointer would be non-nil)
     if req.{{.Name}} != nil {
@@ -84,6 +81,11 @@ func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName
     }
     {{- else if eq .Type "int"}}
     // For integer fields
+    if req.{{.Name}} != 0 {
+        updates["{{.DBName}}"] = req.{{.Name}}
+    }
+    {{- else if eq .Type "uint"}}
+    // For unsigned integer fields
     if req.{{.Name}} != 0 {
         updates["{{.DBName}}"] = req.{{.Name}}
     }
@@ -102,6 +104,7 @@ func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName
     if req.{{.Name}} != "" {
         updates["{{.DBName}}"] = req.{{.Name}}
     }
+    {{- end}}
     {{- end}}
     {{- end}}
     {{- end}}

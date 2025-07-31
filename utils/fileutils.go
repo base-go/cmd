@@ -94,14 +94,11 @@ func UpdateInitGo(packageName, structName string) error {
 	}
 
 	// Create the module initializer line
-	moduleInitializer := fmt.Sprintf(`		"%s": func(db *gorm.DB, router *gin.RouterGroup, log logger.Logger, emitter *emitter.Emitter, activeStorage *storage.ActiveStorage) module.Module {
-			return %s.New%sModule(db, router, log, emitter, activeStorage)
-		},
-
+	moduleInitializer := fmt.Sprintf(`	modules["%s"] = %s.New%sModule(deps.DB)
 `, packageName, packageName, structName)
 
 	// Check if the module initializer already exists
-	if strings.Contains(contentStr, fmt.Sprintf(`"%s":`, packageName)) {
+	if strings.Contains(contentStr, fmt.Sprintf(`modules["%s"]`, packageName)) {
 		fmt.Printf("Module initializer for %s already exists in init.go\n", packageName)
 		return nil
 	}

@@ -26,10 +26,19 @@ func init() {
 func destroyModule(cmd *cobra.Command, args []string) {
 	singularName := args[0]
 	pluralName := utils.ToSnakeCase(utils.ToPlural(singularName))
+	singularDirName := utils.ToSnakeCase(singularName)
 
-	// Check if the module exists
-	moduleDir := filepath.Join("app", pluralName)
-	if _, err := os.Stat(moduleDir); os.IsNotExist(err) {
+	// Check if the module exists - try both plural and singular directory names
+	var moduleDir string
+	
+	pluralDir := filepath.Join("app", pluralName)
+	singularDir := filepath.Join("app", singularDirName)
+	
+	if _, err := os.Stat(pluralDir); err == nil {
+		moduleDir = pluralDir
+	} else if _, err := os.Stat(singularDir); err == nil {
+		moduleDir = singularDir
+	} else {
 		fmt.Printf("Module '%s' does not exist.\n", singularName)
 		return
 	}
@@ -55,15 +64,27 @@ func destroyModule(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// Delete model file
-	modelFile := filepath.Join("app", "models", utils.ToSnakeCase(singularName)+".go")
-	if err := os.Remove(modelFile); err != nil {
-		fmt.Printf("Error removing model file %s: %v\n", modelFile, err)
-		return
+	// Delete model file - check both models and model directories
+	modelFiles := []string{
+		filepath.Join("app", "models", utils.ToSnakeCase(singularName)+".go"),
+		filepath.Join("app", "model", utils.ToSnakeCase(singularName)+".go"),
+	}
+	
+	modelRemoved := false
+	for _, modelFile := range modelFiles {
+		if err := os.Remove(modelFile); err == nil {
+			fmt.Printf("Removed model file: %s\n", modelFile)
+			modelRemoved = true
+			break
+		}
+	}
+	
+	if !modelRemoved {
+		fmt.Printf("Warning: No model file found for %s\n", singularName)
 	}
 
-	// Update app/init.go to unregister the module
-	if err := utils.UpdateInitFileForDestroy(pluralName); err != nil {
+	// Update app/init.go to unregister the module - pass the singular name for module lookup
+	if err := utils.UpdateInitFileForDestroy(singularName); err != nil {
 		fmt.Printf("Error updating app/init.go: %v\n", err)
 		return
 	}

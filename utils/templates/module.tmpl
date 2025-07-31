@@ -1,66 +1,33 @@
 package {{.PackageName}}
 
 import (
-    "base/core/module"
     "base/app/models"
-    "base/core/logger"
-    "base/core/emitter"
-    "base/core/storage"
+    "base/core/module"
 
-    "github.com/gin-gonic/gin"
     "gorm.io/gorm"
 )
 
 type Module struct {
     module.DefaultModule
-    DB         *gorm.DB
-    Controller *{{.StructName}}Controller
-    Service    *{{.StructName}}Service
-    Logger     *logger.Logger
-    Storage    *storage.ActiveStorage
+    DB *gorm.DB
 }
 
-func New{{.StructName}}Module(db *gorm.DB, router *gin.RouterGroup, log logger.Logger, emitter *emitter.Emitter, storage *storage.ActiveStorage) module.Module {
-    {{- range .Fields}}
-    {{- if eq .AssociatedType "image"}}
-    // Register image attachment configuration for {{.Name}}
-    storage.RegisterAttachment("{{toLower $.StructName}}", storage.AttachmentConfig{
-        Field:             "{{.JSONName}}",
-        MaxFileSize:       5 * 1024 * 1024, // 5MB
-        AllowedExtensions: []string{".jpg", ".jpeg", ".png", ".gif", ".webp"},
-    })
-    {{- else if eq .AssociatedType "file"}}
-    // Register file attachment configuration for {{.Name}}
-    storage.RegisterAttachment("{{toLower $.StructName}}", storage.AttachmentConfig{
-        Field:             "{{.JSONName}}",
-        MaxFileSize:       50 * 1024 * 1024, // 50MB
-        AllowedExtensions: []string{".pdf", ".doc", ".docx", ".xls", ".xlsx", ".zip", ".rar"},
-    })
-    {{- end}}
-    {{- end}}
-
-    service := New{{.StructName}}Service(db, emitter, storage, log)
-    controller := New{{.StructName}}Controller(service, storage)
-
-    m := &Module{
-        DB:         db,
-        Service:    service,
-        Controller: controller,
-        Logger:     &log,
-        Storage:    storage,
+func New{{.StructName}}Module(db *gorm.DB) *Module {
+    return &Module{
+        DB: db,
     }
-
-    return m
 }
 
-func (m *Module) Routes(router *gin.RouterGroup) {
-    m.Controller.Routes(router)
+func (m *Module) Init() error {
+    return nil
 }
 
 func (m *Module) Migrate() error {
     return m.DB.AutoMigrate(&models.{{.StructName}}{})
 }
 
-func (m *Module) GetModels() []interface{} {
-    return []interface{}{&models.{{.StructName}}{}}
+func (m *Module) GetModels() []any {
+    return []any{
+        &models.{{.StructName}}{},
+    }
 }

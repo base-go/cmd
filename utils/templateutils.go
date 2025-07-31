@@ -114,6 +114,31 @@ func ProcessField(fieldDef string) []FieldStruct {
 		}}
 	}
 
+	// Auto-detect relationships based on field name ending with _id
+	if strings.HasSuffix(name, "_id") && fieldType == "uint" {
+		relationName := strings.TrimSuffix(name, "_id")
+		relatedModel := ToPascalCase(relationName)
+		
+		// Create both the foreign key field and the relationship field
+		return []FieldStruct{
+			{
+				Name:     ToPascalCase(name),
+				Type:     GetGoType(fieldType),
+				JSONName: ToSnakeCase(name),
+				DBName:   ToSnakeCase(name),
+			},
+			{
+				Name:         ToPascalCase(relationName),
+				Type:         relatedModel,
+				JSONName:     ToSnakeCase(relationName),
+				DBName:       ToSnakeCase(relationName),
+				Relationship: "belongs_to",
+				RelatedModel: relatedModel,
+				GORM:         fmt.Sprintf("foreignKey:%s", ToPascalCase(name)),
+			},
+		}
+	}
+
 	// Handle regular fields
 	return []FieldStruct{{
 		Name:     ToPascalCase(name),

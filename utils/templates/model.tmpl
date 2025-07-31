@@ -23,12 +23,11 @@ type {{.StructName}} struct {
     DeletedAt gorm.DeletedAt `json:"deleted_at,omitempty" gorm:"index"`
     {{- range .Fields}}
     {{- if eq .Type "*storage.Attachment"}}
-    {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:ModelId;references:Id"`
+    {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty" gorm:"{{.GORM}}"`
     {{- else if eq .Relationship "belongs_to"}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id"`
-    {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty"`
+    {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty" gorm:"{{.GORM}}"`
     {{- else if eq .Relationship "has_many"}}
-    {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{$.StructName}}Id;references:Id"`
+    {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty" gorm:"{{.GORM}}"`
     {{- else}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end}}
@@ -58,10 +57,12 @@ type {{.StructName}}ListResponse struct {
     {{- range .Fields}}
     {{- if eq .Type "*storage.Attachment"}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty"`
-    {{- else if eq .Relationship "belongs_to"}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id"`
     {{- else if ne .Relationship "has_many"}}
+    {{- if ne .Relationship "belongs_to"}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
+    {{- else}}
+    {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
+    {{- end}}
     {{- end}}
     {{- end}}
 }
@@ -76,7 +77,6 @@ type {{.StructName}}Response struct {
     {{- if eq .Type "*storage.Attachment"}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty"`
     {{- else if eq .Relationship "belongs_to"}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id"`
     {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty"`
     {{- else if eq .Relationship "has_many"}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty"`
@@ -91,10 +91,12 @@ type Create{{.StructName}}Request struct {
     {{- range .Fields}}
     {{- if eq .Type "*storage.Attachment"}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty"`
-    {{- else if eq .Relationship "belongs_to"}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id" binding:"required"`
     {{- else if ne .Relationship "has_many"}}
+    {{- if ne .Relationship "belongs_to"}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}" binding:"required"`
+    {{- else}}
+    {{.Name}} {{.Type}} `json:"{{.JSONName}}" binding:"required"`
+    {{- end}}
     {{- end}}
     {{- end}}
 }
@@ -104,13 +106,19 @@ type Update{{.StructName}}Request struct {
     {{- range .Fields}}
     {{- if eq .Type "*storage.Attachment"}}
     {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty"`
-    {{- else if eq .Relationship "belongs_to"}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id,omitempty"`
     {{- else if ne .Relationship "has_many"}}
+    {{- if ne .Relationship "belongs_to"}}
     {{- if eq .Type "bool"}}
     {{.Name}} *{{.Type}}  `json:"{{.JSONName}},omitempty"`
     {{- else}}
     {{.Name}} {{.Type}}  `json:"{{.JSONName}},omitempty"`
+    {{- end}}
+    {{- else}}
+    {{- if eq .Type "bool"}}
+    {{.Name}} *{{.Type}}  `json:"{{.JSONName}},omitempty"`
+    {{- else}}
+    {{.Name}} {{.Type}}  `json:"{{.JSONName}},omitempty"`
+    {{- end}}
     {{- end}}
     {{- end}}
     {{- end}}
@@ -128,10 +136,12 @@ func (item *{{.StructName}}) ToListResponse() *{{.StructName}}ListResponse {
         {{- range .Fields}}
         {{- if eq .Type "*storage.Attachment"}}
         {{.Name}}: item.{{.Name}},
-        {{- else if eq .Relationship "belongs_to"}}
-        {{.Name}}Id: item.{{.Name}}Id,
         {{- else if ne .Relationship "has_many"}}
+        {{- if ne .Relationship "belongs_to"}}
         {{.Name}}: item.{{.Name}},
+        {{- else}}
+        {{.Name}}: item.{{.Name}},
+        {{- end}}
         {{- end}}
         {{- end}}
     }
@@ -151,7 +161,6 @@ func (item *{{.StructName}}) ToResponse() *{{.StructName}}Response {
         {{- if eq .Type "*storage.Attachment"}}
         {{.Name}}: item.{{.Name}},
         {{- else if eq .Relationship "belongs_to"}}
-        {{.Name}}Id: item.{{.Name}}Id,
         {{.Name}}: item.{{.Name}},
         {{- else if eq .Relationship "has_many"}}
         {{.Name}}: item.{{.Name}},
