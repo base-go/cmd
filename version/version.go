@@ -12,7 +12,7 @@ import (
 // Version information
 var (
 	// Version is the current version of Base CLI
-	Version = "1.1.1"
+	Version = "2.0.0"
 
 	// CommitHash is the git commit hash at build time
 	CommitHash = "unknown"
@@ -65,7 +65,7 @@ func (bi BuildInfo) String() string {
 
 // CheckLatestVersion checks GitHub for newer releases
 func CheckLatestVersion() (*Release, error) {
-	url := "https://api.github.com/repos/base-go/cmd/releases/latest"
+	url := "https://api.github.com/repos/BaseTechStack/basecmd/releases/latest"
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err

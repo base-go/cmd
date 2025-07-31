@@ -9,7 +9,12 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-VERSION="v$1"
+# Handle version with or without 'v' prefix
+if [[ "$1" == v* ]]; then
+    VERSION="$1"
+else
+    VERSION="v$1"
+fi
 BUILD_DATE=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 GO_VERSION=$(go version | cut -d' ' -f3)
 COMMIT_HASH=$(git rev-parse HEAD)
