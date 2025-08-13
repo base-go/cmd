@@ -83,10 +83,14 @@ func destroyModule(cmd *cobra.Command, args []string) {
 		fmt.Printf("Warning: No model file found for %s\n", singularName)
 	}
 
-	// Update app/init.go to unregister the module - pass the singular name for module lookup
-	if err := utils.UpdateInitFileForDestroy(singularName); err != nil {
-		fmt.Printf("Error updating app/init.go: %v\n", err)
-		return
+	// Delete test files
+	testDir := filepath.Join("test", "app_test", pluralName+"_test")
+	if _, err := os.Stat(testDir); err == nil {
+		if err := os.RemoveAll(testDir); err != nil {
+			fmt.Printf("Warning: Could not remove test directory %s: %v\n", testDir, err)
+		} else {
+			fmt.Printf("Removed test directory: %s\n", testDir)
+		}
 	}
 
 	fmt.Printf("Successfully destroyed module '%s'.\n", singularName)
