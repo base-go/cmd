@@ -5,6 +5,36 @@ All notable changes to the Base CLI tool will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.1.1] - 2025-08-13
+
+### Added
+- **🎯 SelectOption Support for Frontend Select Boxes** - Enhanced `/all` endpoints
+  - New `SelectOption` struct with just `id` and `name` fields for dropdowns
+  - Intelligent field detection (prioritizes `name`, falls back to `title`)
+  - Support for `translation.Field` types with automatic string extraction
+  - Optimized database queries - only selects necessary fields
+  - Alphabetically sorted results for better UX
+
+### Changed
+- **🔧 Template System Improvements**
+  - Merged "_clean" template files into main templates for cleaner organization
+  - Refactored `GenerateFileFromTemplate` to use `NamingConvention` struct
+  - Updated all templates to use consistent naming convention fields
+  - Fixed controller routes to be explicit (e.g., `/users` instead of `""`)
+
+### Fixed
+- **🛠️ GORM Field Optimization for MySQL**
+  - Added proper size tags: `email` gets `size:255;index`, `string` gets `size:255`
+  - Text fields use explicit `type:text` for longer content
+  - URLs get `size:512` for longer links
+  - Slugs get `size:255;uniqueIndex` for unique indexing
+  - Decimal fields get `type:decimal(10,2)` for proper money precision
+  - Foreign keys automatically get `index` for better performance
+- **🐛 Template Field Resolution**
+  - Fixed template errors with missing `.StructName` → `.Model` fields
+  - Corrected `.LowerName` → `.ModelLower` field references
+  - Resolved `.PluralName` → `.Plural` field mappings
+
 ## [v2.1.0] - 2025-08-13
 
 ### Added

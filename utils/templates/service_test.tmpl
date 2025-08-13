@@ -11,23 +11,23 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test{{.StructName}}Services(t *testing.T) {
+func Test{{.Model}}Services(t *testing.T) {
 	helper := test.SetupTest(t)
 	defer helper.TeardownTest()
 
-	// Auto-migrate {{.StructName}} table for testing
-	err := helper.DB.AutoMigrate(&models.{{.StructName}}{})
+	// Auto-migrate {{.Model}} table for testing
+	err := helper.DB.AutoMigrate(&models.{{.Model}}{})
 	assert.NoError(t, err)
 
 	// Create service with proper emitter and nil storage
-	service := {{.PackageName}}.New{{.StructName}}Service(
+	service := {{.PackageName}}.New{{.Model}}Service(
 		helper.DB,
 		emitter.New(), // proper emitter
 		nil,            // storage (can be nil)
 		helper.Logger,
 	)
 
-	t.Run("{{.StructName}} service operations comprehensive coverage", func(t *testing.T) {
+	t.Run("{{.Model}} service operations comprehensive coverage", func(t *testing.T) {
 		t.Run("Service creation", func(t *testing.T) {
 			// Test that service is created successfully
 			assert.NotNil(t, service)
@@ -35,31 +35,31 @@ func Test{{.StructName}}Services(t *testing.T) {
 
 		t.Run("Basic CRUD operations", func(t *testing.T) {
 			// Test Create operation
-			createReq := &models.Create{{.StructName}}Request{
+			createReq := &models.Create{{.Model}}Request{
 				{{range .Fields}}{{if ne .Relationship ""}}{{else}}{{.Name}}: {{.TestValue}},
 				{{end}}{{end}}
 			}
 
-			{{.LowerName}}, err := service.Create(createReq)
+			{{.ModelLower}}, err := service.Create(createReq)
 			assert.NoError(t, err)
-			assert.NotNil(t, {{.LowerName}})
-			assert.NotZero(t, {{.LowerName}}.Id)
-			{{range .Fields}}{{if ne .Relationship ""}}{{else}}assert.Equal(t, {{.TestValue}}, {{$.LowerName}}.{{.Name}})
+			assert.NotNil(t, {{.ModelLower}})
+			assert.NotZero(t, {{.ModelLower}}.Id)
+			{{range .Fields}}{{if ne .Relationship ""}}{{else}}assert.Equal(t, {{.TestValue}}, {{$.ModelLower}}.{{.Name}})
 			{{end}}{{end}}
 
 			// Test GetById operation
-			found, err := service.GetById({{.LowerName}}.Id)
+			found, err := service.GetById({{.ModelLower}}.Id)
 			assert.NoError(t, err)
 			assert.NotNil(t, found)
-			assert.Equal(t, {{.LowerName}}.Id, found.Id)
+			assert.Equal(t, {{.ModelLower}}.Id, found.Id)
 
 			// Test Update operation
-			updateReq := &models.Update{{.StructName}}Request{
+			updateReq := &models.Update{{.Model}}Request{
 				{{range .Fields}}{{if ne .Relationship ""}}{{else}}{{.Name}}: {{.UpdateTestValue}},
 				{{end}}{{end}}
 			}
 
-			updated, err := service.Update({{.LowerName}}.Id, updateReq)
+			updated, err := service.Update({{.ModelLower}}.Id, updateReq)
 			assert.NoError(t, err)
 			assert.NotNil(t, updated)
 			{{range .Fields}}{{if ne .Relationship ""}}{{else}}assert.Equal(t, {{.UpdateTestValue}}, updated.{{.Name}})
@@ -72,28 +72,28 @@ func Test{{.StructName}}Services(t *testing.T) {
 			assert.NotNil(t, result.Data)
 
 			// Test Delete operation
-			err = service.Delete({{.LowerName}}.Id)
+			err = service.Delete({{.ModelLower}}.Id)
 			assert.NoError(t, err)
 
 			// Verify deletion
-			_, err = service.GetById({{.LowerName}}.Id)
+			_, err = service.GetById({{.ModelLower}}.Id)
 			assert.Error(t, err) // Should not find deleted record
 		})
 
 		t.Run("get operations", func(t *testing.T) {
-			// Create test {{.LowerName}}
-			{{.LowerName}} := &models.{{.StructName}}{
+			// Create test {{.ModelLower}}
+			{{.ModelLower}} := &models.{{.Model}}{
 				{{range .Fields}}{{.Name}}: {{.TestValue}},
 				{{end}}
 			}
-			err := helper.DB.Create({{.LowerName}}).Error
+			err := helper.DB.Create({{.ModelLower}}).Error
 			assert.NoError(t, err)
 
 			// Test GetById
-			found, err := service.GetById({{.LowerName}}.Id)
+			found, err := service.GetById({{.ModelLower}}.Id)
 			assert.NoError(t, err)
 			assert.NotNil(t, found)
-			assert.Equal(t, {{.LowerName}}.Id, found.Id)
+			assert.Equal(t, {{.ModelLower}}.Id, found.Id)
 
 			// Test GetById with invalid ID
 			_, err = service.GetById(0)
@@ -105,22 +105,22 @@ func Test{{.StructName}}Services(t *testing.T) {
 		})
 
 		t.Run("update operations", func(t *testing.T) {
-			// Create test {{.LowerName}}
-			{{.LowerName}} := &models.{{.StructName}}{
+			// Create test {{.ModelLower}}
+			{{.ModelLower}} := &models.{{.Model}}{
 				{{range .Fields}}{{.Name}}: {{.TestValue}},
 				{{end}}
 			}
-			err := helper.DB.Create({{.LowerName}}).Error
+			err := helper.DB.Create({{.ModelLower}}).Error
 			assert.NoError(t, err)
 
 			// Test update
-			updateReq := &models.Update{{.StructName}}Request{
-				Id: {{.LowerName}}.Id,
+			updateReq := &models.Update{{.Model}}Request{
+				Id: {{.ModelLower}}.Id,
 				{{range .Fields}}{{.Name}}: {{.UpdateTestValue}},
 				{{end}}
 			}
 
-			updated, err := service.Update({{.LowerName}}.Id, updateReq)
+			updated, err := service.Update({{.ModelLower}}.Id, updateReq)
 			assert.NoError(t, err)
 			assert.NotNil(t, updated)
 			{{range .Fields}}assert.Equal(t, {{.UpdateTestValue}}, updated.{{.Name}})
@@ -136,20 +136,20 @@ func Test{{.StructName}}Services(t *testing.T) {
 		})
 
 		t.Run("delete operations", func(t *testing.T) {
-			// Create test {{.LowerName}}
-			{{.LowerName}} := &models.{{.StructName}}{
+			// Create test {{.ModelLower}}
+			{{.ModelLower}} := &models.{{.Model}}{
 				{{range .Fields}}{{.Name}}: {{.TestValue}},
 				{{end}}
 			}
-			err := helper.DB.Create({{.LowerName}}).Error
+			err := helper.DB.Create({{.ModelLower}}).Error
 			assert.NoError(t, err)
 
 			// Test delete
-			err = service.Delete({{.LowerName}}.Id)
+			err = service.Delete({{.ModelLower}}.Id)
 			assert.NoError(t, err)
 
 			// Verify deletion
-			_, err = service.GetById({{.LowerName}}.Id)
+			_, err = service.GetById({{.ModelLower}}.Id)
 			assert.Error(t, err)
 
 			// Test delete with invalid ID
@@ -162,13 +162,13 @@ func Test{{.StructName}}Services(t *testing.T) {
 		})
 
 		t.Run("get all operations", func(t *testing.T) {
-			// Create multiple test {{.PluralLowerName}}
+			// Create multiple test {{.PluralLower}}
 			for i := 0; i < 5; i++ {
-				{{.LowerName}} := &models.{{.StructName}}{
+				{{.ModelLower}} := &models.{{.Model}}{
 					{{range .Fields}}{{.Name}}: {{.TestValueWithIndex}},
 					{{end}}
 				}
-				err := helper.DB.Create({{.LowerName}}).Error
+				err := helper.DB.Create({{.ModelLower}}).Error
 				assert.NoError(t, err)
 			}
 
@@ -192,19 +192,19 @@ func Test{{.StructName}}Services(t *testing.T) {
 		t.Run("error cases and edge conditions", func(t *testing.T) {
 			// Test create with duplicate unique field (if applicable)
 			{{range .Fields}}{{if .IsUnique}}
-			{{$.LowerName}}1 := &models.{{$.StructName}}{
+			{{$.ModelLower}}1 := &models.{{$.Model}}{
 				{{range $.Fields}}{{.Name}}: {{.TestValue}},
 				{{end}}
 			}
-			err := helper.DB.Create({{$.LowerName}}1).Error
+			err := helper.DB.Create({{$.ModelLower}}1).Error
 			assert.NoError(t, err)
 
-			{{$.LowerName}}2 := &models.{{$.StructName}}{
+			{{$.ModelLower}}2 := &models.{{$.Model}}{
 				{{range $.Fields}}{{if eq .Name $.Name}}{{.Name}}: {{.TestValue}}, // Duplicate unique value
 				{{else}}{{.Name}}: {{.TestValue}},
 				{{end}}{{end}}
 			}
-			createReq := &models.Create{{$.StructName}}Request{
+			createReq := &models.Create{{$.Model}}Request{
 				{{range $.Fields}}{{if eq .Name $.Name}}{{.Name}}: {{.TestValue}}, // Duplicate unique value
 				{{else}}{{.Name}}: {{.TestValue}},
 				{{end}}{{end}}

@@ -30,6 +30,9 @@ var serviceTestTemplate string
 //go:embed templates/controller_test.tmpl
 var controllerTestTemplate string
 
+//go:embed templates/validator.tmpl
+var validatorTemplate string
+
 // FieldStruct represents a field in the model
 type FieldStruct struct {
 	Name               string
@@ -42,6 +45,7 @@ type FieldStruct struct {
 	Relationship       string
 	RelatedModel       string
 	IsRequired         bool
+	IsRelation         bool   // Whether this field represents a relationship
 	GORM               string // Add this field for GORM tags
 	TestValue          string // Test value for this field
 	UpdateTestValue    string // Update test value for this field
@@ -140,14 +144,90 @@ func processRelationshipField(name string, relatedModel string, relationship str
 	return fields
 }
 
+// inferFieldType infers field type from field name
+func inferFieldType(fieldName string) string {
+	lower := strings.ToLower(fieldName)
+	
+	// Relation patterns
+	if strings.HasSuffix(lower, "_id") {
+		return "uint" // Foreign key
+	}
+	
+	// Text fields (should be TEXT in database)
+	textFields := []string{"description", "content", "body", "notes", "comment", "summary", "bio", "about"}
+	for _, tf := range textFields {
+		if strings.Contains(lower, tf) {
+			return "text"
+		}
+	}
+	
+	// Boolean fields
+	boolFields := []string{"is_", "has_", "can_", "enabled", "active", "published", "verified", "confirmed"}
+	for _, bf := range boolFields {
+		if strings.HasPrefix(lower, bf) || strings.Contains(lower, bf) {
+			return "bool"
+		}
+	}
+	
+	// Numeric fields
+	numericFields := []string{"count", "price", "amount", "quantity", "number", "rating", "score", "weight", "height", "width"}
+	for _, nf := range numericFields {
+		if strings.Contains(lower, nf) {
+			if strings.Contains(lower, "price") || strings.Contains(lower, "amount") {
+				return "decimal" // For money fields
+			}
+			return "int"
+		}
+	}
+	
+	// Date/time fields - check suffixes first, then contains
+	if strings.HasSuffix(lower, "_at") || strings.HasSuffix(lower, "_on") || strings.HasSuffix(lower, "_date") {
+		return "datetime"
+	}
+	dateFields := []string{"date", "time", "created_at", "updated_at", "deleted_at", "published_at", "expires_at"}
+	for _, df := range dateFields {
+		if strings.Contains(lower, df) {
+			return "datetime"
+		}
+	}
+	
+	// Email, URL fields
+	if strings.Contains(lower, "email") {
+		return "email"
+	}
+	if strings.Contains(lower, "url") || strings.Contains(lower, "link") {
+		return "url"
+	}
+	
+	// Image/file fields
+	if strings.Contains(lower, "image") || strings.Contains(lower, "photo") || strings.Contains(lower, "picture") || strings.Contains(lower, "avatar") {
+		return "image"
+	}
+	if strings.Contains(lower, "file") || strings.Contains(lower, "document") || strings.Contains(lower, "attachment") {
+		return "file"
+	}
+	
+	// Translated fields (Base framework feature)
+	if strings.Contains(lower, "translation") || strings.Contains(lower, "i18n") || strings.Contains(lower, "locale") {
+		return "translatedField"
+	}
+	
+	// Default to string for varchar(255)
+	return "string"
+}
+
 func ProcessField(fieldDef string) []FieldStruct {
 	parts := strings.Split(fieldDef, ":")
-	if len(parts) < 2 {
-		return nil
-	}
-
+	
 	name := parts[0]
-	fieldType := parts[1]
+	var fieldType string
+	
+	// Smart field inference: if only field name provided, infer type
+	if len(parts) == 1 {
+		fieldType = inferFieldType(name)
+	} else {
+		fieldType = parts[1]
+	}
 	var relationship, relatedModel string
 
 	// Check if this is a relationship field
@@ -165,6 +245,7 @@ func ProcessField(fieldDef string) []FieldStruct {
 			JSONName:     ToSnakeCase(name),
 			DBName:       ToSnakeCase(name),
 			Relationship: "attachment",
+			IsRelation:   false, // Attachments are not relations
 			GORM:         "polymorphic:Model",
 			IsRequired:   false,
 		}}
@@ -174,23 +255,53 @@ func ProcessField(fieldDef string) []FieldStruct {
 	if strings.HasSuffix(name, "_id") && fieldType == "uint" {
 		relationName := strings.TrimSuffix(name, "_id")
 		relatedModel := ToPascalCase(relationName)
+		
+		// Check if this is a core model (common core models)
+		coreModels := map[string]string{
+			"user":     "users.User",
+			"author":   "users.User", // Authors are users too
+			"category": "Category",   // App model
+			"tag":      "Tag",        // App model  
+			"media":    "media.Media",
+			"file":     "media.Media",
+		}
+		
+		modelType := relatedModel
+		if coreType, exists := coreModels[strings.ToLower(relationName)]; exists {
+			modelType = coreType
+		}
 
 		// Create both the foreign key field and the relationship field
+		goType := GetGoType(fieldType)
+		testValue, updateTestValue, testValueWithIndex, testValueUnique, isUnique := getTestValues(goType, name)
+		
 		return []FieldStruct{
 			{
-				Name:     ToPascalCase(name),
-				Type:     GetGoType(fieldType),
-				JSONName: ToSnakeCase(name),
-				DBName:   ToSnakeCase(name),
+				Name:               ToPascalCase(name),
+				Type:               goType,
+				JSONName:           ToSnakeCase(name),
+				DBName:             ToSnakeCase(name),
+				GORM:               "index", // Foreign keys should be indexed
+				TestValue:          testValue,
+				UpdateTestValue:    updateTestValue,
+				TestValueWithIndex: testValueWithIndex,
+				TestValueUnique:    testValueUnique,
+				IsUnique:           isUnique,
+				IsRelation:         false, // Foreign key field is not a relation itself
 			},
 			{
-				Name:         ToPascalCase(relationName),
-				Type:         relatedModel,
-				JSONName:     ToSnakeCase(relationName),
-				DBName:       ToSnakeCase(relationName),
-				Relationship: "belongs_to",
-				RelatedModel: relatedModel,
-				GORM:         fmt.Sprintf("foreignKey:%s", ToPascalCase(name)),
+				Name:               ToPascalCase(relationName),
+				Type:               modelType,
+				JSONName:           ToSnakeCase(relationName),
+				DBName:             ToSnakeCase(relationName),
+				Relationship:       "belongs_to",
+				RelatedModel:       modelType,
+				IsRelation:         true, // This is the actual relation field
+				GORM:               fmt.Sprintf("foreignKey:%s", ToPascalCase(name)),
+				TestValue:          "nil",
+				UpdateTestValue:    "nil",
+				TestValueWithIndex: "nil",
+				TestValueUnique:    "nil",
 			},
 		}
 	}
@@ -198,11 +309,34 @@ func ProcessField(fieldDef string) []FieldStruct {
 	// Handle regular fields
 	goType := GetGoType(fieldType)
 	testValue, updateTestValue, testValueWithIndex, testValueUnique, isUnique := getTestValues(goType, name)
+	
+	// Add GORM size for better MySQL field types
+	var gormTag string
+	switch fieldType {
+	case "email":
+		gormTag = "size:255;index" // Email should be indexed and have proper size
+	case "string":
+		gormTag = "size:255" // Default string size
+	case "text":
+		gormTag = "type:text" // Explicit text type for longer content
+	case "url":
+		gormTag = "size:512" // URLs can be longer
+	case "slug":
+		gormTag = "size:255;uniqueIndex" // Slugs should be unique and indexed
+	case "decimal":
+		gormTag = "type:decimal(10,2)" // Proper decimal precision for money
+	case "datetime", "time", "date":
+		gormTag = "" // Let GORM handle datetime fields automatically
+	default:
+		gormTag = "" // No special GORM tag needed
+	}
+	
 	return []FieldStruct{{
 		Name:               ToPascalCase(name),
 		Type:               goType,
 		JSONName:           ToSnakeCase(name),
 		DBName:             ToSnakeCase(name),
+		GORM:               gormTag,
 		TestValue:          testValue,
 		UpdateTestValue:    updateTestValue,
 		TestValueWithIndex: testValueWithIndex,
@@ -223,8 +357,8 @@ func GenerateFieldStructs(fields []string) []FieldStruct {
 	return fieldStructs
 }
 
-// GenerateFileFromTemplate generates a file from a template
-func GenerateFileFromTemplate(dir, filename, templateName, structName, pluralName, packageName string, fields []FieldStruct) {
+// GenerateFileFromTemplate generates a file from a template using naming convention
+func GenerateFileFromTemplate(dir, filename, templateName string, naming *NamingConvention, fields []FieldStruct) {
 	var tmplContent string
 	switch templateName {
 	case "model.tmpl":
@@ -235,6 +369,8 @@ func GenerateFileFromTemplate(dir, filename, templateName, structName, pluralNam
 		tmplContent = serviceTemplate
 	case "module.tmpl":
 		tmplContent = moduleTemplate
+	case "validator.tmpl":
+		tmplContent = validatorTemplate
 
 	case "model_test.tmpl":
 		tmplContent = modelTestTemplate
@@ -286,29 +422,19 @@ func GenerateFileFromTemplate(dir, filename, templateName, structName, pluralNam
 	enhancedFields := make([]FieldStruct, len(fields))
 	copy(enhancedFields, fields)
 	for i := range enhancedFields {
-		enhancedFields[i].StructName = structName
-		enhancedFields[i].LowerName = strings.ToLower(structName)
+		enhancedFields[i].StructName = naming.Model
+		enhancedFields[i].LowerName = naming.ModelLower
 	}
-
-	// Execute template
+	
+	// Execute template with enhanced data structure
 	data := struct {
-		StructName      string
-		PluralName      string
-		PackageName     string
-		Fields          []FieldStruct
-		HasImageField   bool
-		LowerName       string
-		PluralLowerName string
-		TableName       string
+		*NamingConvention
+		Fields        []FieldStruct
+		HasImageField bool
 	}{
-		StructName:      structName,
-		PluralName:      pluralName,
-		PackageName:     packageName,
-		Fields:          enhancedFields,
-		HasImageField:   HasImageField(fields),
-		LowerName:       strings.ToLower(structName),
-		PluralLowerName: strings.ToLower(pluralName),
-		TableName:       ToSnakeCase(pluralName),
+		NamingConvention: naming,
+		Fields:           enhancedFields,
+		HasImageField:    HasImageField(fields),
 	}
 
 	if err := tmpl.Execute(f, data); err != nil {
@@ -335,9 +461,9 @@ func HasImageField(fields []FieldStruct) bool {
 }
 
 // GenerateRailsStyleTests generates comprehensive Rails-style tests for a CRUD module
-func GenerateRailsStyleTests(structName, pluralName, packageName string, fields []FieldStruct) error {
-	// Create Rails-style test directory structure
-	testDir := filepath.Join("test", "app_test", fmt.Sprintf("%s_test", packageName))
+func GenerateTests(naming *NamingConvention, fields []FieldStruct) error {
+	// Create test directory structure
+	testDir := filepath.Join("test", "app_test", fmt.Sprintf("%s_test", naming.PackageName))
 	if err := os.MkdirAll(testDir, 0755); err != nil {
 		return fmt.Errorf("failed to create test directory: %w", err)
 	}
@@ -347,9 +473,7 @@ func GenerateRailsStyleTests(structName, pluralName, packageName string, fields 
 		testDir,
 		"model_test.go",
 		"model_test.tmpl",
-		structName,
-		pluralName,
-		packageName,
+		naming,
 		fields,
 	)
 
@@ -358,9 +482,7 @@ func GenerateRailsStyleTests(structName, pluralName, packageName string, fields 
 		testDir,
 		"service_test.go",
 		"service_test.tmpl",
-		structName,
-		pluralName,
-		packageName,
+		naming,
 		fields,
 	)
 
@@ -369,9 +491,7 @@ func GenerateRailsStyleTests(structName, pluralName, packageName string, fields 
 		testDir,
 		"controller_test.go",
 		"controller_test.tmpl",
-		structName,
-		pluralName,
-		packageName,
+		naming,
 		fields,
 	)
 

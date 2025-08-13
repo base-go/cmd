@@ -11,8 +11,7 @@ import (
 )
 
 var (
-	htmlFlag     bool
-	coverageFlag bool
+	htmlFlag bool
 )
 
 var testCmd = &cobra.Command{
@@ -36,7 +35,7 @@ func runTest(cmd *cobra.Command, args []string) error {
 	// Determine if we're running coverage
 	isCoverage := false
 	module := ""
-	
+
 	if len(args) > 0 {
 		if args[0] == "coverage" {
 			isCoverage = true
@@ -85,7 +84,7 @@ func runTest(cmd *cobra.Command, args []string) error {
 		}
 
 		fmt.Printf("Running tests with coverage for %s...\n", getModuleDescription(module))
-		
+
 		// Run the test command
 		if err := runGoCommand(testArgs); err != nil {
 			return fmt.Errorf("tests failed: %v", err)
@@ -113,7 +112,7 @@ func runTest(cmd *cobra.Command, args []string) error {
 		}
 
 		fmt.Printf("Running tests for %s...\n", getModuleDescription(module))
-		
+
 		if err := runGoCommand(testArgs); err != nil {
 			return fmt.Errorf("tests failed: %v", err)
 		}
@@ -141,21 +140,21 @@ func runGoCommand(args []string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Dir = "."
-	
+
 	return cmd.Run()
 }
 
 func generateCoverageReport(coverageFile, module string) error {
 	// Generate text coverage report
 	args := []string{"tool", "cover", "-func=" + coverageFile}
-	
+
 	fmt.Printf("\n📊 Coverage Report for %s:\n", getModuleDescription(module))
 	fmt.Println(strings.Repeat("=", 50))
-	
+
 	cmd := exec.Command("go", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	
+
 	return cmd.Run()
 }
 
@@ -173,16 +172,16 @@ func generateHTMLCoverageReport(coverageFile, module string) error {
 	}
 
 	args := []string{"tool", "cover", "-html=" + coverageFile, "-o", htmlFile}
-	
+
 	cmd := exec.Command("go", args...)
 	cmd.Stderr = os.Stderr
-	
+
 	if err := cmd.Run(); err != nil {
 		return err
 	}
 
 	fmt.Printf("\n🌐 HTML Coverage Report generated: %s\n", htmlFile)
-	
+
 	// Try to get absolute path for better user experience
 	if absPath, err := filepath.Abs(htmlFile); err == nil {
 		fmt.Printf("📂 Open in browser: file://%s\n", absPath)
@@ -194,7 +193,7 @@ func generateHTMLCoverageReport(coverageFile, module string) error {
 func init() {
 	// Add flags
 	testCmd.Flags().BoolVar(&htmlFlag, "html", false, "Generate HTML coverage report (only with coverage)")
-	
+
 	// Add the test command to root
 	rootCmd.AddCommand(testCmd)
 }

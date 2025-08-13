@@ -13,20 +13,20 @@ import (
 )
 
 const (
-    Create{{.StructName}}Event = "{{toLower .PluralName}}.create"
-    Update{{.StructName}}Event = "{{toLower .PluralName}}.update"
-    Delete{{.StructName}}Event = "{{toLower .PluralName}}.delete"
+    Create{{.Model}}Event = "{{toLower .Plural}}.create"
+    Update{{.Model}}Event = "{{toLower .Plural}}.update"
+    Delete{{.Model}}Event = "{{toLower .Plural}}.delete"
 )
 
-type {{.StructName}}Service struct {
+type {{.Service}} struct {
     DB      *gorm.DB
     Emitter *emitter.Emitter
     Storage *storage.ActiveStorage
     Logger  logger.Logger
 }
 
-func New{{.StructName}}Service(db *gorm.DB, emitter *emitter.Emitter, storage *storage.ActiveStorage, logger logger.Logger) *{{.StructName}}Service {
-    return &{{.StructName}}Service{
+func New{{.Service}}(db *gorm.DB, emitter *emitter.Emitter, storage *storage.ActiveStorage, logger logger.Logger) *{{.Service}} {
+    return &{{.Service}}{
         DB:      db,
         Emitter: emitter,
         Storage: storage,
@@ -34,8 +34,55 @@ func New{{.StructName}}Service(db *gorm.DB, emitter *emitter.Emitter, storage *s
     }
 }
 
-func (s *{{.StructName}}Service) Create(req *models.Create{{.StructName}}Request) (*models.{{.StructName}}, error) {
-    item := &models.{{.StructName}}{
+// applySorting applies sorting to the query based on the sort and order parameters
+func (s *{{.Service}}) applySorting(query *gorm.DB, sortBy *string, sortOrder *string) {
+    // Valid sortable fields for {{.Model}}
+    validSortFields := map[string]string{
+        "id": "id",
+        "created_at": "created_at",
+        "updated_at": "updated_at",
+        {{- range .Fields}}
+        {{- if not .IsRelation}}
+        "{{ToSnakeCase .Name}}": "{{ToSnakeCase .Name}}",
+        {{- end}}
+        {{- end}}
+    }
+
+    // Default sorting - if sort_order exists, always use it for custom ordering
+    {{- $hasSortOrder := false }}
+    {{- range .Fields}}
+    {{- if eq (ToSnakeCase .Name) "sort_order"}}
+    {{- $hasSortOrder = true }}
+    {{- end}}
+    {{- end}}
+    {{- if $hasSortOrder }}
+    defaultSortBy := "sort_order"
+    defaultSortOrder := "asc"
+    {{- else }}
+    defaultSortBy := "id"
+    defaultSortOrder := "desc"
+    {{- end}}
+
+    // Determine sort field
+    sortField := defaultSortBy
+    if sortBy != nil && *sortBy != "" {
+        if field, exists := validSortFields[*sortBy]; exists {
+            sortField = field
+        }
+    }
+
+    // Determine sort direction (order parameter)
+    sortDirection := defaultSortOrder
+    if sortOrder != nil && (*sortOrder == "asc" || *sortOrder == "desc") {
+        sortDirection = *sortOrder
+    }
+
+    // Apply sorting
+    query.Order(sortField + " " + sortDirection)
+}
+
+func (s *{{.Model}}Service) Create(req *models.Create{{.Model}}Request) (*models.{{.Model}}, error) {
+    item := &models.{{.Model}}{
         {{- range .Fields}}
         {{- if eq .Type "*storage.Attachment"}}
         // {{.Name}} attachment is handled via separate endpoint
@@ -48,23 +95,23 @@ func (s *{{.StructName}}Service) Create(req *models.Create{{.StructName}}Request
     }
 
     if err := s.DB.Create(item).Error; err != nil {
-        s.Logger.Error("failed to create {{toLower .StructName}}", logger.String("error", err.Error()))
-        return nil, fmt.Errorf("failed to create {{toLower .StructName}}: %w", err)
+        s.Logger.Error("failed to create {{toLower .Model}}", logger.String("error", err.Error()))
+        return nil, fmt.Errorf("failed to create {{toLower .Model}}: %w", err)
     }
 
     // Emit create event
-    s.Emitter.Emit(Create{{.StructName}}Event, item)
+    s.Emitter.Emit(Create{{.Model}}Event, item)
 
     return s.GetById(item.Id)
 }
 
-func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName}}Request) (*models.{{.StructName}}, error) {
-    item := &models.{{.StructName}}{}
+func (s *{{.Model}}Service) Update(id uint, req *models.Update{{.Model}}Request) (*models.{{.Model}}, error) {
+    item := &models.{{.Model}}{}
     if err := s.DB.First(item, id).Error; err != nil {
-        s.Logger.Error("failed to find {{toLower .StructName}} for update", 
+        s.Logger.Error("failed to find {{toLower .Model}} for update", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
-        return nil, fmt.Errorf("failed to find {{toLower .StructName}}: %w", err)
+        return nil, fmt.Errorf("failed to find {{toLower .Model}}: %w", err)
     }
 
     // Build updates map
@@ -110,33 +157,33 @@ func (s *{{.StructName}}Service) Update(id uint, req *models.Update{{.StructName
     {{- end}}
 
     if err := s.DB.Model(item).Updates(updates).Error; err != nil {
-        s.Logger.Error("failed to update {{toLower .StructName}}", 
+        s.Logger.Error("failed to update {{toLower .Model}}", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
-        return nil, fmt.Errorf("failed to update {{toLower .StructName}}: %w", err)
+        return nil, fmt.Errorf("failed to update {{toLower .Model}}: %w", err)
     }
 
     result, err := s.GetById(item.Id)
     if err != nil {
-        s.Logger.Error("failed to get updated {{toLower .StructName}}", 
+        s.Logger.Error("failed to get updated {{toLower .Model}}", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
-        return nil, fmt.Errorf("failed to get updated {{toLower .StructName}}: %w", err)
+        return nil, fmt.Errorf("failed to get updated {{toLower .Model}}: %w", err)
     }
 
     // Emit update event
-    s.Emitter.Emit(Update{{.StructName}}Event, result)
+    s.Emitter.Emit(Update{{.Model}}Event, result)
 
     return result, nil
 }
 
-func (s *{{.StructName}}Service) Delete(id uint) error {
-    item := &models.{{.StructName}}{}
+func (s *{{.Model}}Service) Delete(id uint) error {
+    item := &models.{{.Model}}{}
     if err := s.DB.First(item, id).Error; err != nil {
-        s.Logger.Error("failed to find {{toLower .StructName}} for deletion", 
+        s.Logger.Error("failed to find {{toLower .Model}} for deletion", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
-        return fmt.Errorf("failed to find {{toLower .StructName}}: %w", err)
+        return fmt.Errorf("failed to find {{toLower .Model}}: %w", err)
     }
 
     // Delete file attachments if any
@@ -154,38 +201,38 @@ func (s *{{.StructName}}Service) Delete(id uint) error {
     {{- end}}
 
     if err := s.DB.Delete(item).Error; err != nil {
-        s.Logger.Error("failed to delete {{toLower .StructName}}", 
+        s.Logger.Error("failed to delete {{toLower .Model}}", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
-        return fmt.Errorf("failed to delete {{toLower .StructName}}: %w", err)
+        return fmt.Errorf("failed to delete {{toLower .Model}}: %w", err)
     }
 
     // Emit delete event
-    s.Emitter.Emit(Delete{{.StructName}}Event, item)
+    s.Emitter.Emit(Delete{{.Model}}Event, item)
 
     return nil
 }
 
-func (s *{{.StructName}}Service) GetById(id uint) (*models.{{.StructName}}, error) {
-    item := &models.{{.StructName}}{}
+func (s *{{.Model}}Service) GetById(id uint) (*models.{{.Model}}, error) {
+    item := &models.{{.Model}}{}
     
     query := item.Preload(s.DB)
     
     if err := query.First(item, id).Error; err != nil {
-        s.Logger.Error("failed to get {{toLower .StructName}}", 
+        s.Logger.Error("failed to get {{toLower .Model}}", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
-        return nil, fmt.Errorf("failed to get {{toLower .StructName}}: %w", err)
+        return nil, fmt.Errorf("failed to get {{toLower .Model}}: %w", err)
     }
 
     return item, nil
 }
 
-func (s *{{.StructName}}Service) GetAll(page *int, limit *int, sort *int) (*types.PaginatedResponse, error) {
-    var items []*models.{{.StructName}}
+func (s *{{.Model}}Service) GetAll(page *int, limit *int, sortBy *string, sortOrder *string) (*types.PaginatedResponse, error) {
+    var items []*models.{{.Model}}
     var total int64
 
-    query := s.DB.Model(&models.{{.StructName}}{})
+    query := s.DB.Model(&models.{{.Model}}{})
     // Set default values if nil
 	defaultPage := 1
 	defaultLimit := 10
@@ -198,9 +245,9 @@ func (s *{{.StructName}}Service) GetAll(page *int, limit *int, sort *int) (*type
 
     // Get total count
     if err := query.Count(&total).Error; err != nil {
-        s.Logger.Error("failed to count {{toLower .PluralName}}", 
+        s.Logger.Error("failed to count {{toLower .Plural}}", 
             logger.String("error", err.Error()))
-        return nil, fmt.Errorf("failed to count {{toLower .PluralName}}: %w", err)
+        return nil, fmt.Errorf("failed to count {{toLower .Plural}}: %w", err)
     }
 
     // Apply pagination if provided
@@ -209,22 +256,21 @@ func (s *{{.StructName}}Service) GetAll(page *int, limit *int, sort *int) (*type
         query = query.Offset(offset).Limit(*limit)
     }
 
-    if sort != nil {
-        query = query.Order("{{.DBName}} desc")
-    }
+    // Apply sorting
+    s.applySorting(query, sortBy, sortOrder)
 
     // Preload relationships
-    query = (&models.{{.StructName}}{}).Preload(query)
+    query = (&models.{{.Model}}{}).Preload(query)
 
     // Execute query
     if err := query.Find(&items).Error; err != nil {
-        s.Logger.Error("failed to get {{toLower .PluralName}}", 
+        s.Logger.Error("failed to get {{toLower .Plural}}", 
             logger.String("error", err.Error()))
-        return nil, fmt.Errorf("failed to get {{toLower .PluralName}}: %w", err)
+        return nil, fmt.Errorf("failed to get {{toLower .Plural}}: %w", err)
     }
 
     // Convert to response type
-    responses := make([]*models.{{.StructName}}ListResponse, len(items))
+    responses := make([]*models.{{.Model}}ListResponse, len(items))
     for i, item := range items {
         responses[i] = item.ToListResponse()
     }
@@ -246,16 +292,61 @@ func (s *{{.StructName}}Service) GetAll(page *int, limit *int, sort *int) (*type
     }, nil
 }
 
+// GetAllForSelect gets all items for select box/dropdown options (simplified response)
+func (s *{{.Model}}Service) GetAllForSelect() ([]*models.{{.Model}}, error) {
+    var items []*models.{{.Model}}
+    
+    query := s.DB.Model(&models.{{.Model}}{})
+    
+    // Only select the necessary fields for select options
+    {{- $nameField := "" }}
+    {{- $titleField := "" }}
+    {{- range .Fields }}
+    {{- if not .IsRelation }}
+    {{- if or (eq (toLower .Name) "name") (eq (toLower .Name) "title") }}
+    {{- if eq (toLower .Name) "name" }}{{ $nameField = .Name }}{{end}}
+    {{- if eq (toLower .Name) "title" }}{{ $titleField = .Name }}{{end}}
+    {{- end }}
+    {{- end }}
+    {{- end }}
+    
+    {{- if or $nameField $titleField }}
+    {{- if $nameField }}
+    query = query.Select("id, {{ToSnakeCase $nameField}}")
+    {{- else if $titleField }}
+    query = query.Select("id, {{ToSnakeCase $titleField}}")
+    {{- end }}
+    {{- else }}
+    query = query.Select("id") // Only ID if no name/title field found
+    {{- end }}
+    
+    // Order by name/title for better UX
+    {{- if $nameField }}
+    query = query.Order("{{ToSnakeCase $nameField}} ASC")
+    {{- else if $titleField }}
+    query = query.Order("{{ToSnakeCase $titleField}} ASC")
+    {{- else }}
+    query = query.Order("id ASC")
+    {{- end }}
+    
+    if err := query.Find(&items).Error; err != nil {
+        s.Logger.Error("Failed to fetch items for select", "error", err)
+        return nil, err
+    }
+    
+    return items, nil
+}
+
 {{- range .Fields}}
 {{- if eq .Type "*storage.Attachment"}}
-// Upload{{.Name}} uploads a file for the {{$.StructName}}'s {{.Name}} field
-func (s *{{$.StructName}}Service) Upload{{.Name}}(id uint, file *multipart.FileHeader) (*models.{{$.StructName}}, error) {
-    item := &models.{{$.StructName}}{}
+// Upload{{.Name}} uploads a file for the {{$.Model}}'s {{.Name}} field
+func (s *{{$.Model}}Service) Upload{{.Name}}(id uint, file *multipart.FileHeader) (*models.{{$.Model}}, error) {
+    item := &models.{{$.Model}}{}
     if err := s.DB.First(item, id).Error; err != nil {
-        s.Logger.Error("failed to find {{toLower $.StructName}}", 
+        s.Logger.Error("failed to find {{toLower $.Model}}", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
-        return nil, fmt.Errorf("failed to find {{toLower $.StructName}}: %w", err)
+        return nil, fmt.Errorf("failed to find {{toLower $.Model}}: %w", err)
     }
 
     // Delete existing file if any
@@ -288,14 +379,14 @@ func (s *{{$.StructName}}Service) Upload{{.Name}}(id uint, file *multipart.FileH
     return s.GetById(id)
 }
 
-// Remove{{.Name}} removes the file from the {{$.StructName}}'s {{.Name}} field
-func (s *{{$.StructName}}Service) Remove{{.Name}}(id uint) (*models.{{$.StructName}}, error) {
-    item := &models.{{$.StructName}}{}
+// Remove{{.Name}} removes the file from the {{$.Model}}'s {{.Name}} field
+func (s *{{$.Model}}Service) Remove{{.Name}}(id uint) (*models.{{$.Model}}, error) {
+    item := &models.{{$.Model}}{}
     if err := s.DB.First(item, id).Error; err != nil {
-        s.Logger.Error("failed to find {{toLower $.StructName}}", 
+        s.Logger.Error("failed to find {{toLower $.Model}}", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
-        return nil, fmt.Errorf("failed to find {{toLower $.StructName}}: %w", err)
+        return nil, fmt.Errorf("failed to find {{toLower $.Model}}: %w", err)
     }
 
     if item.{{.Name}} == nil {

@@ -28,21 +28,13 @@ func generateModule(cmd *cobra.Command, args []string) {
 	singularName := args[0]
 	fields := args[1:]
 
-	// Convert singular name to snake_case for directory naming
-	dirName := utils.ToSnakeCase(singularName)
-	pluralName := utils.PluralizeClient.Plural(singularName)
-	pluralDirName := utils.ToSnakeCase(pluralName)
-
-	// Use PascalCase for struct naming
-	structName := utils.ToPascalCase(singularName)
-
-	// Use the plural name in snake_case for package naming
-	packageName := utils.ToSnakeCase(pluralName)
+	// Create naming convention from the input name
+	naming := utils.NewNamingConvention(singularName)
 
 	// Create directories (plural names in snake_case)
 	dirs := []string{
 		filepath.Join("app", "models"),
-		filepath.Join("app", pluralDirName),
+		filepath.Join("app", naming.DirName),
 	}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
@@ -57,56 +49,51 @@ func generateModule(cmd *cobra.Command, args []string) {
 	// Generate model
 	utils.GenerateFileFromTemplate(
 		filepath.Join("app", "models"),
-		fmt.Sprintf("%s.go", dirName),
+		naming.ModelSnake+".go",
 		"model.tmpl",
-		structName,
-		pluralName,
-		"models",
+		naming,
 		fieldStructs,
 	)
 
 	// Generate service
 	utils.GenerateFileFromTemplate(
-		filepath.Join("app", pluralDirName),
+		filepath.Join("app", naming.DirName),
 		"service.go",
 		"service.tmpl",
-		structName,
-		pluralName,
-		packageName,
+		naming,
 		fieldStructs,
 	)
 
 	// Generate controller
 	utils.GenerateFileFromTemplate(
-		filepath.Join("app", pluralDirName),
+		filepath.Join("app", naming.DirName),
 		"controller.go",
 		"controller.tmpl",
-		structName,
-		pluralName,
-		packageName,
+		naming,
 		fieldStructs,
 	)
 
 	// Generate module
 	utils.GenerateFileFromTemplate(
-		filepath.Join("app", pluralDirName),
+		filepath.Join("app", naming.DirName),
 		"module.go",
 		"module.tmpl",
-		structName,
-		pluralName,
-		packageName,
+		naming,
 		fieldStructs,
 	)
 
-	// Update init.go
-	if err := utils.UpdateInitGo(pluralDirName, structName); err != nil {
-		fmt.Printf("Error updating init.go: %v\n", err)
-		return
-	}
+	// Generate validator
+	utils.GenerateFileFromTemplate(
+		filepath.Join("app", naming.DirName),
+		"validator.go",
+		"validator.tmpl",
+		naming,
+		fieldStructs,
+	)
 
-	// Generate Rails-style tests
-	if err := utils.GenerateRailsStyleTests(structName, pluralName, packageName, fieldStructs); err != nil {
-		fmt.Printf("Error generating Rails-style tests: %v\n", err)
+	// Generate tests
+	if err := utils.GenerateTests(naming, fieldStructs); err != nil {
+		fmt.Printf("Error generating tests: %v\n", err)
 		return
 	}
 
@@ -122,19 +109,19 @@ func generateModule(cmd *cobra.Command, args []string) {
 	}
 
 	// Run goimports on generated files
-	generatedPath := filepath.Join("app", pluralDirName)
-	modelPath := filepath.Join("app", "models", fmt.Sprintf("%s.go", dirName))
+	generatedPath := filepath.Join("app", naming.DirName)
 
+	fmt.Println("Running goimports on generated files...")
 	// Run goimports on the generated directory
 	if err := exec.Command("find", generatedPath, "-name", "*.go", "-exec", "goimports", "-w", "{}", ";").Run(); err != nil {
 		fmt.Printf("Error running goimports on %s: %v\n", generatedPath, err)
 	}
 
 	// Run goimports on the model file
-	modelPath = filepath.Join("app", "models", fmt.Sprintf("%s.go", dirName))
+	modelPath := filepath.Join("app", "models", naming.ModelSnake+".go")
 	if err := exec.Command("goimports", "-w", modelPath).Run(); err != nil {
 		fmt.Printf("Error running goimports on %s: %v\n", modelPath, err)
 	}
 
-	fmt.Printf("Successfully generated %s module\n", structName)
+	fmt.Printf("Successfully generated %s module\n", naming.Model)
 }

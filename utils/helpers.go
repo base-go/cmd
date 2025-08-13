@@ -23,18 +23,35 @@ func init() {
 
 func GetGoType(t string) string {
 	switch t {
-	case "int":
-		return "int"
-	case "string", "text":
+	// Exact Go types - pass through as-is
+	case "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64":
+		return t
+	case "float32", "float64":
+		return t
+	case "bool":
+		return t
+	case "string":
+		return t
+	case "byte", "rune":
+		return t
+		
+	// Base framework special types
+	case "translatedField":
+		return "translation.Field"
+		
+	// Convenience aliases
+	case "text", "email", "url", "slug":
 		return "string"
 	case "datetime", "time", "date":
 		return "types.DateTime"
-	case "float":
+	case "float", "decimal":
 		return "float64"
 	case "sort":
 		return "int"
-	case "bool":
-		return "bool"
+	case "image", "file":
+		return "*storage.Attachment"
+		
+	// Default: assume it's already a valid Go type or custom type
 	default:
 		return t
 	}

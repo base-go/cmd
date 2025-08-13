@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/BaseTechStack/basecmd/utils"
+	"github.com/BaseTechStack/basecmd/version"
 	"github.com/spf13/cobra"
 )
 
@@ -25,7 +26,10 @@ func init() {
 
 func createNewProject(cmd *cobra.Command, args []string) {
 	projectName := args[0]
-	archiveURL := "https://github.com/base-go/base/archive/v2.zip"
+
+	// Use the same version as the CLI for framework download
+	cliVersion := version.Version
+	archiveURL := fmt.Sprintf("https://github.com/BaseTechStack/base/archive/refs/tags/v%s.zip", cliVersion)
 
 	// Create the project directory
 	err := os.Mkdir(projectName, 0755)
@@ -65,15 +69,18 @@ func createNewProject(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// Move contents from the subdirectory to the project root
-	files, err := os.ReadDir(filepath.Join(projectName, "base-v2"))
+	// Move contents from the version-specific subdirectory to the project root
+	versionedDirName := fmt.Sprintf("base-%s", cliVersion)
+	extractedDir := filepath.Join(projectName, versionedDirName)
+
+	files, err := os.ReadDir(extractedDir)
 	if err != nil {
-		fmt.Printf("Error reading template directory: %v\n", err)
+		fmt.Printf("Error reading template directory %s: %v\n", extractedDir, err)
 		return
 	}
 
 	for _, f := range files {
-		oldPath := filepath.Join(projectName, "base-v2", f.Name())
+		oldPath := filepath.Join(extractedDir, f.Name())
 		newPath := filepath.Join(projectName, f.Name())
 		err = os.Rename(oldPath, newPath)
 		if err != nil {
@@ -82,7 +89,7 @@ func createNewProject(cmd *cobra.Command, args []string) {
 	}
 
 	// Remove the now-empty subdirectory
-	os.RemoveAll(filepath.Join(projectName, "base-v2"))
+	os.RemoveAll(extractedDir)
 
 	// Get the absolute path of the new project directory
 	absPath, err := filepath.Abs(projectName)
