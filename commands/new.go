@@ -25,7 +25,7 @@ func init() {
 
 func createNewProject(cmd *cobra.Command, args []string) {
 	projectName := args[0]
-	archiveURL := "https://github.com/base-go/base/archive/main.zip"
+	archiveURL := "https://github.com/base-go/base/archive/v2.zip"
 
 	// Create the project directory
 	err := os.Mkdir(projectName, 0755)
@@ -66,14 +66,14 @@ func createNewProject(cmd *cobra.Command, args []string) {
 	}
 
 	// Move contents from the subdirectory to the project root
-	files, err := os.ReadDir(filepath.Join(projectName, "base-main"))
+	files, err := os.ReadDir(filepath.Join(projectName, "base-v2"))
 	if err != nil {
 		fmt.Printf("Error reading template directory: %v\n", err)
 		return
 	}
 
 	for _, f := range files {
-		oldPath := filepath.Join(projectName, "base-main", f.Name())
+		oldPath := filepath.Join(projectName, "base-v2", f.Name())
 		newPath := filepath.Join(projectName, f.Name())
 		err = os.Rename(oldPath, newPath)
 		if err != nil {
@@ -82,7 +82,7 @@ func createNewProject(cmd *cobra.Command, args []string) {
 	}
 
 	// Remove the now-empty subdirectory
-	os.RemoveAll(filepath.Join(projectName, "base-main"))
+	os.RemoveAll(filepath.Join(projectName, "base-v2"))
 
 	// Get the absolute path of the new project directory
 	absPath, err := filepath.Abs(projectName)
