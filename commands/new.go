@@ -12,6 +12,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 var newCmd = &cobra.Command{
 	Use:   "new [project_name]",
 	Short: "Create a new project",
@@ -39,12 +46,20 @@ func createNewProject(cmd *cobra.Command, args []string) {
 	}
 
 	// Download the archive
+	fmt.Printf("Downloading project template from: %s\n", archiveURL)
 	resp, err := http.Get(archiveURL)
 	if err != nil {
 		fmt.Printf("Error downloading project template: %v\n", err)
 		return
 	}
 	defer resp.Body.Close()
+
+	// Check HTTP response status
+	if resp.StatusCode != http.StatusOK {
+		fmt.Printf("Error: HTTP %d when downloading template\n", resp.StatusCode)
+		fmt.Printf("URL: %s\n", archiveURL)
+		return
+	}
 
 	// Create a temporary file to store the zip
 	tmpZip, err := os.CreateTemp("", "base-project-*.zip")
@@ -55,12 +70,21 @@ func createNewProject(cmd *cobra.Command, args []string) {
 	defer os.Remove(tmpZip.Name())
 
 	// Copy the zip content to the temporary file
-	_, err = io.Copy(tmpZip, resp.Body)
+	bytesWritten, err := io.Copy(tmpZip, resp.Body)
 	if err != nil {
 		fmt.Printf("Error saving project template: %v\n", err)
 		return
 	}
 	tmpZip.Close()
+
+	// Debug: Show file size and check if it's reasonable
+	fmt.Printf("Downloaded %d bytes\n", bytesWritten)
+	if bytesWritten < 1000 {
+		fmt.Printf("Warning: Downloaded file seems too small (%d bytes)\n", bytesWritten)
+		// Read the file to see what we actually downloaded
+		content, _ := os.ReadFile(tmpZip.Name())
+		fmt.Printf("Content preview: %s\n", string(content[:min(len(content), 200)]))
+	}
 
 	// Unzip the file
 	err = utils.Unzip(tmpZip.Name(), projectName)
