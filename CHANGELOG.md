@@ -5,6 +5,31 @@ All notable changes to the Base CLI tool will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.1.0] - 2025-08-13
+
+### Added
+- **🎯 Enhanced Swagger Documentation System** - Complete overhaul of API documentation
+  - Auto-discovery of swagger annotations from controller files
+  - Enhanced `base docs` command to generate comprehensive documentation  
+  - Support for detailed @Param, @Success, @Failure, and @Security annotations
+  - Automatic parsing of parameter types, request bodies, and responses
+  - Integration with `base start -d` flag for automatic doc generation
+- **🔧 API Route Prefix Fix** - Unified API structure  
+  - All swagger routes now correctly prefixed with `/api`
+  - Updated controller templates to include `/api` prefix automatically
+  - Fixed swagger documentation to match actual API structure
+  - New modules automatically generate with correct API routes
+- **📋 Controller Template Improvements**
+  - Consolidated to single controller template (removed duplicate)
+  - Enhanced swagger annotations with detailed parameter information
+  - Better error handling and response schemas
+  - Auto-generation includes security requirements
+
+### Fixed
+- Template generation now uses correct `/api` prefixed routes
+- Swagger documentation matches actual server endpoints
+- Controller generation produces consistent API structure
+
 ## [v2.0.0] - 2025-01-31
 
 ### Added

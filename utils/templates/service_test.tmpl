@@ -1,0 +1,217 @@
+package {{.PackageName}}_test
+
+import (
+	"testing"
+
+	"base/app/{{.PackageName}}"
+	"base/app/models"
+	"base/core/emitter"
+	"base/test"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func Test{{.StructName}}Services(t *testing.T) {
+	helper := test.SetupTest(t)
+	defer helper.TeardownTest()
+
+	// Auto-migrate {{.StructName}} table for testing
+	err := helper.DB.AutoMigrate(&models.{{.StructName}}{})
+	assert.NoError(t, err)
+
+	// Create service with proper emitter and nil storage
+	service := {{.PackageName}}.New{{.StructName}}Service(
+		helper.DB,
+		emitter.New(), // proper emitter
+		nil,            // storage (can be nil)
+		helper.Logger,
+	)
+
+	t.Run("{{.StructName}} service operations comprehensive coverage", func(t *testing.T) {
+		t.Run("Service creation", func(t *testing.T) {
+			// Test that service is created successfully
+			assert.NotNil(t, service)
+		})
+
+		t.Run("Basic CRUD operations", func(t *testing.T) {
+			// Test Create operation
+			createReq := &models.Create{{.StructName}}Request{
+				{{range .Fields}}{{if ne .Relationship ""}}{{else}}{{.Name}}: {{.TestValue}},
+				{{end}}{{end}}
+			}
+
+			{{.LowerName}}, err := service.Create(createReq)
+			assert.NoError(t, err)
+			assert.NotNil(t, {{.LowerName}})
+			assert.NotZero(t, {{.LowerName}}.Id)
+			{{range .Fields}}{{if ne .Relationship ""}}{{else}}assert.Equal(t, {{.TestValue}}, {{$.LowerName}}.{{.Name}})
+			{{end}}{{end}}
+
+			// Test GetById operation
+			found, err := service.GetById({{.LowerName}}.Id)
+			assert.NoError(t, err)
+			assert.NotNil(t, found)
+			assert.Equal(t, {{.LowerName}}.Id, found.Id)
+
+			// Test Update operation
+			updateReq := &models.Update{{.StructName}}Request{
+				{{range .Fields}}{{if ne .Relationship ""}}{{else}}{{.Name}}: {{.UpdateTestValue}},
+				{{end}}{{end}}
+			}
+
+			updated, err := service.Update({{.LowerName}}.Id, updateReq)
+			assert.NoError(t, err)
+			assert.NotNil(t, updated)
+			{{range .Fields}}{{if ne .Relationship ""}}{{else}}assert.Equal(t, {{.UpdateTestValue}}, updated.{{.Name}})
+			{{end}}{{end}}
+
+			// Test GetAll operation
+			result, err := service.GetAll(nil, nil)
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+			assert.NotNil(t, result.Data)
+
+			// Test Delete operation
+			err = service.Delete({{.LowerName}}.Id)
+			assert.NoError(t, err)
+
+			// Verify deletion
+			_, err = service.GetById({{.LowerName}}.Id)
+			assert.Error(t, err) // Should not find deleted record
+		})
+
+		t.Run("get operations", func(t *testing.T) {
+			// Create test {{.LowerName}}
+			{{.LowerName}} := &models.{{.StructName}}{
+				{{range .Fields}}{{.Name}}: {{.TestValue}},
+				{{end}}
+			}
+			err := helper.DB.Create({{.LowerName}}).Error
+			assert.NoError(t, err)
+
+			// Test GetById
+			found, err := service.GetById({{.LowerName}}.Id)
+			assert.NoError(t, err)
+			assert.NotNil(t, found)
+			assert.Equal(t, {{.LowerName}}.Id, found.Id)
+
+			// Test GetById with invalid ID
+			_, err = service.GetById(0)
+			assert.Error(t, err)
+
+			// Test GetById with non-existent ID
+			_, err = service.GetById(99999)
+			assert.Error(t, err)
+		})
+
+		t.Run("update operations", func(t *testing.T) {
+			// Create test {{.LowerName}}
+			{{.LowerName}} := &models.{{.StructName}}{
+				{{range .Fields}}{{.Name}}: {{.TestValue}},
+				{{end}}
+			}
+			err := helper.DB.Create({{.LowerName}}).Error
+			assert.NoError(t, err)
+
+			// Test update
+			updateReq := &models.Update{{.StructName}}Request{
+				Id: {{.LowerName}}.Id,
+				{{range .Fields}}{{.Name}}: {{.UpdateTestValue}},
+				{{end}}
+			}
+
+			updated, err := service.Update({{.LowerName}}.Id, updateReq)
+			assert.NoError(t, err)
+			assert.NotNil(t, updated)
+			{{range .Fields}}assert.Equal(t, {{.UpdateTestValue}}, updated.{{.Name}})
+			{{end}}
+
+			// Test update with invalid ID
+			_, err = service.Update(0, updateReq)
+			assert.Error(t, err)
+
+			// Test update with non-existent ID
+			_, err = service.Update(99999, updateReq)
+			assert.Error(t, err)
+		})
+
+		t.Run("delete operations", func(t *testing.T) {
+			// Create test {{.LowerName}}
+			{{.LowerName}} := &models.{{.StructName}}{
+				{{range .Fields}}{{.Name}}: {{.TestValue}},
+				{{end}}
+			}
+			err := helper.DB.Create({{.LowerName}}).Error
+			assert.NoError(t, err)
+
+			// Test delete
+			err = service.Delete({{.LowerName}}.Id)
+			assert.NoError(t, err)
+
+			// Verify deletion
+			_, err = service.GetById({{.LowerName}}.Id)
+			assert.Error(t, err)
+
+			// Test delete with invalid ID
+			err = service.Delete(0)
+			assert.Error(t, err)
+
+			// Test delete with non-existent ID
+			err = service.Delete(99999)
+			assert.Error(t, err)
+		})
+
+		t.Run("get all operations", func(t *testing.T) {
+			// Create multiple test {{.PluralLowerName}}
+			for i := 0; i < 5; i++ {
+				{{.LowerName}} := &models.{{.StructName}}{
+					{{range .Fields}}{{.Name}}: {{.TestValueWithIndex}},
+					{{end}}
+				}
+				err := helper.DB.Create({{.LowerName}}).Error
+				assert.NoError(t, err)
+			}
+
+			// Test GetAll without pagination
+			result, err := service.GetAll(nil, nil)
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+			assert.NotEmpty(t, result.Data)
+
+			// Test GetAll with pagination
+			page := 1
+			limit := 2
+			result, err = service.GetAll(&page, &limit)
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+			assert.LessOrEqual(t, len(result.Data), limit)
+			assert.Equal(t, page, result.Pagination.Page)
+			assert.Equal(t, limit, result.Pagination.PageSize)
+		})
+
+		t.Run("error cases and edge conditions", func(t *testing.T) {
+			// Test create with duplicate unique field (if applicable)
+			{{range .Fields}}{{if .IsUnique}}
+			{{$.LowerName}}1 := &models.{{$.StructName}}{
+				{{range $.Fields}}{{.Name}}: {{.TestValue}},
+				{{end}}
+			}
+			err := helper.DB.Create({{$.LowerName}}1).Error
+			assert.NoError(t, err)
+
+			{{$.LowerName}}2 := &models.{{$.StructName}}{
+				{{range $.Fields}}{{if eq .Name $.Name}}{{.Name}}: {{.TestValue}}, // Duplicate unique value
+				{{else}}{{.Name}}: {{.TestValue}},
+				{{end}}{{end}}
+			}
+			createReq := &models.Create{{$.StructName}}Request{
+				{{range $.Fields}}{{if eq .Name $.Name}}{{.Name}}: {{.TestValue}}, // Duplicate unique value
+				{{else}}{{.Name}}: {{.TestValue}},
+				{{end}}{{end}}
+			}
+			_, err = service.Create(createReq)
+			assert.Error(t, err) // Should fail due to duplicate unique constraint
+			{{end}}{{end}}
+		})
+	})
+}

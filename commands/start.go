@@ -54,30 +54,8 @@ func setupAirConfig(cwd string) error {
 	return nil
 }
 
-func ensureSwagInstalled() error {
-	if _, err := exec.LookPath("swag"); err != nil {
-		fmt.Println("Installing swag for API documentation...")
-		cmd := exec.Command("go", "install", "github.com/swaggo/swag/cmd/swag@latest")
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		return cmd.Run()
-	}
-	return nil
-}
-
-func generateSwaggerDocs(cwd string) error {
-	fmt.Println("Generating Swagger documentation...")
-	cmd := exec.Command("swag", "init",
-		"--parseDependency",
-		"--parseInternal",
-		"--parseVendor",
-		"--parseDepth", "1",
-		"--generatedTime=false")
-	cmd.Dir = cwd
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
+// Base framework uses custom swagger implementation
+// No need for swaggo/swag installation or generation
 
 func startApplication(cmd *cobra.Command, args []string) {
 	// Get the current working directory
@@ -97,17 +75,20 @@ func startApplication(cmd *cobra.Command, args []string) {
 	}
 
 	if docs {
-		// Install swag if needed
-		if err := ensureSwagInstalled(); err != nil {
-			fmt.Printf("Error installing swag: %v\n", err)
-			return
+		fmt.Println("📚 Generating swagger documentation from annotations...")
+		
+		// Generate swagger docs using the new docs command  
+		docsCmd := exec.Command("./base", "docs")
+		docsCmd.Dir = cwd
+		docsCmd.Stdout = os.Stdout
+		docsCmd.Stderr = os.Stderr
+		
+		if err := docsCmd.Run(); err != nil {
+			fmt.Printf("Warning: Failed to generate docs: %v\n", err)
+			fmt.Println("Continuing without auto-generated documentation...")
 		}
-
-		// Generate swagger docs
-		if err := generateSwaggerDocs(cwd); err != nil {
-			fmt.Printf("Error generating swagger docs: %v\n", err)
-			return
-		}
+		
+		fmt.Println("📚 Swagger documentation will be available at /swagger/ when server starts")
 	}
 
 	if hotReload {
@@ -129,7 +110,13 @@ func startApplication(cmd *cobra.Command, args []string) {
 		airCmd.Stdout = os.Stdout
 		airCmd.Stderr = os.Stderr
 		airCmd.Dir = cwd
-		airCmd.Env = append(os.Environ(), "SWAG_DISABLED=true")
+		
+		// Set environment variables
+		env := os.Environ()
+		if docs {
+			env = append(env, "SWAGGER_ENABLED=true")
+		}
+		airCmd.Env = env
 
 		if err := airCmd.Run(); err != nil {
 			fmt.Printf("Error running application with air: %v\n", err)
@@ -144,6 +131,13 @@ func startApplication(cmd *cobra.Command, args []string) {
 		mainCmd.Stdout = os.Stdout
 		mainCmd.Stderr = os.Stderr
 		mainCmd.Dir = cwd
+		
+		// Set environment variables
+		env := os.Environ()
+		if docs {
+			env = append(env, "SWAGGER_ENABLED=true")
+		}
+		mainCmd.Env = env
 
 		if err := mainCmd.Run(); err != nil {
 			fmt.Printf("Error running application: %v\n", err)

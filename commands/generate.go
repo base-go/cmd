@@ -104,6 +104,12 @@ func generateModule(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	// Generate Rails-style tests
+	if err := utils.GenerateRailsStyleTests(structName, pluralName, packageName, fieldStructs); err != nil {
+		fmt.Printf("Error generating Rails-style tests: %v\n", err)
+		return
+	}
+
 	// Check if goimports is installed
 	if _, err := exec.LookPath("goimports"); err != nil {
 		fmt.Println("goimports not found, installing...")

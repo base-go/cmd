@@ -1,0 +1,116 @@
+package {{.PackageName}}_test
+
+import (
+	"testing"
+	"time"
+
+	"base/app/models"
+	"base/test"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func Test{{.StructName}}Models(t *testing.T) {
+	helper := test.SetupTest(t)
+	defer helper.TeardownTest()
+
+	// Auto-migrate {{.StructName}} table for testing
+	err := helper.DB.AutoMigrate(&models.{{.StructName}}{})
+	assert.NoError(t, err)
+
+	t.Run("{{.StructName}} model operations comprehensive coverage", func(t *testing.T) {
+		t.Run("create and basic operations", func(t *testing.T) {
+			// Test {{.StructName}} creation
+			{{.LowerName}} := &models.{{.StructName}}{
+				{{range .Fields}}{{if ne .Relationship ""}}{{else}}{{.Name}}: {{.TestValue}},
+				{{end}}{{end}}
+			}
+			err := helper.DB.Create({{.LowerName}}).Error
+			assert.NoError(t, err)
+			assert.NotZero(t, {{.LowerName}}.Id)
+			assert.NotZero(t, {{.LowerName}}.CreatedAt)
+			assert.NotZero(t, {{.LowerName}}.UpdatedAt)
+
+			// Test find by ID
+			var found{{.StructName}} models.{{.StructName}}
+			err = helper.DB.First(&found{{.StructName}}, {{.LowerName}}.Id).Error
+			assert.NoError(t, err)
+			assert.Equal(t, {{.LowerName}}.Id, found{{.StructName}}.Id)
+			{{range .Fields}}{{if ne .Relationship ""}}{{else}}assert.Equal(t, {{.TestValue}}, found{{$.StructName}}.{{.Name}})
+			{{end}}{{end}}
+		})
+
+		t.Run("{{.StructName}} model methods", func(t *testing.T) {
+			{{.LowerName}} := &models.{{.StructName}}{
+				{{range .Fields}}{{if ne .Relationship ""}}{{else}}{{.Name}}: {{.TestValue}},
+				{{end}}{{end}}
+			}
+			err := helper.DB.Create({{.LowerName}}).Error
+			assert.NoError(t, err)
+
+			// Test TableName
+			assert.Equal(t, "{{.TableName}}", {{.LowerName}}.TableName())
+
+			// Test GetId
+			assert.Equal(t, {{.LowerName}}.Id, {{.LowerName}}.GetId())
+
+			// Test GetModelName
+			assert.Equal(t, "{{.LowerName}}", {{.LowerName}}.GetModelName())
+
+			// Test ToListResponse
+			listResponse := {{.LowerName}}.ToListResponse()
+			assert.NotNil(t, listResponse)
+			assert.Equal(t, {{.LowerName}}.Id, listResponse.Id)
+			{{range .Fields}}{{if ne .Relationship ""}}{{else}}assert.Equal(t, {{.TestValue}}, listResponse.{{.Name}})
+			{{end}}{{end}}
+
+			// Test ToResponse
+			response := {{.LowerName}}.ToResponse()
+			assert.NotNil(t, response)
+			assert.Equal(t, {{.LowerName}}.Id, response.Id)
+			{{range .Fields}}{{if ne .Relationship ""}}{{else}}assert.Equal(t, {{.TestValue}}, response.{{.Name}})
+			{{end}}{{end}}
+
+			// Test Preload
+			query := {{.LowerName}}.Preload(helper.DB)
+			assert.NotNil(t, query)
+		})
+
+		t.Run("{{.StructName}} soft delete", func(t *testing.T) {
+			{{.LowerName}} := &models.{{.StructName}}{
+				{{range .Fields}}{{if ne .Relationship ""}}{{else}}{{.Name}}: {{.TestValue}},
+				{{end}}{{end}}
+			}
+			err := helper.DB.Create({{.LowerName}}).Error
+			assert.NoError(t, err)
+
+			// Test timestamps
+			assert.True(t, {{.LowerName}}.CreatedAt.Before(time.Now().Add(time.Second)))
+			assert.True(t, {{.LowerName}}.UpdatedAt.Before(time.Now().Add(time.Second)))
+
+			// Test soft delete
+			err = helper.DB.Delete({{.LowerName}}).Error
+			assert.NoError(t, err)
+
+			// Should not find deleted record
+			var found{{.StructName}} models.{{.StructName}}
+			err = helper.DB.First(&found{{.StructName}}, {{.LowerName}}.Id).Error
+			assert.Error(t, err)
+
+			// Should find with Unscoped
+			err = helper.DB.Unscoped().First(&found{{.StructName}}, {{.LowerName}}.Id).Error
+			assert.NoError(t, err)
+			assert.Equal(t, {{.LowerName}}.Id, found{{.StructName}}.Id)
+			assert.NotZero(t, found{{.StructName}}.DeletedAt)
+		})
+
+		t.Run("validation of required fields", func(t *testing.T) {
+			{{.LowerName}} := &models.{{.StructName}}{}
+			err := helper.DB.Create({{.LowerName}}).Error
+			{{range .Fields}}{{if and (not (eq .Type "*storage.Attachment")) (not (ne .Relationship "")) (.Required)}}
+			// Missing required field {{.Name}} should cause error
+			assert.Error(t, err)
+			{{end}}{{end}}
+		})
+	})
+}
