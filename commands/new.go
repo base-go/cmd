@@ -98,8 +98,43 @@ func createNewProject(cmd *cobra.Command, args []string) {
 	}
 
 	// Move contents from the version-specific subdirectory to the project root
-	versionedDirName := fmt.Sprintf("base-%s", tag)
-	extractedDir := filepath.Join(projectName, versionedDirName)
+	// GitHub archives may produce either base-vX.Y.Z or base-X.Y.Z
+	candidateDirs := []string{
+		fmt.Sprintf("base-%s", tag),          // e.g., base-v2.1.3
+		fmt.Sprintf("base-%s", normalized),   // e.g., base-2.1.3
+	}
+
+	var extractedDir string
+	for _, d := range candidateDirs {
+		p := filepath.Join(projectName, d)
+		if fi, err := os.Stat(p); err == nil && fi.IsDir() {
+			extractedDir = p
+			break
+		}
+	}
+
+	// Fallback: pick the first directory that starts with "base-"
+	if extractedDir == "" {
+		if entries, err := os.ReadDir(projectName); err == nil {
+			for _, e := range entries {
+				if e.IsDir() && strings.HasPrefix(e.Name(), "base-") {
+					extractedDir = filepath.Join(projectName, e.Name())
+					break
+				}
+			}
+		}
+	}
+
+	if extractedDir == "" {
+		fmt.Printf("Error: could not locate extracted template directory. Looked for: %v\n", candidateDirs)
+		if entries, err := os.ReadDir(projectName); err == nil {
+			fmt.Printf("Contents of '%s':\n", projectName)
+			for _, e := range entries {
+				fmt.Println(" -", e.Name())
+			}
+		}
+		return
+	}
 
 	files, err := os.ReadDir(extractedDir)
 	if err != nil {

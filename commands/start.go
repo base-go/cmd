@@ -76,18 +76,18 @@ func startApplication(cmd *cobra.Command, args []string) {
 
 	if docs {
 		fmt.Println("📚 Generating swagger documentation from annotations...")
-		
-		// Generate swagger docs using the new docs command  
-		docsCmd := exec.Command("./base", "docs")
+
+		// Generate swagger docs using the new docs command
+		docsCmd := exec.Command("base", "docs")
 		docsCmd.Dir = cwd
 		docsCmd.Stdout = os.Stdout
 		docsCmd.Stderr = os.Stderr
-		
+
 		if err := docsCmd.Run(); err != nil {
 			fmt.Printf("Warning: Failed to generate docs: %v\n", err)
 			fmt.Println("Continuing without auto-generated documentation...")
 		}
-		
+
 		fmt.Println("📚 Swagger documentation will be available at /swagger/ when server starts")
 	}
 
@@ -110,7 +110,7 @@ func startApplication(cmd *cobra.Command, args []string) {
 		airCmd.Stdout = os.Stdout
 		airCmd.Stderr = os.Stderr
 		airCmd.Dir = cwd
-		
+
 		// Set environment variables
 		env := os.Environ()
 		if docs {
@@ -131,7 +131,7 @@ func startApplication(cmd *cobra.Command, args []string) {
 		mainCmd.Stdout = os.Stdout
 		mainCmd.Stderr = os.Stderr
 		mainCmd.Dir = cwd
-		
+
 		// Set environment variables
 		env := os.Environ()
 		if docs {
