@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/BaseTechStack/basecmd/utils"
 	"github.com/BaseTechStack/basecmd/version"
@@ -35,8 +36,11 @@ func createNewProject(cmd *cobra.Command, args []string) {
 	projectName := args[0]
 
 	// Use the same version as the CLI for framework download
-	cliVersion := version.Version
-	archiveURL := fmt.Sprintf("https://github.com/BaseTechStack/base/archive/refs/tags/v%s.zip", cliVersion)
+	// Normalize to ensure exactly one leading 'v' in the tag
+	rawVersion := version.Version
+	normalized := strings.TrimPrefix(rawVersion, "v")
+	tag := "v" + normalized
+	archiveURL := fmt.Sprintf("https://github.com/BaseTechStack/base/archive/refs/tags/%s.zip", tag)
 
 	// Create the project directory
 	err := os.Mkdir(projectName, 0755)
@@ -94,7 +98,7 @@ func createNewProject(cmd *cobra.Command, args []string) {
 	}
 
 	// Move contents from the version-specific subdirectory to the project root
-	versionedDirName := fmt.Sprintf("base-%s", cliVersion)
+	versionedDirName := fmt.Sprintf("base-%s", tag)
 	extractedDir := filepath.Join(projectName, versionedDirName)
 
 	files, err := os.ReadDir(extractedDir)
