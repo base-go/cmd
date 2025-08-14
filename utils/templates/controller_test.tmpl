@@ -13,8 +13,8 @@ import (
 	"base/core/emitter"
 	"base/core/router"
 	"base/test"
-
-	"github.com/stretchr/testify/assert"
+	{{if hasField .Fields "translation.Field"}}"base/core/translation"
+	{{end}}"github.com/stretchr/testify/assert"
 )
 
 func Test{{.Model}}Controllers(t *testing.T) {
@@ -42,7 +42,8 @@ func Test{{.Model}}Controllers(t *testing.T) {
 	t.Run("{{.Model}} controller operations comprehensive coverage", func(t *testing.T) {
 		t.Run("Create {{.Model}}", func(t *testing.T) {
 			createReq := models.Create{{.Model}}Request{
-				{{range .Fields}}{{if not .IsRelation}}{{.Name}}: {{.TestValue}},
+				{{range .Fields}}{{if not .IsRelation}}{{if and (ne .Type "*storage.Attachment")}}{{.Name}}: {{.TestValue}}, 
+				{{end}}{{else if eq .Relationship "belongs_to"}}{{.Name}}Id: 1, 
 				{{end}}{{end}}
 			}
 
@@ -59,14 +60,14 @@ func Test{{.Model}}Controllers(t *testing.T) {
 			err := json.Unmarshal(w.Body.Bytes(), &response)
 			assert.NoError(t, err)
 			assert.NotZero(t, response.Id)
-			{{range .Fields}}{{if not .IsRelation}}assert.Equal(t, {{.TestValue}}, response.{{.Name}})
+			{{range .Fields}}{{if and (not .IsRelation) (ne .Type "*storage.Attachment")}}assert.Equal(t, {{.TestValue}}, response.{{.Name}})
 			{{end}}{{end}}
 		})
 
 		t.Run("Get {{.Model}} by ID", func(t *testing.T) {
 			// Create test {{.ModelLower}}
 			{{.ModelLower}} := &models.{{.Model}}{
-				{{range .Fields}}{{if not .IsRelation}}{{.Name}}: {{.TestValue}},
+				{{range .Fields}}{{if and (not .IsRelation) (ne .Type "*storage.Attachment")}}{{.Name}}: {{.TestValue}},
 				{{end}}{{end}}
 			}
 			err := helper.DB.Create({{.ModelLower}}).Error
@@ -82,21 +83,22 @@ func Test{{.Model}}Controllers(t *testing.T) {
 			err = json.Unmarshal(w.Body.Bytes(), &response)
 			assert.NoError(t, err)
 			assert.Equal(t, {{.ModelLower}}.Id, response.Id)
-			{{range .Fields}}{{if not .IsRelation}}assert.Equal(t, {{.TestValue}}, response.{{.Name}})
+			{{range .Fields}}{{if and (not .IsRelation) (ne .Type "*storage.Attachment")}}assert.Equal(t, {{.TestValue}}, response.{{.Name}})
 			{{end}}{{end}}
 		})
 
 		t.Run("Update {{.Model}}", func(t *testing.T) {
 			// Create test {{.ModelLower}}
 			{{.ModelLower}} := &models.{{.Model}}{
-				{{range .Fields}}{{if not .IsRelation}}{{.Name}}: {{.TestValue}},
+				{{range .Fields}}{{if and (not .IsRelation) (ne .Type "*storage.Attachment")}}{{.Name}}: {{.TestValue}},
 				{{end}}{{end}}
 			}
 			err := helper.DB.Create({{.ModelLower}}).Error
 			assert.NoError(t, err)
 
 			updateReq := models.Update{{.Model}}Request{
-				{{range .Fields}}{{if not .IsRelation}}{{.Name}}: {{.UpdateTestValue}},
+				{{range .Fields}}{{if not .IsRelation}}{{if and (ne .Type "*storage.Attachment")}}{{if eq .Type "bool"}}{{.Name}}: func() *bool { b := {{.UpdateTestValue}}; return &b }(), {{else}}{{.Name}}: {{.UpdateTestValue}}, {{end}}
+				{{end}}{{else if eq .Relationship "belongs_to"}}{{.Name}}Id: 2, 
 				{{end}}{{end}}
 			}
 
@@ -113,14 +115,14 @@ func Test{{.Model}}Controllers(t *testing.T) {
 			err = json.Unmarshal(w.Body.Bytes(), &response)
 			assert.NoError(t, err)
 			assert.Equal(t, {{.ModelLower}}.Id, response.Id)
-			{{range .Fields}}assert.Equal(t, {{.UpdateTestValue}}, response.{{.Name}})
-			{{end}}
+			{{range .Fields}}{{if and (not .IsRelation) (ne .Type "*storage.Attachment")}}assert.Equal(t, {{.UpdateTestValue}}, response.{{.Name}})
+			{{end}}{{end}}
 		})
 
 		t.Run("Delete {{.Model}}", func(t *testing.T) {
 			// Create test {{.ModelLower}}
 			{{.ModelLower}} := &models.{{.Model}}{
-				{{range .Fields}}{{if not .IsRelation}}{{.Name}}: {{.TestValue}},
+				{{range .Fields}}{{if and (not .IsRelation) (ne .Type "*storage.Attachment")}}{{.Name}}: {{.TestValue}},
 				{{end}}{{end}}
 			}
 			err := helper.DB.Create({{.ModelLower}}).Error
@@ -142,8 +144,8 @@ func Test{{.Model}}Controllers(t *testing.T) {
 			// Create multiple test {{.PluralLower}}
 			for i := 0; i < 5; i++ {
 				{{.ModelLower}} := &models.{{.Model}}{
-					{{range .Fields}}{{.Name}}: {{.TestValueWithIndex}},
-					{{end}}
+					{{range .Fields}}{{if and (not .IsRelation) (ne .Type "*storage.Attachment")}}{{.Name}}: {{.TestValueWithIndex}},
+					{{end}}{{end}}
 				}
 				err := helper.DB.Create({{.ModelLower}}).Error
 				assert.NoError(t, err)
@@ -193,7 +195,7 @@ func Test{{.Model}}Controllers(t *testing.T) {
 
 			// Test Update with invalid ID
 			updateReq := models.Update{{.Model}}Request{
-				{{range .Fields}}{{if not .IsRelation}}{{.Name}}: {{.UpdateTestValue}},
+				{{range .Fields}}{{if and (not .IsRelation) (ne .Type "*storage.Attachment")}}{{if eq .Type "bool"}}{{.Name}}: func() *bool { b := {{.UpdateTestValue}}; return &b }(),{{else}}{{.Name}}: {{.UpdateTestValue}},{{end}}
 				{{end}}{{end}}
 			}
 			jsonData, _ := json.Marshal(updateReq)

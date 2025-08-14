@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,6 +14,52 @@ import (
 var (
 	htmlFlag bool
 )
+
+// ANSI color codes
+const (
+	colorReset  = "\033[0m"
+	colorRed    = "\033[31m"
+	colorGreen  = "\033[32m"
+	colorYellow = "\033[33m"
+	colorBlue   = "\033[34m"
+	colorPurple = "\033[35m"
+	colorCyan   = "\033[36m"
+	colorWhite  = "\033[37m"
+	colorGray   = "\033[90m"
+	colorBold   = "\033[1m"
+)
+
+// colorizeTestOutput adds colors to Go test output
+func colorizeTestOutput(line string) string {
+	switch {
+	case strings.Contains(line, "--- PASS:"):
+		return colorGreen + line + colorReset
+	case strings.Contains(line, "--- FAIL:"):
+		return colorRed + line + colorReset
+	case strings.Contains(line, "=== RUN"):
+		return colorBlue + line + colorReset
+	case strings.Contains(line, "PASS") && !strings.Contains(line, "---"):
+		return colorGreen + line + colorReset
+	case strings.Contains(line, "FAIL") && !strings.Contains(line, "---"):
+		return colorRed + line + colorReset
+	case strings.Contains(line, "Error Trace:"):
+		return colorRed + line + colorReset
+	case strings.Contains(line, "expected:"):
+		return colorYellow + line + colorReset
+	case strings.Contains(line, "actual:"):
+		return colorPurple + line + colorReset
+	case strings.Contains(line, "Test:"):
+		return colorCyan + line + colorReset
+	case strings.HasPrefix(line, "?"):
+		return colorGray + line + colorReset
+	case strings.HasPrefix(line, "ok"):
+		return colorGreen + line + colorReset
+	case strings.Contains(line, "coverage:"):
+		return colorCyan + line + colorReset
+	default:
+		return line
+	}
+}
 
 var testCmd = &cobra.Command{
 	Use:   "test [module]",
@@ -83,7 +130,11 @@ func runTest(cmd *cobra.Command, args []string) error {
 			testPath,
 		}
 
-		fmt.Printf("Running tests with coverage for %s...\n", getModuleDescription(module))
+		// Print beautiful header for coverage
+		fmt.Printf("%s🧪 Running Base Framework Tests with Coverage%s\n", colorBold+colorWhite, colorReset)
+		fmt.Printf("%s%s%s\n", colorGray, strings.Repeat("=", 50), colorReset)
+		fmt.Printf("📋 Module: %s%s%s\n", colorCyan, getModuleDescription(module), colorReset)
+		fmt.Printf("📊 Coverage: %sEnabled%s\n\n", colorGreen, colorReset)
 
 		// Run the test command
 		if err := runGoCommand(testArgs); err != nil {
@@ -111,14 +162,18 @@ func runTest(cmd *cobra.Command, args []string) error {
 			testPath,
 		}
 
-		fmt.Printf("Running tests for %s...\n", getModuleDescription(module))
+		// Print beautiful header
+		fmt.Printf("%s🧪 Running Base Framework Tests%s\n", colorBold+colorWhite, colorReset)
+		fmt.Printf("%s%s%s\n", colorGray, strings.Repeat("=", 50), colorReset)
+		fmt.Printf("📋 Module: %s%s%s\n\n", colorCyan, getModuleDescription(module), colorReset)
 
 		if err := runGoCommand(testArgs); err != nil {
+			fmt.Printf("\n%s🚫 Tests failed%s\n", colorRed, colorReset)
 			return fmt.Errorf("tests failed: %v", err)
 		}
 	}
 
-	fmt.Println("✅ Tests completed successfully!")
+	fmt.Printf("\n%s✅ Tests completed successfully!%s\n", colorGreen+colorBold, colorReset)
 	return nil
 }
 
@@ -137,11 +192,52 @@ func getModuleDescription(module string) string {
 
 func runGoCommand(args []string) error {
 	cmd := exec.Command("go", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
 	cmd.Dir = "."
 
-	return cmd.Run()
+	// Create pipes to capture stdout and stderr
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
+
+	// Start the command
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	// Create channels to handle output from both pipes
+	done := make(chan bool, 2)
+
+	// Handle stdout
+	go func() {
+		scanner := bufio.NewScanner(stdoutPipe)
+		for scanner.Scan() {
+			line := scanner.Text()
+			fmt.Println(colorizeTestOutput(line))
+		}
+		done <- true
+	}()
+
+	// Handle stderr
+	go func() {
+		scanner := bufio.NewScanner(stderrPipe)
+		for scanner.Scan() {
+			line := scanner.Text()
+			fmt.Fprintln(os.Stderr, colorizeTestOutput(line))
+		}
+		done <- true
+	}()
+
+	// Wait for both goroutines to finish
+	<-done
+	<-done
+
+	// Wait for the command to finish
+	return cmd.Wait()
 }
 
 func generateCoverageReport(coverageFile, module string) error {

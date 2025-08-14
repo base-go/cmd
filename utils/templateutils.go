@@ -52,10 +52,10 @@ type FieldStruct struct {
 	TestValueWithIndex string // Test value with index for loops
 	TestValueUnique    string // Unique test value for constraint tests
 	IsUnique           bool   // Whether this field has unique constraint
-	
+
 	// Parent context variables to be accessible inside range loops
-	StructName         string // Parent struct name for use in range loops
-	LowerName          string // Lowercase struct name for use in range loops
+	StructName string // Parent struct name for use in range loops
+	LowerName  string // Lowercase struct name for use in range loops
 }
 
 // getTestValues generates test values for different field types
@@ -67,7 +67,17 @@ func getTestValues(fieldType, fieldName string) (testValue, updateTestValue, tes
 		testValueWithIndex = fmt.Sprintf(`fmt.Sprintf("Test %s %%d", i)`, ToPascalCase(fieldName))
 		testValueUnique = fmt.Sprintf(`"Unique %s"`, ToPascalCase(fieldName))
 		isUnique = (fieldName == "email" || fieldName == "username")
-	case "int", "uint":
+	case "translation.Field":
+		testValue = fmt.Sprintf(`translation.NewField("Test %s")`, ToPascalCase(fieldName))
+		updateTestValue = fmt.Sprintf(`translation.NewField("Updated %s")`, ToPascalCase(fieldName))
+		testValueWithIndex = fmt.Sprintf(`translation.NewField(fmt.Sprintf("Test %s %%d", i))`, ToPascalCase(fieldName))
+		testValueUnique = fmt.Sprintf(`translation.NewField("Unique %s")`, ToPascalCase(fieldName))
+	case "int":
+		testValue = "123"
+		updateTestValue = "456"
+		testValueWithIndex = "int(100 + i)"
+		testValueUnique = "789"
+	case "uint":
 		testValue = "123"
 		updateTestValue = "456"
 		testValueWithIndex = "uint(100 + i)"
@@ -82,11 +92,21 @@ func getTestValues(fieldType, fieldName string) (testValue, updateTestValue, tes
 		updateTestValue = "false"
 		testValueWithIndex = "(i%2 == 0)"
 		testValueUnique = "false"
+	case "*bool":
+		testValue = "func() *bool { b := true; return &b }()"
+		updateTestValue = "func() *bool { b := false; return &b }()"
+		testValueWithIndex = "func() *bool { b := (i%2 == 0); return &b }()"
+		testValueUnique = "func() *bool { b := false; return &b }()"
 	case "time.Time":
 		testValue = "time.Now()"
 		updateTestValue = "time.Now().Add(time.Hour)"
 		testValueWithIndex = "time.Now().Add(time.Duration(i) * time.Minute)"
 		testValueUnique = "time.Now().Add(time.Hour * 24)"
+	case "types.DateTime":
+		testValue = "types.Now()"
+		updateTestValue = "types.Now().Add(time.Hour)"
+		testValueWithIndex = "types.Now().Add(time.Duration(i) * time.Minute)"
+		testValueUnique = "types.Now().Add(time.Hour * 24)"
 	default:
 		// For relationships and other types
 		testValue = "nil"
@@ -116,15 +136,24 @@ func processRelationshipField(name string, relatedModel string, relationship str
 
 	switch relationship {
 	case "belongs_to", "belongsTo":
-		// Add the relationship field only
+		// Don't add the foreign key field here - the template will generate it
+		// based on the relationship field
+
+		// Add the relationship field
 		fields = append(fields, FieldStruct{
-			Name:         ToPascalCase(name),
-			Type:         "*" + relatedModel,
-			JSONName:     ToSnakeCase(name),
-			DBName:       ToSnakeCase(name),
-			Relationship: relationship,
-			RelatedModel: relatedModel,
-			IsRequired:   false,
+			Name:               ToPascalCase(name),
+			Type:               "*" + relatedModel,
+			JSONName:           ToSnakeCase(name),
+			DBName:             ToSnakeCase(name),
+			Relationship:       relationship,
+			RelatedModel:       relatedModel,
+			IsRequired:         false,
+			IsRelation:         true,
+			GORM:               fmt.Sprintf("foreignKey:%sId", ToPascalCase(name)),
+			TestValue:          "nil",
+			UpdateTestValue:    "nil",
+			TestValueWithIndex: "nil",
+			TestValueUnique:    "nil",
 		})
 
 	case "has_many", "hasMany":
@@ -147,12 +176,12 @@ func processRelationshipField(name string, relatedModel string, relationship str
 // inferFieldType infers field type from field name
 func inferFieldType(fieldName string) string {
 	lower := strings.ToLower(fieldName)
-	
+
 	// Relation patterns
 	if strings.HasSuffix(lower, "_id") {
 		return "uint" // Foreign key
 	}
-	
+
 	// Text fields (should be TEXT in database)
 	textFields := []string{"description", "content", "body", "notes", "comment", "summary", "bio", "about"}
 	for _, tf := range textFields {
@@ -160,7 +189,7 @@ func inferFieldType(fieldName string) string {
 			return "text"
 		}
 	}
-	
+
 	// Boolean fields
 	boolFields := []string{"is_", "has_", "can_", "enabled", "active", "published", "verified", "confirmed"}
 	for _, bf := range boolFields {
@@ -168,7 +197,7 @@ func inferFieldType(fieldName string) string {
 			return "bool"
 		}
 	}
-	
+
 	// Numeric fields
 	numericFields := []string{"count", "price", "amount", "quantity", "number", "rating", "score", "weight", "height", "width"}
 	for _, nf := range numericFields {
@@ -179,7 +208,7 @@ func inferFieldType(fieldName string) string {
 			return "int"
 		}
 	}
-	
+
 	// Date/time fields - check suffixes first, then contains
 	if strings.HasSuffix(lower, "_at") || strings.HasSuffix(lower, "_on") || strings.HasSuffix(lower, "_date") {
 		return "datetime"
@@ -190,7 +219,7 @@ func inferFieldType(fieldName string) string {
 			return "datetime"
 		}
 	}
-	
+
 	// Email, URL fields
 	if strings.Contains(lower, "email") {
 		return "email"
@@ -198,7 +227,7 @@ func inferFieldType(fieldName string) string {
 	if strings.Contains(lower, "url") || strings.Contains(lower, "link") {
 		return "url"
 	}
-	
+
 	// Image/file fields
 	if strings.Contains(lower, "image") || strings.Contains(lower, "photo") || strings.Contains(lower, "picture") || strings.Contains(lower, "avatar") {
 		return "image"
@@ -206,22 +235,22 @@ func inferFieldType(fieldName string) string {
 	if strings.Contains(lower, "file") || strings.Contains(lower, "document") || strings.Contains(lower, "attachment") {
 		return "file"
 	}
-	
+
 	// Translated fields (Base framework feature)
 	if strings.Contains(lower, "translation") || strings.Contains(lower, "i18n") || strings.Contains(lower, "locale") {
 		return "translatedField"
 	}
-	
+
 	// Default to string for varchar(255)
 	return "string"
 }
 
 func ProcessField(fieldDef string) []FieldStruct {
 	parts := strings.Split(fieldDef, ":")
-	
+
 	name := parts[0]
 	var fieldType string
-	
+
 	// Smart field inference: if only field name provided, infer type
 	if len(parts) == 1 {
 		fieldType = inferFieldType(name)
@@ -255,17 +284,15 @@ func ProcessField(fieldDef string) []FieldStruct {
 	if strings.HasSuffix(name, "_id") && fieldType == "uint" {
 		relationName := strings.TrimSuffix(name, "_id")
 		relatedModel := ToPascalCase(relationName)
-		
+
 		// Check if this is a core model (common core models)
 		coreModels := map[string]string{
-			"user":     "users.User",
-			"author":   "users.User", // Authors are users too
-			"category": "Category",   // App model
-			"tag":      "Tag",        // App model  
-			"media":    "media.Media",
-			"file":     "media.Media",
+			"user":   "users.User",
+			"author": "users.User", // Authors are users too
+			"media":  "media.Media",
+			"file":   "media.Media",
 		}
-		
+
 		modelType := relatedModel
 		if coreType, exists := coreModels[strings.ToLower(relationName)]; exists {
 			modelType = coreType
@@ -274,10 +301,10 @@ func ProcessField(fieldDef string) []FieldStruct {
 		// Create both the foreign key field and the relationship field
 		goType := GetGoType(fieldType)
 		testValue, updateTestValue, testValueWithIndex, testValueUnique, isUnique := getTestValues(goType, name)
-		
+
 		return []FieldStruct{
 			{
-				Name:               ToPascalCase(name),
+				Name:               ToPascalCase(name), // This is the foreign key field (e.g., ParentId)
 				Type:               goType,
 				JSONName:           ToSnakeCase(name),
 				DBName:             ToSnakeCase(name),
@@ -287,16 +314,17 @@ func ProcessField(fieldDef string) []FieldStruct {
 				TestValueWithIndex: testValueWithIndex,
 				TestValueUnique:    testValueUnique,
 				IsUnique:           isUnique,
-				IsRelation:         false, // Foreign key field is not a relation itself
+				IsRelation:         false, // This is the FK field, not the relation itself
+				Relationship:       "",    // Explicitly set to empty for template matching
 			},
 			{
-				Name:               ToPascalCase(relationName),
-				Type:               modelType,
+				Name:               ToPascalCase(relationName), // This is the relationship field (e.g., Parent)
+				Type:               "*" + modelType,
 				JSONName:           ToSnakeCase(relationName),
 				DBName:             ToSnakeCase(relationName),
 				Relationship:       "belongs_to",
 				RelatedModel:       modelType,
-				IsRelation:         true, // This is the actual relation field
+				IsRelation:         true,
 				GORM:               fmt.Sprintf("foreignKey:%s", ToPascalCase(name)),
 				TestValue:          "nil",
 				UpdateTestValue:    "nil",
@@ -309,7 +337,7 @@ func ProcessField(fieldDef string) []FieldStruct {
 	// Handle regular fields
 	goType := GetGoType(fieldType)
 	testValue, updateTestValue, testValueWithIndex, testValueUnique, isUnique := getTestValues(goType, name)
-	
+
 	// Add GORM size for better MySQL field types
 	var gormTag string
 	switch fieldType {
@@ -330,7 +358,7 @@ func ProcessField(fieldDef string) []FieldStruct {
 	default:
 		gormTag = "" // No special GORM tag needed
 	}
-	
+
 	return []FieldStruct{{
 		Name:               ToPascalCase(name),
 		Type:               goType,
@@ -425,7 +453,7 @@ func GenerateFileFromTemplate(dir, filename, templateName string, naming *Naming
 		enhancedFields[i].StructName = naming.Model
 		enhancedFields[i].LowerName = naming.ModelLower
 	}
-	
+
 	// Execute template with enhanced data structure
 	data := struct {
 		*NamingConvention

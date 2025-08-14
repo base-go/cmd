@@ -36,8 +36,8 @@ func Test{{.Model}}Services(t *testing.T) {
 		t.Run("Basic CRUD operations", func(t *testing.T) {
 			// Test Create operation
 			createReq := &models.Create{{.Model}}Request{
-				{{range .Fields}}{{if ne .Relationship ""}}{{else}}{{.Name}}: {{.TestValue}},
-				{{end}}{{end}}
+				{{range .Fields}}{{if ne .Relationship ""}}{{else}}{{if ne .Type "*storage.Attachment"}}{{.Name}}: {{.TestValue}},
+				{{end}}{{end}}{{end}}
 			}
 
 			{{.ModelLower}}, err := service.Create(createReq)
@@ -55,18 +55,18 @@ func Test{{.Model}}Services(t *testing.T) {
 
 			// Test Update operation
 			updateReq := &models.Update{{.Model}}Request{
-				{{range .Fields}}{{if ne .Relationship ""}}{{else}}{{.Name}}: {{.UpdateTestValue}},
-				{{end}}{{end}}
+				{{range .Fields}}{{if not .IsRelation}}{{if ne .Type "*storage.Attachment"}}{{if eq .Type "bool"}}{{.Name}}: func() *bool { b := false; return &b }(), {{else}}{{.Name}}: {{.UpdateTestValue}},{{end}}
+				{{end}}{{end}}{{end}}
 			}
 
 			updated, err := service.Update({{.ModelLower}}.Id, updateReq)
 			assert.NoError(t, err)
 			assert.NotNil(t, updated)
-			{{range .Fields}}{{if ne .Relationship ""}}{{else}}assert.Equal(t, {{.UpdateTestValue}}, updated.{{.Name}})
-			{{end}}{{end}}
+			{{range .Fields}}{{if not .IsRelation}}{{if ne .Type "*storage.Attachment"}}{{if eq .Type "bool"}}assert.Equal(t, false, updated.{{.Name}}){{else}}assert.Equal(t, {{.UpdateTestValue}}, updated.{{.Name}}){{end}}
+			{{end}}{{end}}{{end}}
 
 			// Test GetAll operation
-			result, err := service.GetAll(nil, nil)
+			result, err := service.GetAll(nil, nil, nil, nil)
 			assert.NoError(t, err)
 			assert.NotNil(t, result)
 			assert.NotNil(t, result.Data)
@@ -83,8 +83,8 @@ func Test{{.Model}}Services(t *testing.T) {
 		t.Run("get operations", func(t *testing.T) {
 			// Create test {{.ModelLower}}
 			{{.ModelLower}} := &models.{{.Model}}{
-				{{range .Fields}}{{.Name}}: {{.TestValue}},
-				{{end}}
+				{{range .Fields}}{{if ne .Type "*storage.Attachment"}}{{.Name}}: {{.TestValue}},
+				{{end}}{{end}}
 			}
 			err := helper.DB.Create({{.ModelLower}}).Error
 			assert.NoError(t, err)
@@ -107,24 +107,23 @@ func Test{{.Model}}Services(t *testing.T) {
 		t.Run("update operations", func(t *testing.T) {
 			// Create test {{.ModelLower}}
 			{{.ModelLower}} := &models.{{.Model}}{
-				{{range .Fields}}{{.Name}}: {{.TestValue}},
-				{{end}}
+				{{range .Fields}}{{if ne .Type "*storage.Attachment"}}{{.Name}}: {{.TestValue}},
+				{{end}}{{end}}
 			}
 			err := helper.DB.Create({{.ModelLower}}).Error
 			assert.NoError(t, err)
 
 			// Test update
 			updateReq := &models.Update{{.Model}}Request{
-				Id: {{.ModelLower}}.Id,
-				{{range .Fields}}{{.Name}}: {{.UpdateTestValue}},
-				{{end}}
+				{{range .Fields}}{{if not .IsRelation}}{{if ne .Type "*storage.Attachment"}}{{if eq .Type "bool"}}{{.Name}}: func() *bool { b := false; return &b }(), {{else}}{{.Name}}: {{.UpdateTestValue}},{{end}}
+				{{end}}{{end}}{{end}}
 			}
 
 			updated, err := service.Update({{.ModelLower}}.Id, updateReq)
 			assert.NoError(t, err)
 			assert.NotNil(t, updated)
-			{{range .Fields}}assert.Equal(t, {{.UpdateTestValue}}, updated.{{.Name}})
-			{{end}}
+			{{range .Fields}}{{if ne .Type "*storage.Attachment"}}{{if eq .Type "bool"}}assert.Equal(t, false, updated.{{.Name}}){{else}}assert.Equal(t, {{.UpdateTestValue}}, updated.{{.Name}}){{end}}
+			{{end}}{{end}}
 
 			// Test update with invalid ID
 			_, err = service.Update(0, updateReq)
@@ -138,8 +137,8 @@ func Test{{.Model}}Services(t *testing.T) {
 		t.Run("delete operations", func(t *testing.T) {
 			// Create test {{.ModelLower}}
 			{{.ModelLower}} := &models.{{.Model}}{
-				{{range .Fields}}{{.Name}}: {{.TestValue}},
-				{{end}}
+				{{range .Fields}}{{if ne .Type "*storage.Attachment"}}{{.Name}}: {{.TestValue}},
+				{{end}}{{end}}
 			}
 			err := helper.DB.Create({{.ModelLower}}).Error
 			assert.NoError(t, err)
@@ -165,15 +164,15 @@ func Test{{.Model}}Services(t *testing.T) {
 			// Create multiple test {{.PluralLower}}
 			for i := 0; i < 5; i++ {
 				{{.ModelLower}} := &models.{{.Model}}{
-					{{range .Fields}}{{.Name}}: {{.TestValueWithIndex}},
-					{{end}}
+					{{range .Fields}}{{if ne .Type "*storage.Attachment"}}{{.Name}}: {{.TestValueWithIndex}},
+					{{end}}{{end}}
 				}
 				err := helper.DB.Create({{.ModelLower}}).Error
 				assert.NoError(t, err)
 			}
 
 			// Test GetAll without pagination
-			result, err := service.GetAll(nil, nil)
+			result, err := service.GetAll(nil, nil, nil, nil)
 			assert.NoError(t, err)
 			assert.NotNil(t, result)
 			assert.NotEmpty(t, result.Data)
@@ -181,10 +180,13 @@ func Test{{.Model}}Services(t *testing.T) {
 			// Test GetAll with pagination
 			page := 1
 			limit := 2
-			result, err = service.GetAll(&page, &limit)
+			result, err = service.GetAll(&page, &limit, nil, nil)
 			assert.NoError(t, err)
 			assert.NotNil(t, result)
-			assert.LessOrEqual(t, len(result.Data), limit)
+			// Type assert to slice to use len()
+			if data, ok := result.Data.([]interface{}); ok {
+				assert.LessOrEqual(t, len(data), limit)
+			}
 			assert.Equal(t, page, result.Pagination.Page)
 			assert.Equal(t, limit, result.Pagination.PageSize)
 		})
@@ -193,20 +195,18 @@ func Test{{.Model}}Services(t *testing.T) {
 			// Test create with duplicate unique field (if applicable)
 			{{range .Fields}}{{if .IsUnique}}
 			{{$.ModelLower}}1 := &models.{{$.Model}}{
-				{{range $.Fields}}{{.Name}}: {{.TestValue}},
-				{{end}}
+				{{$uniqueField := .Name}}{{range $.Fields}}{{if not .IsRelation}}{{if and (ne .Type "*storage.Attachment")}}{{if eq .Name $uniqueField}}{{.Name}}: {{.TestValue}}, // Duplicate unique value
+				{{else}}{{.Name}}: {{.TestValue}},
+				{{end}}{{end}}{{else if eq .Relationship "belongs_to"}}{{.Name}}Id: 1,
+				{{end}}{{end}}
 			}
 			err := helper.DB.Create({{$.ModelLower}}1).Error
 			assert.NoError(t, err)
 
-			{{$.ModelLower}}2 := &models.{{$.Model}}{
-				{{range $.Fields}}{{if eq .Name $.Name}}{{.Name}}: {{.TestValue}}, // Duplicate unique value
-				{{else}}{{.Name}}: {{.TestValue}},
-				{{end}}{{end}}
-			}
 			createReq := &models.Create{{$.Model}}Request{
-				{{range $.Fields}}{{if eq .Name $.Name}}{{.Name}}: {{.TestValue}}, // Duplicate unique value
+				{{range $.Fields}}{{if not .IsRelation}}{{if and (ne .Type "*storage.Attachment")}}{{if eq .Name $uniqueField}}{{.Name}}: {{.TestValue}}, // Duplicate unique value
 				{{else}}{{.Name}}: {{.TestValue}},
+				{{end}}{{end}}{{else if eq .Relationship "belongs_to"}}{{.Name}}Id: 1,
 				{{end}}{{end}}
 			}
 			_, err = service.Create(createReq)

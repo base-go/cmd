@@ -74,6 +74,14 @@ func startApplication(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	// Run go mod tidy to ensure dependencies are up to date
+	fmt.Println("Ensuring dependencies are up to date...")
+	tidyCmd := exec.Command("go", "mod", "tidy")
+	tidyCmd.Dir = cwd
+	if err := tidyCmd.Run(); err != nil {
+		fmt.Printf("Warning: Failed to run go mod tidy: %v\n", err)
+	}
+
 	if docs {
 		fmt.Println("📚 Generating swagger documentation from annotations...")
 

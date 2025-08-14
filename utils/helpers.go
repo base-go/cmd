@@ -36,7 +36,7 @@ func GetGoType(t string) string {
 		return t
 		
 	// Base framework special types
-	case "translatedField":
+	case "translatedField", "translation":
 		return "translation.Field"
 		
 	// Convenience aliases
@@ -315,19 +315,26 @@ func RemoveImport(content []byte, importStr string) []byte {
 
 func RemoveModuleInitializer(content []byte, pluralName string) []byte {
 	contentStr := string(content)
-	// Look for the module initializer
-	moduleStr := fmt.Sprintf(`"%s":`, pluralName)
+	// Look for the module initializer pattern: modules["pluralName"] = pluralName.Init(deps)
+	moduleStr := fmt.Sprintf(`modules["%s"]`, pluralName)
 	initializerStart := strings.Index(contentStr, moduleStr)
 	if initializerStart != -1 {
-		// Find the start of the line
+		// Find the start of the line (including any comment above)
 		lineStart := strings.LastIndex(contentStr[:initializerStart], "\n") + 1
-		// Find the end of the module block (closing brace followed by comma)
-		initializerEnd := strings.Index(contentStr[initializerStart:], "},") + initializerStart + 2
-		if initializerEnd > initializerStart {
-			// Remove any trailing newline
-			if len(contentStr) > initializerEnd && contentStr[initializerEnd] == '\n' {
-				initializerEnd++
+		
+		// Check if there's a comment line above this module
+		if lineStart > 1 {
+			prevLineStart := strings.LastIndex(contentStr[:lineStart-1], "\n") + 1
+			prevLine := strings.TrimSpace(contentStr[prevLineStart:lineStart])
+			if strings.HasPrefix(prevLine, "//") && strings.Contains(prevLine, "module") {
+				lineStart = prevLineStart // Include the comment line
 			}
+		}
+		
+		// Find the end of the line
+		initializerEnd := strings.Index(contentStr[initializerStart:], "\n") + initializerStart
+		if initializerEnd != -1 {
+			initializerEnd++ // Include the newline
 			contentStr = contentStr[:lineStart] + contentStr[initializerEnd:]
 		}
 	}

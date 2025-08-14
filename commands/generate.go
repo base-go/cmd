@@ -111,11 +111,16 @@ func generateModule(cmd *cobra.Command, args []string) {
 
 	// Run goimports on generated files
 	generatedPath := filepath.Join("app", naming.DirName)
+	generatedPathTest := filepath.Join("test", "app_test", naming.DirName+"_test")
 
 	fmt.Println("Running goimports on generated files...")
 	// Run goimports on the generated directory
 	if err := exec.Command("find", generatedPath, "-name", "*.go", "-exec", "goimports", "-w", "{}", ";").Run(); err != nil {
 		fmt.Printf("Error running goimports on %s: %v\n", generatedPath, err)
+	}
+	// Run goimports on the test directory
+	if err := exec.Command("find", generatedPathTest, "-name", "*.go", "-exec", "goimports", "-w", "{}", ";").Run(); err != nil {
+		fmt.Printf("Error running goimports on %s: %v\n", generatedPathTest, err)
 	}
 
 	// Run goimports on the model file
@@ -124,98 +129,105 @@ func generateModule(cmd *cobra.Command, args []string) {
 		fmt.Printf("Error running goimports on %s: %v\n", modelPath, err)
 	}
 
-	// Automatically add import to main.go if it exists
-	if err := addImportToMainGo(naming.DirName); err != nil {
-		fmt.Printf("Warning: Could not automatically add import to main.go: %v\n", err)
-		fmt.Printf("Please manually add: _ \"base/app/%s\" to your imports in main.go\n", naming.DirName)
+	// Add module to app/init.go
+	if err := addModuleToAppInit(naming.DirName); err != nil {
+		fmt.Printf("Warning: Could not add module to app/init.go: %v\n", err)
+		fmt.Printf("Please manually add: _ \"base/app/%s\" to app/init.go\n", naming.DirName)
 	} else {
-		fmt.Printf("✅ Automatically added import to main.go\n")
+		fmt.Printf("✅ Added module to app/init.go\n")
+	}
+
+	// Run go mod tidy to ensure dependencies are up to date
+	fmt.Println("Running go mod tidy...")
+	if err := exec.Command("go", "mod", "tidy").Run(); err != nil {
+		fmt.Printf("Warning: Failed to run go mod tidy: %v\n", err)
+	} else {
+		fmt.Printf("✅ Dependencies updated\n")
 	}
 
 	fmt.Printf("Successfully generated %s module\n", naming.Model)
 }
 
-// addImportToMainGo automatically adds the import for the generated module to main.go
-func addImportToMainGo(moduleName string) error {
-	mainGoPath := "main.go"
-	
-	// Check if main.go exists
-	if _, err := os.Stat(mainGoPath); os.IsNotExist(err) {
-		return fmt.Errorf("main.go not found in current directory")
+// addModuleToAppInit adds the module to app/init.go
+func addModuleToAppInit(moduleName string) error {
+	initGoPath := filepath.Join("app", "init.go")
+
+	// Check if app/init.go exists
+	if _, err := os.Stat(initGoPath); os.IsNotExist(err) {
+		// Create app/init.go if it doesn't exist
+		if err := os.MkdirAll("app", os.ModePerm); err != nil {
+			return fmt.Errorf("failed to create app directory: %w", err)
+		}
+
+		content := fmt.Sprintf(`package app
+
+import (
+	"base/app/%s"
+	"base/core/module"
+)
+
+// AppModules implements module.AppModuleProvider interface
+type AppModules struct{}
+
+// GetAppModules returns the list of app modules to initialize
+// This is the only function that needs to be updated when adding new app modules
+func (am *AppModules) GetAppModules(deps module.Dependencies) map[string]module.Module {
+	modules := make(map[string]module.Module)
+
+	// App modules - custom system functionality
+	modules["%s"] = %s.Init(deps)
+
+	return modules
+}
+
+// NewAppModules creates a new AppModules provider
+func NewAppModules() *AppModules {
+	return &AppModules{}
+}
+`, moduleName, moduleName, moduleName)
+
+		if err := os.WriteFile(initGoPath, []byte(content), 0644); err != nil {
+			return fmt.Errorf("failed to create app/init.go: %w", err)
+		}
+		return nil
 	}
 
-	// Read main.go content
-	content, err := os.ReadFile(mainGoPath)
+	// Read existing app/init.go content
+	content, err := os.ReadFile(initGoPath)
 	if err != nil {
-		return fmt.Errorf("failed to read main.go: %w", err)
+		return fmt.Errorf("failed to read app/init.go: %w", err)
 	}
 
 	contentStr := string(content)
-	importLine := fmt.Sprintf("\t_ \"base/app/%s\"", moduleName)
 
-	// Check if import already exists
-	if strings.Contains(contentStr, importLine) {
-		return nil // Already imported
+	// Check if module already exists
+	moduleInit := fmt.Sprintf("modules[\"%s\"] = %s.Init(deps)", moduleName, moduleName)
+	if strings.Contains(contentStr, moduleInit) {
+		return nil // Already added
 	}
 
-	// Find the import section
-	importStart := strings.Index(contentStr, "import (")
-	if importStart == -1 {
-		return fmt.Errorf("could not find import section in main.go")
+	// Add import if not exists using the proper AddImport function
+	importLine := fmt.Sprintf("\"base/app/%s\"", moduleName)
+	contentBytes, importAdded := utils.AddImport([]byte(contentStr), importLine)
+	if importAdded {
+		contentStr = string(contentBytes)
 	}
 
-	// Find the end of the import section
-	importEnd := strings.Index(contentStr[importStart:], ")")
-	if importEnd == -1 {
-		return fmt.Errorf("could not find end of import section in main.go")
+	// Add module initialization
+	// Find the return modules line
+	returnIndex := strings.Index(contentStr, "return modules")
+	if returnIndex == -1 {
+		return fmt.Errorf("could not find 'return modules' in app/init.go")
 	}
-	importEnd += importStart
 
-	// Look for the generated modules comment
-	generatedComment := "// Import generated modules to trigger their init() functions"
-	commentIndex := strings.Index(contentStr, generatedComment)
-
-	if commentIndex == -1 {
-		// Add the comment and the import before the closing )
-		insertPoint := importEnd
-		newContent := contentStr[:insertPoint] + "\n\n\t" + generatedComment + "\n" + importLine + "\n" + contentStr[insertPoint:]
-		contentStr = newContent
-	} else {
-		// Find the last import line after the comment
-		commentEnd := commentIndex + len(generatedComment)
-		nextImportEnd := importEnd
-		
-		// Find where to insert (after the last generated import)
-		lines := strings.Split(contentStr[commentEnd:nextImportEnd], "\n")
-		var lastImportLineIndex int
-		for i, line := range lines {
-			if strings.Contains(line, "_ \"base/app/") {
-				lastImportLineIndex = i
-			}
-		}
-		
-		// Insert after the last import line or after the comment if no imports exist
-		if lastImportLineIndex > 0 {
-			// Insert after the last import
-			beforeComment := contentStr[:commentEnd]
-			afterComment := contentStr[commentEnd:]
-			
-			lines = strings.Split(afterComment[:nextImportEnd-commentEnd], "\n")
-			lines = append(lines[:lastImportLineIndex+1], append([]string{importLine}, lines[lastImportLineIndex+1:]...)...)
-			
-			newAfterComment := strings.Join(lines, "\n") + contentStr[nextImportEnd:]
-			contentStr = beforeComment + newAfterComment
-		} else {
-			// Insert right after the comment
-			insertPoint := commentEnd + 1
-			newContent := contentStr[:insertPoint] + importLine + "\n" + contentStr[insertPoint:]
-			contentStr = newContent
-		}
-	}
+	// Insert the module initialization before return
+	insertPoint := returnIndex - 1
+	moduleInitLine := fmt.Sprintf("\n\t// %s module\n\t%s\n", strings.Title(moduleName), moduleInit)
+	contentStr = contentStr[:insertPoint] + moduleInitLine + contentStr[insertPoint:]
 
 	// Write back to file
-	if err := os.WriteFile(mainGoPath, []byte(contentStr), 0644); err != nil {
-		return fmt.Errorf("failed to write main.go: %w", err)
+	if err := os.WriteFile(initGoPath, []byte(contentStr), 0644); err != nil {
+		return fmt.Errorf("failed to write app/init.go: %w", err)
 	}
 
 	return nil

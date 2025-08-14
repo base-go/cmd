@@ -2,6 +2,7 @@ package {{.PackageName}}
 
 import (
     "fmt"
+    "math"
     "mime/multipart"
 
     "gorm.io/gorm"
@@ -84,19 +85,19 @@ func (s *{{.Service}}) applySorting(query *gorm.DB, sortBy *string, sortOrder *s
 func (s *{{.Model}}Service) Create(req *models.Create{{.Model}}Request) (*models.{{.Model}}, error) {
     item := &models.{{.Model}}{
         {{- range .Fields}}
-        {{- if eq .Type "*storage.Attachment"}}
+        {{- if eq .Type "*storage.Attachment" }}
         // {{.Name}} attachment is handled via separate endpoint
-        {{- else if ne .Relationship "has_many"}}
-        {{- if ne .Relationship "belongs_to"}}
+        {{- else if eq .Relationship "belongs_to" }}
+        {{.Name}}Id: req.{{.Name}}Id,
+        {{- else if not .IsRelation }}
         {{.Name}}: req.{{.Name}},
-        {{- end}}
         {{- end}}
         {{- end}}
     }
 
     if err := s.DB.Create(item).Error; err != nil {
         s.Logger.Error("failed to create {{toLower .Model}}", logger.String("error", err.Error()))
-        return nil, fmt.Errorf("failed to create {{toLower .Model}}: %w", err)
+        return nil, err
     }
 
     // Emit create event
@@ -111,16 +112,20 @@ func (s *{{.Model}}Service) Update(id uint, req *models.Update{{.Model}}Request)
         s.Logger.Error("failed to find {{toLower .Model}} for update", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
-        return nil, fmt.Errorf("failed to find {{toLower .Model}}: %w", err)
+        return nil, err
     }
 
     // Build updates map
     updates := make(map[string]any)
     {{- range .Fields}}
-    {{- if eq .Type "*storage.Attachment"}}
+    {{- if eq .Type "*storage.Attachment" }}
     // {{.Name}} attachment is handled via separate endpoint
-    {{- else if ne .Relationship "has_many"}}
-    {{- if ne .Relationship "belongs_to"}}
+    {{- else if eq .Relationship "belongs_to" }}
+    // For foreign key relationships
+    if req.{{.Name}}Id != 0 {
+        updates["{{.JSONName}}_id"] = req.{{.Name}}Id
+    }
+    {{- else if not .IsRelation}}
     {{- if eq .Type "bool"}}
     // For boolean fields, check if it's included in the request (pointer would be non-nil)
     if req.{{.Name}} != nil {
@@ -146,6 +151,11 @@ func (s *{{.Model}}Service) Update(id uint, req *models.Update{{.Model}}Request)
     if !req.{{.Name}}.IsZero() {
         updates["{{.DBName}}"] = req.{{.Name}}
     }
+    {{- else if eq .Type "translation.Field"}}
+    // For translation fields, check if it's not empty
+    if req.{{.Name}}.Original != "" {
+        updates["{{.DBName}}"] = req.{{.Name}}.Original
+    }
     {{- else}}
     // For string and other fields
     if req.{{.Name}} != "" {
@@ -154,13 +164,12 @@ func (s *{{.Model}}Service) Update(id uint, req *models.Update{{.Model}}Request)
     {{- end}}
     {{- end}}
     {{- end}}
-    {{- end}}
 
     if err := s.DB.Model(item).Updates(updates).Error; err != nil {
         s.Logger.Error("failed to update {{toLower .Model}}", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
-        return nil, fmt.Errorf("failed to update {{toLower .Model}}: %w", err)
+        return nil, err
     }
 
     result, err := s.GetById(item.Id)
@@ -168,7 +177,7 @@ func (s *{{.Model}}Service) Update(id uint, req *models.Update{{.Model}}Request)
         s.Logger.Error("failed to get updated {{toLower .Model}}", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
-        return nil, fmt.Errorf("failed to get updated {{toLower .Model}}: %w", err)
+        return nil, err
     }
 
     // Emit update event
@@ -183,7 +192,7 @@ func (s *{{.Model}}Service) Delete(id uint) error {
         s.Logger.Error("failed to find {{toLower .Model}} for deletion", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
-        return fmt.Errorf("failed to find {{toLower .Model}}: %w", err)
+        return err
     }
 
     // Delete file attachments if any
@@ -194,7 +203,7 @@ func (s *{{.Model}}Service) Delete(id uint) error {
             s.Logger.Error("failed to delete {{.JSONName}}", 
                 logger.String("error", err.Error()),
                 logger.Int("id", int(id)))
-            return fmt.Errorf("failed to delete {{.JSONName}}: %w", err)
+            return err
         }
     }
     {{- end}}
@@ -204,7 +213,7 @@ func (s *{{.Model}}Service) Delete(id uint) error {
         s.Logger.Error("failed to delete {{toLower .Model}}", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
-        return fmt.Errorf("failed to delete {{toLower .Model}}: %w", err)
+        return err
     }
 
     // Emit delete event
@@ -222,7 +231,7 @@ func (s *{{.Model}}Service) GetById(id uint) (*models.{{.Model}}, error) {
         s.Logger.Error("failed to get {{toLower .Model}}", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
-        return nil, fmt.Errorf("failed to get {{toLower .Model}}: %w", err)
+        return nil, err
     }
 
     return item, nil
@@ -247,7 +256,7 @@ func (s *{{.Model}}Service) GetAll(page *int, limit *int, sortBy *string, sortOr
     if err := query.Count(&total).Error; err != nil {
         s.Logger.Error("failed to count {{toLower .Plural}}", 
             logger.String("error", err.Error()))
-        return nil, fmt.Errorf("failed to count {{toLower .Plural}}: %w", err)
+        return nil, err
     }
 
     // Apply pagination if provided
@@ -259,20 +268,20 @@ func (s *{{.Model}}Service) GetAll(page *int, limit *int, sortBy *string, sortOr
     // Apply sorting
     s.applySorting(query, sortBy, sortOrder)
 
-    // Preload relationships
-    query = (&models.{{.Model}}{}).Preload(query)
+    // Don't preload relationships for list response (faster)
+    // query = (&models.{{.Model}}{}).Preload(query)
 
     // Execute query
     if err := query.Find(&items).Error; err != nil {
         s.Logger.Error("failed to get {{toLower .Plural}}", 
             logger.String("error", err.Error()))
-        return nil, fmt.Errorf("failed to get {{toLower .Plural}}: %w", err)
+        return nil, err
     }
 
     // Convert to response type
-    responses := make([]*models.{{.Model}}SelectOption, len(items))
+    responses := make([]*models.{{.Model}}ListResponse, len(items))
     for i, item := range items {
-        responses[i] = item.ToSelectOption()
+        responses[i] = item.ToListResponse()
     }
 
     // Calculate total pages
@@ -346,7 +355,7 @@ func (s *{{$.Model}}Service) Upload{{.Name}}(id uint, file *multipart.FileHeader
         s.Logger.Error("failed to find {{toLower $.Model}}", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
-        return nil, fmt.Errorf("failed to find {{toLower $.Model}}: %w", err)
+        return nil, err
     }
 
     // Delete existing file if any
@@ -355,7 +364,7 @@ func (s *{{$.Model}}Service) Upload{{.Name}}(id uint, file *multipart.FileHeader
             s.Logger.Error("failed to delete existing {{.JSONName}}", 
                 logger.String("error", err.Error()),
                 logger.Int("id", int(id)))
-            return nil, fmt.Errorf("failed to delete existing {{.JSONName}}: %w", err)
+            return nil, err
         }
     }
 
@@ -365,7 +374,7 @@ func (s *{{$.Model}}Service) Upload{{.Name}}(id uint, file *multipart.FileHeader
         s.Logger.Error("failed to attach {{.JSONName}}", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
-        return nil, fmt.Errorf("failed to attach {{.JSONName}}: %w", err)
+        return nil, err
     }
 
     // Update the model with the new attachment
@@ -373,7 +382,7 @@ func (s *{{$.Model}}Service) Upload{{.Name}}(id uint, file *multipart.FileHeader
         s.Logger.Error("failed to associate {{.JSONName}}", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
-        return nil, fmt.Errorf("failed to associate {{.JSONName}}: %w", err)
+        return nil, err
     }
 
     return s.GetById(id)
@@ -386,7 +395,7 @@ func (s *{{$.Model}}Service) Remove{{.Name}}(id uint) (*models.{{$.Model}}, erro
         s.Logger.Error("failed to find {{toLower $.Model}}", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
-        return nil, fmt.Errorf("failed to find {{toLower $.Model}}: %w", err)
+        return nil, err
     }
 
     if item.{{.Name}} == nil {
@@ -397,7 +406,7 @@ func (s *{{$.Model}}Service) Remove{{.Name}}(id uint) (*models.{{$.Model}}, erro
         s.Logger.Error("failed to delete {{.JSONName}}", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
-        return nil, fmt.Errorf("failed to delete {{.JSONName}}: %w", err)
+        return nil, err
     }
 
     // Clear the association
@@ -405,7 +414,7 @@ func (s *{{$.Model}}Service) Remove{{.Name}}(id uint) (*models.{{$.Model}}, erro
         s.Logger.Error("failed to clear {{.JSONName}} association", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
-        return nil, fmt.Errorf("failed to clear {{.JSONName}} association: %w", err)
+        return nil, err
     }
 
     return s.GetById(id)

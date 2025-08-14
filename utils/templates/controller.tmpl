@@ -3,10 +3,12 @@ package {{.PackageName}}
 import (
     "net/http"
     "strconv"
+    "strings"
 
     "base/app/models"
     "base/core/router"
     "base/core/storage"
+    "base/core/types"
 )
 
 type {{.Controller}} struct {
@@ -22,13 +24,21 @@ func New{{.Controller}}(service *{{.Service}}, storage *storage.ActiveStorage) *
 }
 
 func (c *{{.Controller}}) Routes(router *router.RouterGroup) {
-    // Main CRUD endpoints
-    router.GET("{{.RoutePath}}", c.List)       // Paginated list
-    router.GET("{{.RoutePath}}/all", c.ListAll) // Unpaginated list
-    router.GET("{{.RoutePath}}/:id", c.Get)
-    router.POST("{{.RoutePath}}", c.Create)
-    router.PUT("{{.RoutePath}}/:id", c.Update)
-    router.DELETE("{{.RoutePath}}/:id", c.Delete)
+    // Main CRUD endpoints - specific routes MUST come before parameterized routes
+    router.GET("{{.RoutePath}}", c.List)       // Paginated list  
+    router.POST("{{.RoutePath}}", c.Create)    // Create
+    router.GET("{{.RoutePath}}/all", c.ListAll) // Unpaginated list - MUST be before /:id
+    router.GET("{{.RoutePath}}/:id", c.Get)    // Get by ID - MUST be after /all
+    router.PUT("{{.RoutePath}}/:id", c.Update) // Update
+    router.DELETE("{{.RoutePath}}/:id", c.Delete) // Delete
+
+    //Upload endpoints for each file field
+    {{- range .Fields}}
+    {{- if eq .Type "*storage.Attachment"}}
+    router.POST("{{$.RoutePath}}/:id/{{ToSnakeCase .Name}}", c.Upload{{.Name}})
+    router.DELETE("{{$.RoutePath}}/:id/{{ToSnakeCase .Name}}", c.Remove{{.Name}})
+    {{- end}}
+    {{- end}}
 }
 
 // Create{{.Model}} godoc
@@ -40,18 +50,18 @@ func (c *{{.Controller}}) Routes(router *router.RouterGroup) {
 // @Produce json
 // @Param {{ToKebabCase $.PackageName}} body models.Create{{.Model}}Request true "Create {{.Model}} request"
 // @Success 201 {object} models.{{.Model}}Response
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Failure 400 {object} types.ErrorResponse
+// @Failure 500 {object} types.ErrorResponse
 // @Router /api/{{ToKebabCase $.PackageName}} [post]
 func (c *{{.Model}}Controller) Create(ctx *router.Context) error {
     var req models.Create{{.Model}}Request
     if err := ctx.ShouldBindJSON(&req); err != nil {
-        return ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+        return ctx.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
     }
 
     item, err := c.Service.Create(&req)
     if err != nil {
-        return ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to create item: " + err.Error()})
+        return ctx.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: "Failed to create item: " + err.Error()})
     }
 
     return ctx.JSON(http.StatusCreated, item.ToResponse())
@@ -66,18 +76,18 @@ func (c *{{.Model}}Controller) Create(ctx *router.Context) error {
 // @Produce json
 // @Param id path int true "{{.Model}} id"
 // @Success 200 {object} models.{{.Model}}Response
-// @Failure 400 {object} ErrorResponse
-// @Failure 404 {object} ErrorResponse
+// @Failure 400 {object} types.ErrorResponse
+// @Failure 404 {object} types.ErrorResponse
 // @Router /api/{{ToKebabCase $.PackageName}}/{id} [get]
 func (c *{{.Model}}Controller) Get(ctx *router.Context) error {
     id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
     if err != nil {
-        return ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid id format"})
+        return ctx.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "Invalid id format"})
     }
 
     item, err := c.Service.GetById(uint(id))
     if err != nil {
-        return ctx.JSON(http.StatusNotFound, ErrorResponse{Error: "Item not found"})
+        return ctx.JSON(http.StatusNotFound, types.ErrorResponse{Error: "Item not found"})
     }
 
     return ctx.JSON(http.StatusOK, item.ToResponse())
@@ -95,8 +105,8 @@ func (c *{{.Model}}Controller) Get(ctx *router.Context) error {
 // @Param sort query string false "Sort field (id, created_at, updated_at, {{- range .Fields}}{{- if not .IsRelation}}{{ToSnakeCase .Name}}, {{- end}}{{- end}})"
 // @Param order query string false "Sort order (asc, desc)"
 // @Success 200 {object} types.PaginatedResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Failure 400 {object} types.ErrorResponse
+// @Failure 500 {object} types.ErrorResponse
 // @Router /api/{{ToKebabCase $.PackageName}} [get]
 func (c *{{.Model}}Controller) List(ctx *router.Context) error {
     var page, limit *int
@@ -107,7 +117,7 @@ func (c *{{.Model}}Controller) List(ctx *router.Context) error {
         if pageNum, err := strconv.Atoi(pageStr); err == nil && pageNum > 0 {
             page = &pageNum
         } else {
-            return ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid page number"})
+            return ctx.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "Invalid page number"})
         }
     }
 
@@ -116,7 +126,7 @@ func (c *{{.Model}}Controller) List(ctx *router.Context) error {
         if limitNum, err := strconv.Atoi(limitStr); err == nil && limitNum > 0 {
             limit = &limitNum
         } else {
-            return ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid limit number"})
+            return ctx.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "Invalid limit number"})
         }
     }
 
@@ -129,13 +139,13 @@ func (c *{{.Model}}Controller) List(ctx *router.Context) error {
         if orderStr == "asc" || orderStr == "desc" {
             sortOrder = &orderStr
         } else {
-            return ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid sort order. Use 'asc' or 'desc'"})
+            return ctx.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "Invalid sort order. Use 'asc' or 'desc'"})
         }
     }
 
     paginatedResponse, err := c.Service.GetAll(page, limit, sortBy, sortOrder)
     if err != nil {
-        return ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch items: " + err.Error()})
+        return ctx.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: "Failed to fetch items: " + err.Error()})
     }
 
     return ctx.JSON(http.StatusOK, paginatedResponse)
@@ -149,12 +159,12 @@ func (c *{{.Model}}Controller) List(ctx *router.Context) error {
 // @Accept json
 // @Produce json
 // @Success 200 {array} models.{{.Model}}SelectOption
-// @Failure 500 {object} ErrorResponse
+// @Failure 500 {object} types.ErrorResponse
 // @Router /api/{{ToKebabCase $.PackageName}}/all [get]
 func (c *{{.Model}}Controller) ListAll(ctx *router.Context) error {
     items, err := c.Service.GetAllForSelect()
     if err != nil {
-        return ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to fetch select options: " + err.Error()})
+        return ctx.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: "Failed to fetch select options: " + err.Error()})
     }
 
     // Convert to select options
@@ -176,24 +186,27 @@ func (c *{{.Model}}Controller) ListAll(ctx *router.Context) error {
 // @Param id path int true "{{.Model}} id"
 // @Param {{ToKebabCase $.PackageName}} body models.Update{{.Model}}Request true "Update {{.Model}} request"
 // @Success 200 {object} models.{{.Model}}Response
-// @Failure 400 {object} ErrorResponse
-// @Failure 404 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Failure 400 {object} types.ErrorResponse
+// @Failure 404 {object} types.ErrorResponse
+// @Failure 500 {object} types.ErrorResponse
 // @Router /api/{{ToKebabCase $.PackageName}}/{id} [put]
 func (c *{{.Model}}Controller) Update(ctx *router.Context) error {
     id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
     if err != nil {
-        return ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid id format"})
+        return ctx.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "Invalid id format"})
     }
 
     var req models.Update{{.Model}}Request
     if err := ctx.ShouldBindJSON(&req); err != nil {
-        return ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+        return ctx.JSON(http.StatusBadRequest, types.ErrorResponse{Error: err.Error()})
     }
 
     item, err := c.Service.Update(uint(id), &req)
     if err != nil {
-        return ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to update item: " + err.Error()})
+        if strings.Contains(err.Error(), "record not found") {
+            return ctx.JSON(http.StatusNotFound, types.ErrorResponse{Error: "Item not found"})
+        }
+        return ctx.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: "Failed to update item: " + err.Error()})
     }
 
     return ctx.JSON(http.StatusOK, item.ToResponse())
@@ -207,27 +220,86 @@ func (c *{{.Model}}Controller) Update(ctx *router.Context) error {
 // @Accept json
 // @Produce json
 // @Param id path int true "{{.Model}} id"
-// @Success 200 {object} SuccessResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
+// @Success 200 {object} types.SuccessResponse
+// @Failure 400 {object} types.ErrorResponse
+// @Failure 500 {object} types.ErrorResponse
 // @Router /api/{{ToKebabCase $.PackageName}}/{id} [delete]
 func (c *{{.Model}}Controller) Delete(ctx *router.Context) error {
     id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
     if err != nil {
-        return ctx.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid id format"})
+        return ctx.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "Invalid id format"})
     }
 
     if err := c.Service.Delete(uint(id)); err != nil {
-        return ctx.JSON(http.StatusInternalServerError, ErrorResponse{Error: "Failed to delete item: " + err.Error()})
+        if strings.Contains(err.Error(), "record not found") {
+            return ctx.JSON(http.StatusNotFound, types.ErrorResponse{Error: "Item not found"})
+        }
+        return ctx.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: "Failed to delete item: " + err.Error()})
     }
 
-    return ctx.JSON(http.StatusOK, SuccessResponse{Message: "Item deleted successfully"})
+    ctx.Status(http.StatusNoContent)
+    return nil
 }
 
-type ErrorResponse struct {
-    Error string `json:"error"`
+{{- range .Fields}}
+{{- if eq .Type "*storage.Attachment"}}
+
+// Upload{{.Name}} godoc
+// @Summary Upload {{ToKebabCase .Name}} for {{$.Model}}
+// @Description Upload a file for the {{$.Model}}'s {{ToKebabCase .Name}} field
+// @Tags App/{{$.Model}}
+// @Security BearerAuth
+// @Accept multipart/form-data
+// @Produce json
+// @Param id path int true "{{$.Model}} id"
+// @Param file formData file true "{{.Name}} file"
+// @Success 200 {object} models.{{$.Model}}Response
+// @Failure 400 {object} types.ErrorResponse
+// @Failure 500 {object} types.ErrorResponse
+// @Router /api/{{ToKebabCase $.PackageName}}/{id}/{{ToSnakeCase .Name}} [post]
+func (c *{{$.Model}}Controller) Upload{{.Name}}(ctx *router.Context) error {
+    id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
+    if err != nil {
+        return ctx.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "Invalid id format"})
+    }
+
+    file, err := ctx.FormFile("file")
+    if err != nil {
+        return ctx.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "No file uploaded"})
+    }
+
+    item, err := c.Service.Upload{{.Name}}(uint(id), file)
+    if err != nil {
+        return ctx.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: "Failed to upload {{ToKebabCase .Name}}: " + err.Error()})
+    }
+
+    return ctx.JSON(http.StatusOK, item.ToResponse())
 }
 
-type SuccessResponse struct {
-    Message string `json:"message"`
+// Remove{{.Name}} godoc
+// @Summary Remove {{ToKebabCase .Name}} from {{$.Model}}
+// @Description Remove the file from the {{$.Model}}'s {{ToKebabCase .Name}} field
+// @Tags App/{{$.Model}}
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param id path int true "{{$.Model}} id"
+// @Success 200 {object} models.{{$.Model}}Response
+// @Failure 400 {object} types.ErrorResponse
+// @Failure 500 {object} types.ErrorResponse
+// @Router /api/{{ToKebabCase $.PackageName}}/{id}/{{ToSnakeCase .Name}} [delete]
+func (c *{{$.Model}}Controller) Remove{{.Name}}(ctx *router.Context) error {
+    id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
+    if err != nil {
+        return ctx.JSON(http.StatusBadRequest, types.ErrorResponse{Error: "Invalid id format"})
+    }
+
+    item, err := c.Service.Remove{{.Name}}(uint(id))
+    if err != nil {
+        return ctx.JSON(http.StatusInternalServerError, types.ErrorResponse{Error: "Failed to remove {{ToKebabCase .Name}}: " + err.Error()})
+    }
+
+    return ctx.JSON(http.StatusOK, item.ToResponse())
 }
+{{- end}}
+{{- end}}

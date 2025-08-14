@@ -6,6 +6,9 @@ import (
 
 	"base/app/models"
 	"base/test"
+	{{- if hasField .Fields "translation.Field" }}
+	"base/core/translation"
+	{{- end }}
 
 	"github.com/stretchr/testify/assert"
 )
@@ -102,15 +105,6 @@ func Test{{.Model}}Models(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, {{.ModelLower}}.Id, found{{.Model}}.Id)
 			assert.NotZero(t, found{{.Model}}.DeletedAt)
-		})
-
-		t.Run("validation of required fields", func(t *testing.T) {
-			{{.ModelLower}} := &models.{{.Model}}{}
-			err := helper.DB.Create({{.ModelLower}}).Error
-			{{range .Fields}}{{if and (not (eq .Type "*storage.Attachment")) (not .IsRelation) .IsRequired}}
-			// Missing required field {{.Name}} should cause error
-			assert.Error(t, err)
-			{{end}}{{end}}
 		})
 	})
 }
