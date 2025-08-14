@@ -270,9 +270,9 @@ func (s *{{.Model}}Service) GetAll(page *int, limit *int, sortBy *string, sortOr
     }
 
     // Convert to response type
-    responses := make([]*models.{{.Model}}ListResponse, len(items))
+    responses := make([]*models.{{.Model}}SelectOption, len(items))
     for i, item := range items {
-        responses[i] = item.ToListResponse()
+        responses[i] = item.ToSelectOption()
     }
 
     // Calculate total pages
@@ -330,7 +330,7 @@ func (s *{{.Model}}Service) GetAllForSelect() ([]*models.{{.Model}}, error) {
     {{- end }}
     
     if err := query.Find(&items).Error; err != nil {
-        s.Logger.Error("Failed to fetch items for select", "error", err)
+        s.Logger.Error("Failed to fetch items for select", logger.String("error", err.Error()))
         return nil, err
     }
     

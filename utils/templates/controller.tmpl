@@ -9,19 +9,19 @@ import (
     "base/core/storage"
 )
 
-type {{.Model}}Controller struct {
-    Service    *{{.Model}}Service
+type {{.Controller}} struct {
+    Service    *{{.Service}}
     Storage    *storage.ActiveStorage
 }
 
-func New{{.Model}}Controller(service *{{.Model}}Service, storage *storage.ActiveStorage) *{{.Model}}Controller {
-    return &{{.Model}}Controller{
+func New{{.Controller}}(service *{{.Service}}, storage *storage.ActiveStorage) *{{.Controller}} {
+    return &{{.Controller}}{
         Service: service,
         Storage: storage,
     }
 }
 
-func (c *{{.Model}}Controller) Routes(router *router.Router) {
+func (c *{{.Controller}}) Routes(router *router.RouterGroup) {
     // Main CRUD endpoints
     router.GET("{{.RoutePath}}", c.List)       // Paginated list
     router.GET("{{.RoutePath}}/all", c.ListAll) // Unpaginated list

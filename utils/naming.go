@@ -72,9 +72,9 @@ func NewNamingConvention(modelName string) *NamingConvention {
 		RoutePath:  "/" + ToKebabCase(plural),
 		RouteGroup: ToKebabCase(plural),
 
-		// Controller and Service naming
-		Controller: plural + "Controller",
-		Service:    plural + "Service",
+		// Controller and Service naming (singular like model)
+		Controller: model + "Controller",
+		Service:    model + "Service",
 
 		// Database naming
 		TableName: ToSnakeCase(plural),

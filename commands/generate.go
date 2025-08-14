@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/BaseTechStack/basecmd/utils"
 	"github.com/spf13/cobra"
@@ -123,5 +124,99 @@ func generateModule(cmd *cobra.Command, args []string) {
 		fmt.Printf("Error running goimports on %s: %v\n", modelPath, err)
 	}
 
+	// Automatically add import to main.go if it exists
+	if err := addImportToMainGo(naming.DirName); err != nil {
+		fmt.Printf("Warning: Could not automatically add import to main.go: %v\n", err)
+		fmt.Printf("Please manually add: _ \"base/app/%s\" to your imports in main.go\n", naming.DirName)
+	} else {
+		fmt.Printf("✅ Automatically added import to main.go\n")
+	}
+
 	fmt.Printf("Successfully generated %s module\n", naming.Model)
+}
+
+// addImportToMainGo automatically adds the import for the generated module to main.go
+func addImportToMainGo(moduleName string) error {
+	mainGoPath := "main.go"
+	
+	// Check if main.go exists
+	if _, err := os.Stat(mainGoPath); os.IsNotExist(err) {
+		return fmt.Errorf("main.go not found in current directory")
+	}
+
+	// Read main.go content
+	content, err := os.ReadFile(mainGoPath)
+	if err != nil {
+		return fmt.Errorf("failed to read main.go: %w", err)
+	}
+
+	contentStr := string(content)
+	importLine := fmt.Sprintf("\t_ \"base/app/%s\"", moduleName)
+
+	// Check if import already exists
+	if strings.Contains(contentStr, importLine) {
+		return nil // Already imported
+	}
+
+	// Find the import section
+	importStart := strings.Index(contentStr, "import (")
+	if importStart == -1 {
+		return fmt.Errorf("could not find import section in main.go")
+	}
+
+	// Find the end of the import section
+	importEnd := strings.Index(contentStr[importStart:], ")")
+	if importEnd == -1 {
+		return fmt.Errorf("could not find end of import section in main.go")
+	}
+	importEnd += importStart
+
+	// Look for the generated modules comment
+	generatedComment := "// Import generated modules to trigger their init() functions"
+	commentIndex := strings.Index(contentStr, generatedComment)
+
+	if commentIndex == -1 {
+		// Add the comment and the import before the closing )
+		insertPoint := importEnd
+		newContent := contentStr[:insertPoint] + "\n\n\t" + generatedComment + "\n" + importLine + "\n" + contentStr[insertPoint:]
+		contentStr = newContent
+	} else {
+		// Find the last import line after the comment
+		commentEnd := commentIndex + len(generatedComment)
+		nextImportEnd := importEnd
+		
+		// Find where to insert (after the last generated import)
+		lines := strings.Split(contentStr[commentEnd:nextImportEnd], "\n")
+		var lastImportLineIndex int
+		for i, line := range lines {
+			if strings.Contains(line, "_ \"base/app/") {
+				lastImportLineIndex = i
+			}
+		}
+		
+		// Insert after the last import line or after the comment if no imports exist
+		if lastImportLineIndex > 0 {
+			// Insert after the last import
+			beforeComment := contentStr[:commentEnd]
+			afterComment := contentStr[commentEnd:]
+			
+			lines = strings.Split(afterComment[:nextImportEnd-commentEnd], "\n")
+			lines = append(lines[:lastImportLineIndex+1], append([]string{importLine}, lines[lastImportLineIndex+1:]...)...)
+			
+			newAfterComment := strings.Join(lines, "\n") + contentStr[nextImportEnd:]
+			contentStr = beforeComment + newAfterComment
+		} else {
+			// Insert right after the comment
+			insertPoint := commentEnd + 1
+			newContent := contentStr[:insertPoint] + importLine + "\n" + contentStr[insertPoint:]
+			contentStr = newContent
+		}
+	}
+
+	// Write back to file
+	if err := os.WriteFile(mainGoPath, []byte(contentStr), 0644); err != nil {
+		return fmt.Errorf("failed to write main.go: %w", err)
+	}
+
+	return nil
 }
