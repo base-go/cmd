@@ -350,7 +350,7 @@ func generateStaticSwaggerFiles(outputDir string, annotations []SwaggerAnnotatio
 }
 
 // generateOpenAPISpec creates an OpenAPI 3.0 specification from annotations
-func generateOpenAPISpec(annotations []SwaggerAnnotation) map[string]interface{} {
+func generateOpenAPISpec(annotations []SwaggerAnnotation) map[string]any {
 	// Extract swagger info from main.go
 	swaggerInfo, err := extractSwaggerInfoFromMainGo()
 	if err != nil {
@@ -366,7 +366,7 @@ func generateOpenAPISpec(annotations []SwaggerAnnotation) map[string]interface{}
 	}
 	
 	// Build paths from annotations
-	paths := make(map[string]interface{})
+	paths := make(map[string]any)
 	
 	for _, ann := range annotations {
 		route := ann.Route
@@ -375,11 +375,11 @@ func generateOpenAPISpec(annotations []SwaggerAnnotation) map[string]interface{}
 		}
 		
 		if paths[route] == nil {
-			paths[route] = make(map[string]interface{})
+			paths[route] = make(map[string]any)
 		}
 		
 		// Build operation
-		operation := map[string]interface{}{
+		operation := map[string]any{
 			"summary":     ann.Summary,
 			"description": ann.Description,
 			"tags":        []string{ann.Tags},
@@ -388,14 +388,14 @@ func generateOpenAPISpec(annotations []SwaggerAnnotation) map[string]interface{}
 		
 		// Add parameters
 		if len(ann.Parameters) > 0 {
-			var parameters []interface{}
+			var parameters []any
 			for _, param := range ann.Parameters {
-				parameters = append(parameters, map[string]interface{}{
+				parameters = append(parameters, map[string]any{
 					"name":        param.Name,
 					"in":          param.In,
 					"description": param.Description,
 					"required":    param.Required,
-					"schema": map[string]interface{}{
+					"schema": map[string]any{
 						"type": param.Type,
 					},
 				})
@@ -404,15 +404,15 @@ func generateOpenAPISpec(annotations []SwaggerAnnotation) map[string]interface{}
 		}
 		
 		// Add responses
-		responses := make(map[string]interface{})
+		responses := make(map[string]any)
 		if len(ann.Responses) > 0 {
 			for _, resp := range ann.Responses {
-				responses[resp.Code] = map[string]interface{}{
+				responses[resp.Code] = map[string]any{
 					"description": resp.Description,
 				}
 			}
 		} else {
-			responses["200"] = map[string]interface{}{
+			responses["200"] = map[string]any{
 				"description": "Success",
 			}
 		}
@@ -420,73 +420,73 @@ func generateOpenAPISpec(annotations []SwaggerAnnotation) map[string]interface{}
 		
 		// Add security
 		if len(ann.Security) > 0 {
-			var security []interface{}
+			var security []any
 			for _, sec := range ann.Security {
-				security = append(security, map[string]interface{}{
-					sec: []interface{}{},
+				security = append(security, map[string]any{
+					sec: []any{},
 				})
 			}
 			operation["security"] = security
 		}
 		
-		paths[route].(map[string]interface{})[strings.ToLower(ann.Method)] = operation
+		paths[route].(map[string]any)[strings.ToLower(ann.Method)] = operation
 	}
 	
 	// Build servers from extracted info
-	servers := []interface{}{}
+	servers := []any{}
 	for _, scheme := range swaggerInfo.Schemes {
-		servers = append(servers, map[string]interface{}{
+		servers = append(servers, map[string]any{
 			"url":         fmt.Sprintf("%s://%s", scheme, swaggerInfo.Host),
 			"description": fmt.Sprintf("Base Framework API Server (%s)", scheme),
 		})
 	}
 	
-	return map[string]interface{}{
+	return map[string]any{
 		"openapi": "3.0.3",
-		"info": map[string]interface{}{
+		"info": map[string]any{
 			"title":       swaggerInfo.Title,
 			"description": swaggerInfo.Description,
 			"version":     swaggerInfo.Version,
-			"contact": map[string]interface{}{
+			"contact": map[string]any{
 				"name":  "Base Team",
 				"url":   "https://github.com/BaseTechStack",
 				"email": "info@base.al",
 			},
-			"license": map[string]interface{}{
+			"license": map[string]any{
 				"name": "MIT",
 				"url":  "https://opensource.org/licenses/MIT",
 			},
 		},
 		"servers": servers,
-		"components": map[string]interface{}{
-			"securitySchemes": map[string]interface{}{
-				"ApiKeyAuth": map[string]interface{}{
+		"components": map[string]any{
+			"securitySchemes": map[string]any{
+				"ApiKeyAuth": map[string]any{
 					"type": "apiKey",
 					"in":   "header",
 					"name": "X-Api-Key",
 				},
-				"BearerAuth": map[string]interface{}{
+				"BearerAuth": map[string]any{
 					"type":         "http",
 					"scheme":       "bearer",
 					"bearerFormat": "JWT",
 					"description":  "Enter the token with the `Bearer: ` prefix, e.g. \"Bearer abcde12345\"",
 				},
 			},
-			"schemas": map[string]interface{}{
-				"Error": map[string]interface{}{
+			"schemas": map[string]any{
+				"Error": map[string]any{
 					"type": "object",
-					"properties": map[string]interface{}{
-						"error": map[string]interface{}{
+					"properties": map[string]any{
+						"error": map[string]any{
 							"type":        "string",
 							"description": "Error message",
 						},
 					},
 					"required": []string{"error"},
 				},
-				"Success": map[string]interface{}{
+				"Success": map[string]any{
 					"type": "object",
-					"properties": map[string]interface{}{
-						"message": map[string]interface{}{
+					"properties": map[string]any{
+						"message": map[string]any{
 							"type":        "string",
 							"description": "Success message",
 						},
@@ -525,11 +525,11 @@ func generateOperationID(method, route string) string {
 }
 
 // generateSwaggerYAML creates a YAML version of the OpenAPI spec
-func generateSwaggerYAML(doc map[string]interface{}) string {
+func generateSwaggerYAML(doc map[string]any) string {
 	yamlBuilder := strings.Builder{}
 	yamlBuilder.WriteString("openapi: \"3.0.3\"\n")
 	
-	if info, ok := doc["info"].(map[string]interface{}); ok {
+	if info, ok := doc["info"].(map[string]any); ok {
 		yamlBuilder.WriteString("info:\n")
 		if title, ok := info["title"].(string); ok {
 			yamlBuilder.WriteString(fmt.Sprintf("  title: \"%s\"\n", title))
@@ -542,10 +542,10 @@ func generateSwaggerYAML(doc map[string]interface{}) string {
 		}
 	}
 	
-	if servers, ok := doc["servers"].([]interface{}); ok && len(servers) > 0 {
+	if servers, ok := doc["servers"].([]any); ok && len(servers) > 0 {
 		yamlBuilder.WriteString("servers:\n")
 		for _, server := range servers {
-			if serverMap, ok := server.(map[string]interface{}); ok {
+			if serverMap, ok := server.(map[string]any); ok {
 				if url, ok := serverMap["url"].(string); ok {
 					yamlBuilder.WriteString(fmt.Sprintf("  - url: \"%s\"\n", url))
 				}
@@ -561,7 +561,7 @@ func generateSwaggerYAML(doc map[string]interface{}) string {
 }
 
 // generateSwaggoDocsGo creates a docs.go file with OpenAPI 3.0 spec
-func generateSwaggoDocsGo(doc map[string]interface{}) string {
+func generateSwaggoDocsGo(doc map[string]any) string {
 	jsonBytes, _ := json.Marshal(doc)
 	jsonStr := string(jsonBytes)
 	
@@ -569,7 +569,7 @@ func generateSwaggoDocsGo(doc map[string]interface{}) string {
 	swaggerInfo, err := extractSwaggerInfoFromMainGo()
 	if err != nil {
 		// Fallback to doc info if extraction fails
-		info := doc["info"].(map[string]interface{})
+		info := doc["info"].(map[string]any)
 		swaggerInfo = SwaggerMainInfo{
 			Title:       info["title"].(string),
 			Version:     info["version"].(string),
