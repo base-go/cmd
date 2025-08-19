@@ -145,6 +145,37 @@ Notes:
 - You can also run `base start -d` to auto-generate docs before starting the server and serve Swagger UI at `/swagger/`
 - All swagger info (title, version, description) is extracted from main.go annotations
 
+### `base d` or `base destroy`
+
+Destroy (delete) one or more existing modules.
+
+```bash
+base d [name1] [name2] ... [flags]
+```
+
+Examples:
+```bash
+# Destroy a single module
+base d user
+
+# Destroy multiple modules at once
+base d user customer order
+
+# Alternative command name
+base destroy user customer
+```
+
+What gets removed:
+- Module directory (`app/modulename/`)
+- Model file (`app/models/modulename.go`)
+- Test directory (`test/app_test/modulename_test/`)
+- Import and registration from `app/init.go`
+
+Notes:
+- Requires confirmation before destroying modules
+- Will attempt to clean up orphaned entries even if module directory doesn't exist
+- Shows progress for each module when destroying multiple modules
+
 ### `base update`
 
 Update framework core components:

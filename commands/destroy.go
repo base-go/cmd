@@ -12,11 +12,12 @@ import (
 )
 
 var destroyCmd = &cobra.Command{
-	Use:   "d [name]",
-	Short: "Destroy an existing module",
-	Long:  `Destroy an existing module with the specified name.`,
-	Args:  cobra.ExactArgs(1),
-	Run:   destroyModule,
+	Use:     "d [name1] [name2] ...",
+	Aliases: []string{"destroy"},
+	Short:   "Destroy existing modules",
+	Long:    `Destroy one or more existing modules with the specified names.`,
+	Args:    cobra.MinimumNArgs(1),
+	Run:     destroyModule,
 }
 
 func init() {
@@ -24,36 +25,12 @@ func init() {
 }
 
 func destroyModule(cmd *cobra.Command, args []string) {
-	singularName := args[0]
-	pluralName := utils.ToSnakeCase(utils.ToPlural(singularName))
-	singularDirName := utils.ToSnakeCase(singularName)
-
-	// Check if the module exists - try both plural and singular directory names
-	var moduleDir string
-	var moduleExists bool
-
-	pluralDir := filepath.Join("app", pluralName)
-	singularDir := filepath.Join("app", singularDirName)
-
-	if _, err := os.Stat(pluralDir); err == nil {
-		moduleDir = pluralDir
-		moduleExists = true
-	} else if _, err := os.Stat(singularDir); err == nil {
-		moduleDir = singularDir
-		moduleExists = true
-	} else {
-		// Module directory doesn't exist, but we can still clean up orphaned entries
-		fmt.Printf("Module directory '%s' does not exist, but checking for orphaned entries in init.go...\n", singularName)
-		moduleExists = false
-	}
-
-	// Prompt for confirmation with Y preselected
+	// Show summary of modules to be destroyed
+	fmt.Printf("Modules to destroy: %s\n", strings.Join(args, ", "))
+	
+	// Confirm destruction of all modules
 	reader := bufio.NewReader(os.Stdin)
-	if moduleExists {
-		fmt.Printf("Are you sure you want to destroy the '%s' module? [Y/n] ", singularName)
-	} else {
-		fmt.Printf("Are you sure you want to clean up orphaned '%s' entries from init.go? [Y/n] ", singularName)
-	}
+	fmt.Printf("Are you sure you want to destroy %d module(s)? [Y/n] ", len(args))
 	response, err := reader.ReadString('\n')
 	if err != nil {
 		fmt.Printf("Error reading input: %v\n", err)
@@ -66,13 +43,54 @@ func destroyModule(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	// Process each module
+	allSuccessful := true
+	for i, moduleName := range args {
+		fmt.Printf("\n[%d/%d] Destroying module '%s'...\n", i+1, len(args), moduleName)
+		if !destroySingleModule(moduleName) {
+			allSuccessful = false
+		}
+	}
+
+	if allSuccessful {
+		fmt.Printf("\n✅ Successfully destroyed all %d module(s).\n", len(args))
+	} else {
+		fmt.Printf("\n⚠️  Some modules could not be fully destroyed. Check the output above for details.\n")
+	}
+}
+
+func destroySingleModule(singularName string) bool {
+	pluralName := utils.ToSnakeCase(utils.ToPlural(singularName))
+	singularDirName := utils.ToSnakeCase(singularName)
+
+	// Check if the module exists - try both plural and singular directory names
+	var moduleDir string
+	var moduleExists bool
+	success := true
+
+	pluralDir := filepath.Join("app", pluralName)
+	singularDir := filepath.Join("app", singularDirName)
+
+	if _, err := os.Stat(pluralDir); err == nil {
+		moduleDir = pluralDir
+		moduleExists = true
+	} else if _, err := os.Stat(singularDir); err == nil {
+		moduleDir = singularDir
+		moduleExists = true
+	} else {
+		// Module directory doesn't exist, but we can still clean up orphaned entries
+		fmt.Printf("  Module directory '%s' does not exist, checking for orphaned entries...\n", singularName)
+		moduleExists = false
+	}
+
 	// Delete module directory if it exists
 	if moduleExists {
 		if err := os.RemoveAll(moduleDir); err != nil {
-			fmt.Printf("Error removing directory %s: %v\n", moduleDir, err)
-			return
+			fmt.Printf("  ❌ Error removing directory %s: %v\n", moduleDir, err)
+			success = false
+		} else {
+			fmt.Printf("  ✅ Removed module directory: %s\n", moduleDir)
 		}
-		fmt.Printf("Removed module directory: %s\n", moduleDir)
 	}
 
 	// Delete model file if module exists - check both models and model directories
@@ -85,14 +103,14 @@ func destroyModule(cmd *cobra.Command, args []string) {
 		modelRemoved := false
 		for _, modelFile := range modelFiles {
 			if err := os.Remove(modelFile); err == nil {
-				fmt.Printf("Removed model file: %s\n", modelFile)
+				fmt.Printf("  ✅ Removed model file: %s\n", modelFile)
 				modelRemoved = true
 				break
 			}
 		}
 
 		if !modelRemoved {
-			fmt.Printf("Warning: No model file found for %s\n", singularName)
+			fmt.Printf("  ⚠️  Warning: No model file found for %s\n", singularName)
 		}
 	}
 
@@ -101,21 +119,25 @@ func destroyModule(cmd *cobra.Command, args []string) {
 		testDir := filepath.Join("test", "app_test", pluralName+"_test")
 		if _, err := os.Stat(testDir); err == nil {
 			if err := os.RemoveAll(testDir); err != nil {
-				fmt.Printf("Warning: Could not remove test directory %s: %v\n", testDir, err)
+				fmt.Printf("  ⚠️  Warning: Could not remove test directory %s: %v\n", testDir, err)
 			} else {
-				fmt.Printf("Removed test directory: %s\n", testDir)
+				fmt.Printf("  ✅ Removed test directory: %s\n", testDir)
 			}
 		}
 	}
 
 	// Remove import from base/app/init.go
 	if err := removeModuleFromAppInit(pluralName); err != nil {
-		fmt.Printf("Warning: Could not remove import from base/app/init.go: %v\n", err)
+		fmt.Printf("  ⚠️  Warning: Could not remove import from base/app/init.go: %v\n", err)
 	} else {
-		fmt.Printf("✅ Removed '%s' from base/app/init.go\n", pluralName)
+		fmt.Printf("  ✅ Removed '%s' from base/app/init.go\n", pluralName)
 	}
 
-	fmt.Printf("Successfully destroyed module '%s'.\n", singularName)
+	if success {
+		fmt.Printf("  ✅ Successfully destroyed module '%s'\n", singularName)
+	}
+	
+	return success
 }
 
 // removeModuleFromAppInit removes the module from app/init.go
