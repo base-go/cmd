@@ -647,6 +647,12 @@ func extractSwaggerInfoFromMainGo() (SwaggerMainInfo, error) {
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		
+		// Stop parsing main API annotations when we hit security definitions
+		// to avoid overwriting main description with security description
+		if strings.HasPrefix(line, "// @securityDefinitions") {
+			break
+		}
+		
 		// Parse swagger annotations
 		if strings.HasPrefix(line, "// @title ") {
 			info.Title = strings.TrimPrefix(line, "// @title ")
@@ -657,7 +663,11 @@ func extractSwaggerInfoFromMainGo() (SwaggerMainInfo, error) {
 		} else if strings.HasPrefix(line, "// @BasePath ") {
 			info.BasePath = strings.TrimPrefix(line, "// @BasePath ")
 		} else if strings.HasPrefix(line, "// @host ") {
-			info.Host = strings.TrimPrefix(line, "// @host ")
+			// Remove http:// or https:// prefix from host if present
+			host := strings.TrimPrefix(line, "// @host ")
+			host = strings.TrimPrefix(host, "http://")
+			host = strings.TrimPrefix(host, "https://")
+			info.Host = host
 		} else if strings.HasPrefix(line, "// @schemes ") {
 			schemesStr := strings.TrimPrefix(line, "// @schemes ")
 			info.Schemes = strings.Fields(schemesStr)
