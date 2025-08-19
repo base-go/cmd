@@ -1,0 +1,217 @@
+package {{.PackageName}}_test
+
+import (
+	"testing"
+
+	"base/app/{{.PackageName}}"
+	"base/app/models"
+	"base/core/emitter"
+	"base/test"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func Test{{.Model}}Services(t *testing.T) {
+	helper := test.SetupTest(t)
+	defer helper.TeardownTest()
+
+	// Auto-migrate {{.Model}} table for testing
+	err := helper.DB.AutoMigrate(&models.{{.Model}}{})
+	assert.NoError(t, err)
+
+	// Create service with proper emitter and nil storage
+	service := {{.PackageName}}.New{{.Model}}Service(
+		helper.DB,
+		emitter.New(), // proper emitter
+		nil,            // storage (can be nil)
+		helper.Logger,
+	)
+
+	t.Run("{{.Model}} service operations comprehensive coverage", func(t *testing.T) {
+		t.Run("Service creation", func(t *testing.T) {
+			// Test that service is created successfully
+			assert.NotNil(t, service)
+		})
+
+		t.Run("Basic CRUD operations", func(t *testing.T) {
+			// Test Create operation
+			createReq := &models.Create{{.Model}}Request{
+				{{range .Fields}}{{if ne .Relationship ""}}{{else}}{{if ne .Type "*storage.Attachment"}}{{.Name}}: {{.TestValue}},
+				{{end}}{{end}}{{end}}
+			}
+
+			{{.ModelLower}}, err := service.Create(createReq)
+			assert.NoError(t, err)
+			assert.NotNil(t, {{.ModelLower}})
+			assert.NotZero(t, {{.ModelLower}}.Id)
+			{{range .Fields}}{{if ne .Relationship ""}}{{else}}assert.Equal(t, {{.TestValue}}, {{$.ModelLower}}.{{.Name}})
+			{{end}}{{end}}
+
+			// Test GetById operation
+			found, err := service.GetById({{.ModelLower}}.Id)
+			assert.NoError(t, err)
+			assert.NotNil(t, found)
+			assert.Equal(t, {{.ModelLower}}.Id, found.Id)
+
+			// Test Update operation
+			updateReq := &models.Update{{.Model}}Request{
+				{{range .Fields}}{{if not .IsRelation}}{{if ne .Type "*storage.Attachment"}}{{if eq .Type "bool"}}{{.Name}}: func() *bool { b := false; return &b }(), {{else}}{{.Name}}: {{.UpdateTestValue}},{{end}}
+				{{end}}{{end}}{{end}}
+			}
+
+			updated, err := service.Update({{.ModelLower}}.Id, updateReq)
+			assert.NoError(t, err)
+			assert.NotNil(t, updated)
+			{{range .Fields}}{{if not .IsRelation}}{{if ne .Type "*storage.Attachment"}}{{if eq .Type "bool"}}assert.Equal(t, false, updated.{{.Name}}){{else}}assert.Equal(t, {{.UpdateTestValue}}, updated.{{.Name}}){{end}}
+			{{end}}{{end}}{{end}}
+
+			// Test GetAll operation
+			result, err := service.GetAll(nil, nil, nil, nil)
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+			assert.NotNil(t, result.Data)
+
+			// Test Delete operation
+			err = service.Delete({{.ModelLower}}.Id)
+			assert.NoError(t, err)
+
+			// Verify deletion
+			_, err = service.GetById({{.ModelLower}}.Id)
+			assert.Error(t, err) // Should not find deleted record
+		})
+
+		t.Run("get operations", func(t *testing.T) {
+			// Create test {{.ModelLower}}
+			{{.ModelLower}} := &models.{{.Model}}{
+				{{range .Fields}}{{if ne .Type "*storage.Attachment"}}{{.Name}}: {{.TestValue}},
+				{{end}}{{end}}
+			}
+			err := helper.DB.Create({{.ModelLower}}).Error
+			assert.NoError(t, err)
+
+			// Test GetById
+			found, err := service.GetById({{.ModelLower}}.Id)
+			assert.NoError(t, err)
+			assert.NotNil(t, found)
+			assert.Equal(t, {{.ModelLower}}.Id, found.Id)
+
+			// Test GetById with invalid ID
+			_, err = service.GetById(0)
+			assert.Error(t, err)
+
+			// Test GetById with non-existent ID
+			_, err = service.GetById(99999)
+			assert.Error(t, err)
+		})
+
+		t.Run("update operations", func(t *testing.T) {
+			// Create test {{.ModelLower}}
+			{{.ModelLower}} := &models.{{.Model}}{
+				{{range .Fields}}{{if ne .Type "*storage.Attachment"}}{{.Name}}: {{.TestValue}},
+				{{end}}{{end}}
+			}
+			err := helper.DB.Create({{.ModelLower}}).Error
+			assert.NoError(t, err)
+
+			// Test update
+			updateReq := &models.Update{{.Model}}Request{
+				{{range .Fields}}{{if not .IsRelation}}{{if ne .Type "*storage.Attachment"}}{{if eq .Type "bool"}}{{.Name}}: func() *bool { b := false; return &b }(), {{else}}{{.Name}}: {{.UpdateTestValue}},{{end}}
+				{{end}}{{end}}{{end}}
+			}
+
+			updated, err := service.Update({{.ModelLower}}.Id, updateReq)
+			assert.NoError(t, err)
+			assert.NotNil(t, updated)
+			{{range .Fields}}{{if ne .Type "*storage.Attachment"}}{{if eq .Type "bool"}}assert.Equal(t, false, updated.{{.Name}}){{else}}assert.Equal(t, {{.UpdateTestValue}}, updated.{{.Name}}){{end}}
+			{{end}}{{end}}
+
+			// Test update with invalid ID
+			_, err = service.Update(0, updateReq)
+			assert.Error(t, err)
+
+			// Test update with non-existent ID
+			_, err = service.Update(99999, updateReq)
+			assert.Error(t, err)
+		})
+
+		t.Run("delete operations", func(t *testing.T) {
+			// Create test {{.ModelLower}}
+			{{.ModelLower}} := &models.{{.Model}}{
+				{{range .Fields}}{{if ne .Type "*storage.Attachment"}}{{.Name}}: {{.TestValue}},
+				{{end}}{{end}}
+			}
+			err := helper.DB.Create({{.ModelLower}}).Error
+			assert.NoError(t, err)
+
+			// Test delete
+			err = service.Delete({{.ModelLower}}.Id)
+			assert.NoError(t, err)
+
+			// Verify deletion
+			_, err = service.GetById({{.ModelLower}}.Id)
+			assert.Error(t, err)
+
+			// Test delete with invalid ID
+			err = service.Delete(0)
+			assert.Error(t, err)
+
+			// Test delete with non-existent ID
+			err = service.Delete(99999)
+			assert.Error(t, err)
+		})
+
+		t.Run("get all operations", func(t *testing.T) {
+			// Create multiple test {{.PluralLower}}
+			for i := 0; i < 5; i++ {
+				{{.ModelLower}} := &models.{{.Model}}{
+					{{range .Fields}}{{if ne .Type "*storage.Attachment"}}{{.Name}}: {{.TestValueWithIndex}},
+					{{end}}{{end}}
+				}
+				err := helper.DB.Create({{.ModelLower}}).Error
+				assert.NoError(t, err)
+			}
+
+			// Test GetAll without pagination
+			result, err := service.GetAll(nil, nil, nil, nil)
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+			assert.NotEmpty(t, result.Data)
+
+			// Test GetAll with pagination
+			page := 1
+			limit := 2
+			result, err = service.GetAll(&page, &limit, nil, nil)
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+			// Type assert to slice to use len()
+			if data, ok := result.Data.([]interface{}); ok {
+				assert.LessOrEqual(t, len(data), limit)
+			}
+			assert.Equal(t, page, result.Pagination.Page)
+			assert.Equal(t, limit, result.Pagination.PageSize)
+		})
+
+		t.Run("error cases and edge conditions", func(t *testing.T) {
+			// Test create with duplicate unique field (if applicable)
+			{{range .Fields}}{{if .IsUnique}}
+			{{$.ModelLower}}1 := &models.{{$.Model}}{
+				{{$uniqueField := .Name}}{{range $.Fields}}{{if not .IsRelation}}{{if and (ne .Type "*storage.Attachment")}}{{if eq .Name $uniqueField}}{{.Name}}: {{.TestValue}}, // Duplicate unique value
+				{{else}}{{.Name}}: {{.TestValue}},
+				{{end}}{{end}}{{else if eq .Relationship "belongs_to"}}{{.Name}}Id: 1,
+				{{end}}{{end}}
+			}
+			err := helper.DB.Create({{$.ModelLower}}1).Error
+			assert.NoError(t, err)
+
+			createReq := &models.Create{{$.Model}}Request{
+				{{range $.Fields}}{{if not .IsRelation}}{{if and (ne .Type "*storage.Attachment")}}{{if eq .Name $uniqueField}}{{.Name}}: {{.TestValue}}, // Duplicate unique value
+				{{else}}{{.Name}}: {{.TestValue}},
+				{{end}}{{end}}{{else if eq .Relationship "belongs_to"}}{{.Name}}Id: 1,
+				{{end}}{{end}}
+			}
+			_, err = service.Create(createReq)
+			assert.Error(t, err) // Should fail due to duplicate unique constraint
+			{{end}}{{end}}
+		})
+	})
+}

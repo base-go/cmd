@@ -17,15 +17,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type Asset struct {
-	Name               string `json:"name"`
-	BrowserDownloadURL string `json:"browser_download_url"`
-}
-
-type Release struct {
-	TagName string  `json:"tag_name"`
-	Assets  []Asset `json:"assets"`
-}
 
 func extractTarGz(gzipStream io.Reader, targetPath string) error {
 	uncompressedStream, err := gzip.NewReader(gzipStream)
@@ -180,22 +171,82 @@ func runWithSudo(command string, args ...string) error {
 var upgradeCmd = &cobra.Command{
 	Use:   "upgrade",
 	Short: "Upgrade Base CLI to the latest version",
+	Long: `Upgrade Base CLI to the latest version.
+
+By default, this command only upgrades within the same major version (e.g., 1.x → 1.y).
+To upgrade to a new major version (which may contain breaking changes), use the --major flag.
+
+Examples:
+  base upgrade           # Upgrade within current major version only
+  base upgrade --major   # Allow upgrade to new major version`,
 	Run: func(cmd *cobra.Command, args []string) {
+		allowMajor, _ := cmd.Flags().GetBool("major")
 		fmt.Println("Checking for updates...")
 
-		release, err := version.CheckLatestVersion()
+		// Get the appropriate latest version based on the --major flag
+		release, targetVersion, err := getTargetVersion(allowMajor)
 		if err != nil {
 			fmt.Printf("Error checking for updates: %v\n", err)
 			return
 		}
 
 		info := version.GetBuildInfo()
-		latestVersion := strings.TrimPrefix(release.TagName, "v")
 
-		if info.Version == latestVersion {
+		if info.Version == targetVersion {
 			fmt.Printf("You're already using the latest version (%s)\n", info.Version)
 			return
 		}
+
+		// Check if there's a major version available but user didn't specify --major
+		if !allowMajor {
+			latestVersion := strings.TrimPrefix(release.TagName, "v")
+			if isMajorVersionUpgrade(info.Version, latestVersion) && targetVersion != latestVersion {
+				fmt.Printf("📦 Minor update available: %s → %s\n", info.Version, targetVersion)
+				fmt.Printf("\n🚨 MAJOR VERSION ALSO AVAILABLE: %s\n", latestVersion)
+				if strings.HasPrefix(latestVersion, "2.") && strings.HasPrefix(info.Version, "1.") {
+					fmt.Println("🎉 NEW in v2.0.0: Automatic Relationship Detection!")
+					fmt.Println("   • Fields ending with '_id' now auto-generate GORM relationships")
+				}
+				fmt.Println("⚠️  To upgrade to the major version, use: base upgrade --major")
+				fmt.Printf("📚 Major version changelog: https://github.com/BaseTechStack/basecmd/releases/tag/v%s\n", latestVersion)
+				fmt.Println()
+			}
+		}
+
+		// Check for major version changes and warn about breaking changes (only when --major is used)
+		if allowMajor && isMajorVersionUpgrade(info.Version, targetVersion) {
+			fmt.Printf("\n🚨 MAJOR VERSION UPGRADE DETECTED: %s → %s\n", info.Version, targetVersion)
+			fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+			fmt.Println("⚠️  This is a MAJOR version upgrade that may contain breaking changes!")
+			fmt.Println("")
+			
+			if strings.HasPrefix(targetVersion, "2.") && strings.HasPrefix(info.Version, "1.") {
+				fmt.Println("🎉 NEW in v2.0.0: Automatic Relationship Detection!")
+				fmt.Println("   • Fields ending with '_id' now automatically generate GORM relationships")
+				fmt.Println("   • No more manual relationship specification needed")
+				fmt.Println("   • Example: 'author_id:uint' → automatically creates Author relationship")
+				fmt.Println("")
+				fmt.Println("✅ COMPATIBILITY: Your existing projects will continue to work without changes")
+				fmt.Println("🚀 BENEFIT: New projects can use the simplified '_id' syntax")
+				fmt.Println("")
+			}
+			
+			fmt.Println("📚 Full changelog: https://github.com/BaseTechStack/basecmd/releases/tag/v" + targetVersion)
+			fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+			fmt.Print("\nDo you want to proceed with the upgrade? [y/N]: ")
+			
+			var response string
+			fmt.Scanln(&response)
+			response = strings.ToLower(strings.TrimSpace(response))
+			
+			if response != "y" && response != "yes" {
+				fmt.Println("Upgrade cancelled.")
+				return
+			}
+			fmt.Println()
+		}
+
+		latestVersion := targetVersion
 
 		// Determine the correct asset name based on OS and architecture
 		osName := runtime.GOOS
@@ -315,6 +366,53 @@ var upgradeCmd = &cobra.Command{
 	},
 }
 
+// isMajorVersionUpgrade checks if the upgrade is a major version change
+func isMajorVersionUpgrade(currentVersion, latestVersion string) bool {
+	// Remove 'v' prefix if present
+	current := strings.TrimPrefix(currentVersion, "v")
+	latest := strings.TrimPrefix(latestVersion, "v")
+	
+	// Split versions to get major version numbers
+	currentParts := strings.Split(current, ".")
+	latestParts := strings.Split(latest, ".")
+	
+	if len(currentParts) == 0 || len(latestParts) == 0 {
+		return false
+	}
+	
+	// Compare major version numbers
+	return currentParts[0] != latestParts[0]
+}
+
+// getTargetVersion returns the appropriate target version based on allowMajor flag
+func getTargetVersion(allowMajor bool) (*version.Release, string, error) {
+	release, err := version.CheckLatestVersion()
+	if err != nil {
+		return nil, "", err
+	}
+
+	latestVersion := strings.TrimPrefix(release.TagName, "v")
+	
+	if !allowMajor {
+		// Get current version info to determine what major version to stay within
+		info := version.GetBuildInfo()
+		currentMajor := strings.Split(strings.TrimPrefix(info.Version, "v"), ".")[0]
+		
+		// If the latest version is in the same major version, use it
+		if strings.HasPrefix(latestVersion, currentMajor+".") {
+			return release, latestVersion, nil
+		}
+		
+		// Otherwise, we need to find the latest version within the current major version
+		// For now, return the current version (no upgrade available within major version)
+		// In a full implementation, you'd query all releases and find the latest within the major version
+		return release, info.Version, nil
+	}
+	
+	return release, latestVersion, nil
+}
+
 func init() {
+	upgradeCmd.Flags().Bool("major", false, "Allow upgrade to new major version (may contain breaking changes)")
 	rootCmd.AddCommand(upgradeCmd)
 }

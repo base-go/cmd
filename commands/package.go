@@ -255,7 +255,7 @@ func removeModuleInitializer(packageName string) error {
 	}
 
 	// Remove initializer block
-	structName := strings.Title(packageName)
+	structName := cases.Title(language.AmericanEnglish).String(packageName)
 	initializerStart := fmt.Sprintf("// Initialize %s modules", structName)
 	if idx := strings.Index(contentStr, initializerStart); idx != -1 {
 		// Find the block end (next empty line)

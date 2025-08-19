@@ -8,13 +8,13 @@ It offers scaffolding, module generation, and utilities to accelerate Go applica
 ### macOS and Linux
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/base-go/cmd/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/BaseTechStack/basecmd/main/install.sh | bash
 ```
 
 If you need to install in a protected directory (like `/usr/local/bin`), use:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/base-go/cmd/main/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/BaseTechStack/basecmd/main/install.sh | sudo bash
 ```
 
 ### Windows
@@ -24,13 +24,13 @@ curl -sSL https://raw.githubusercontent.com/base-go/cmd/main/install.sh | sudo b
 1. Open PowerShell as Administrator
 2. Run:
 ```powershell
-Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/base-go/cmd/main/install.ps1'))
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/BaseTechStack/basecmd/main/install.ps1'))
 ```
 
 #### Option 2: Using Git Bash
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/base-go/cmd/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/BaseTechStack/basecmd/main/install.sh | bash
 ```
 
 ## Commands
@@ -74,6 +74,108 @@ base start -d
 base start -r -d
 ```
 
+### `base test [module]` and `base test coverage [module]`
+
+Run tests for the application with optional coverage reporting.
+
+Modules:
+- `app`
+- `core`
+- omit to run all tests
+
+Options:
+- `--html`: Generate HTML coverage report (only valid with `coverage`)
+
+Examples:
+```bash
+# Run all tests
+base test
+
+# Run tests for a specific module
+base test app
+base test core
+
+# Run with coverage
+base test coverage
+base test coverage app
+base test coverage core
+
+# Generate HTML coverage report
+base test coverage --html
+base test coverage app --html
+```
+
+Notes:
+- Text coverage summary is printed to the console.
+- Coverage files are written as `coverage.out` (all modules) or `<module>_coverage.out`.
+- HTML reports are written to `test/coverage/coverage.html` or `test/coverage/<module>_coverage.html`.
+
+### `base docs`
+
+Generate OpenAPI 3.0 documentation by scanning controller annotations and create static files.
+
+```bash
+base docs [flags]
+```
+
+Options:
+- `-o, --output string`: Output directory for generated files (default "docs")
+- `-s, --static`: Generate static swagger files (JSON, YAML, docs.go) (default true)
+- `--no-static`: Skip generating static files
+
+Examples:
+```bash
+# Generate docs in default 'docs' directory
+base docs
+
+# Generate docs in custom directory
+base docs --output api-docs
+
+# Skip static file generation (legacy mode)
+base docs --no-static
+```
+
+Generated files:
+- `swagger.json`: OpenAPI 3.0 specification in JSON format
+- `swagger.yaml`: OpenAPI 3.0 specification in YAML format
+- `docs.go`: Go package with embedded OpenAPI spec for programmatic access
+
+Notes:
+- Static files are served at `/docs/` when running the server
+- You can also run `base start -d` to auto-generate docs before starting the server and serve Swagger UI at `/swagger/`
+- All swagger info (title, version, description) is extracted from main.go annotations
+
+### `base d` or `base destroy`
+
+Destroy (delete) one or more existing modules.
+
+```bash
+base d [name1] [name2] ... [flags]
+```
+
+Examples:
+```bash
+# Destroy a single module
+base d user
+
+# Destroy multiple modules at once
+base d user customer order
+
+# Alternative command name
+base destroy user customer
+```
+
+What gets removed:
+- Module directory (`app/modulename/`)
+- Model file (`app/models/modulename.go`)
+- Test directory (`test/app_test/modulename_test/`)
+- Import and registration from `app/init.go`
+
+Notes:
+- Requires confirmation before destroying modules
+- Will attempt to clean up orphaned entries even if module directory doesn't exist
+- Shows progress for each module when destroying multiple modules
+
 ### `base update`
 
 Update framework core components:
@@ -103,24 +205,45 @@ base version
 Base supports various field types for model generation:
 
 Basic Types:
-- `string`: String field
-- `int`: Integer field
-- `bool`: Boolean field
-- `float`: Float field
-- `text`: Text field (for longer strings)
+- `string`
+- `bool`
+- `int`, `uint` (also `int8`, `int16`, `int32`, `int64`, `uint8`, `uint16`, `uint32`, `uint64`)
+- `float`, `float32`, `float64`
+- `text` (stored as string with appropriate DB type)
 
-Special Types:
-- `image`: Image attachment with validation (5MB limit, image extensions)
-- `file`: File attachment with validation (50MB limit, document extensions)
-- `attachment`: Generic attachment (10MB limit, mixed extensions)
-- `time`: Time field
-- `date`: Date field
-- `datetime`: DateTime field
+Special Types and Aliases (mapping shown on the right):
+- `email`, `url`, `slug` → string
+- `datetime`, `time`, `date` → `types.DateTime`
+- `decimal`, `float` → `float64`
+- `sort` → `int`
+- `translation`, `translatedField` → `translation.Field`
+- `image`, `file`, `attachment` → `*storage.Attachment`
 
-Relationship Types:
-- `belongs_to`: One-to-one relationship (with foreign key in this model)
-- `has_one`: One-to-one relationship (with foreign key in the other model)
-- `has_many`: One-to-many relationship
+Notes:
+- Attachment fields are handled via dedicated upload endpoints and are not included in JSON create/update payloads.
+- Email/URL/Slug are strings; GORM tags may add size/indexing automatically.
+- Datetime types use Base `types.DateTime` under the hood.
+
+Relationship Types (both snake_case and camelCase accepted):
+- `belongs_to` (or `belongsTo`): one-to-one with FK on this model
+- `has_one` (or `hasOne`): one-to-one with FK on the other model
+- `has_many` (or `hasMany`): one-to-many
+
+Relationship auto-detection:
+- Defining a field as `<name>_id:uint` will also generate the corresponding `belongs_to` relationship for `<name>` automatically.
+
+Type inference (when no explicit type is given):
+- `<name>_id` → `uint` (FK)
+- Contains one of: `description`, `content`, `body`, `notes`, `comment`, `summary`, `bio`, `about` → `text`
+- Prefix or contains: `is_`, `has_`, `can_`, `enabled`, `active`, `published`, `verified`, `confirmed` → `bool`
+- Contains: `price`, `amount` → `decimal`; other numeric-like names (`count`, `quantity`, `number`, `rating`, `score`, `weight`, `height`, `width`) → `int`
+- Suffix `_at`, `_on`, `_date` or contains common datetime terms (`date`, `time`, `created_at`, `updated_at`, `deleted_at`, `published_at`, `expires_at`) → `datetime`
+- Contains `email` → `email` (string)
+- Contains `url` or `link` → `url` (string)
+- Contains `image`, `photo`, `picture`, `avatar` → `image` (attachment)
+- Contains `file`, `document`, `attachment` → `file` (attachment)
+- Contains `translation`, `i18n`, `locale` → `translatedField`
+- Otherwise → `string`
 
 Example:
 ```bash

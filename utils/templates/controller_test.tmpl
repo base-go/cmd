@@ -1,0 +1,215 @@
+package {{.PackageName}}_test
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"base/app/{{.PackageName}}"
+	"base/app/models"
+	"base/core/emitter"
+	"base/core/router"
+	"base/test"
+	{{if hasField .Fields "translation.Field"}}"base/core/translation"
+	{{end}}"github.com/stretchr/testify/assert"
+)
+
+func Test{{.Model}}Controllers(t *testing.T) {
+	helper := test.SetupTest(t)
+	defer helper.TeardownTest()
+
+	// Auto-migrate {{.Model}} table for testing
+	err := helper.DB.AutoMigrate(&models.{{.Model}}{})
+	assert.NoError(t, err)
+
+	// Create service and controller
+	service := {{.PackageName}}.New{{.Model}}Service(
+		helper.DB,
+		emitter.New(),
+		nil, // storage can be nil for basic tests
+		helper.Logger,
+	)
+	controller := {{.PackageName}}.New{{.Model}}Controller(service, nil)
+
+	// Setup router
+	testRouter := router.New()
+	api := testRouter.Group("/api")
+	controller.Routes(api)
+
+	t.Run("{{.Model}} controller operations comprehensive coverage", func(t *testing.T) {
+		t.Run("Create {{.Model}}", func(t *testing.T) {
+			createReq := models.Create{{.Model}}Request{
+				{{range .Fields}}{{if not .IsRelation}}{{if and (ne .Type "*storage.Attachment")}}{{.Name}}: {{.TestValue}}, 
+				{{end}}{{else if eq .Relationship "belongs_to"}}{{.Name}}Id: 1, 
+				{{end}}{{end}}
+			}
+
+			jsonData, _ := json.Marshal(createReq)
+			req, _ := http.NewRequest("POST", "/api/{{ToKebabCase .PackageName}}", bytes.NewBuffer(jsonData))
+			req.Header.Set("Content-Type", "application/json")
+
+			w := httptest.NewRecorder()
+			testRouter.ServeHTTP(w, req)
+
+			assert.Equal(t, http.StatusCreated, w.Code)
+
+			var response models.{{.Model}}Response
+			err := json.Unmarshal(w.Body.Bytes(), &response)
+			assert.NoError(t, err)
+			assert.NotZero(t, response.Id)
+			{{range .Fields}}{{if and (not .IsRelation) (ne .Type "*storage.Attachment")}}assert.Equal(t, {{.TestValue}}, response.{{.Name}})
+			{{end}}{{end}}
+		})
+
+		t.Run("Get {{.Model}} by ID", func(t *testing.T) {
+			// Create test {{.ModelLower}}
+			{{.ModelLower}} := &models.{{.Model}}{
+				{{range .Fields}}{{if and (not .IsRelation) (ne .Type "*storage.Attachment")}}{{.Name}}: {{.TestValue}},
+				{{end}}{{end}}
+			}
+			err := helper.DB.Create({{.ModelLower}}).Error
+			assert.NoError(t, err)
+
+			req, _ := http.NewRequest("GET", fmt.Sprintf("/api/{{ToKebabCase .PackageName}}/%d", {{.ModelLower}}.Id), nil)
+			w := httptest.NewRecorder()
+			testRouter.ServeHTTP(w, req)
+
+			assert.Equal(t, http.StatusOK, w.Code)
+
+			var response models.{{.Model}}Response
+			err = json.Unmarshal(w.Body.Bytes(), &response)
+			assert.NoError(t, err)
+			assert.Equal(t, {{.ModelLower}}.Id, response.Id)
+			{{range .Fields}}{{if and (not .IsRelation) (ne .Type "*storage.Attachment")}}assert.Equal(t, {{.TestValue}}, response.{{.Name}})
+			{{end}}{{end}}
+		})
+
+		t.Run("Update {{.Model}}", func(t *testing.T) {
+			// Create test {{.ModelLower}}
+			{{.ModelLower}} := &models.{{.Model}}{
+				{{range .Fields}}{{if and (not .IsRelation) (ne .Type "*storage.Attachment")}}{{.Name}}: {{.TestValue}},
+				{{end}}{{end}}
+			}
+			err := helper.DB.Create({{.ModelLower}}).Error
+			assert.NoError(t, err)
+
+			updateReq := models.Update{{.Model}}Request{
+				{{range .Fields}}{{if not .IsRelation}}{{if and (ne .Type "*storage.Attachment")}}{{if eq .Type "bool"}}{{.Name}}: func() *bool { b := {{.UpdateTestValue}}; return &b }(), {{else}}{{.Name}}: {{.UpdateTestValue}}, {{end}}
+				{{end}}{{else if eq .Relationship "belongs_to"}}{{.Name}}Id: 2, 
+				{{end}}{{end}}
+			}
+
+			jsonData, _ := json.Marshal(updateReq)
+			req, _ := http.NewRequest("PUT", fmt.Sprintf("/api/{{ToKebabCase .PackageName}}/%d", {{.ModelLower}}.Id), bytes.NewBuffer(jsonData))
+			req.Header.Set("Content-Type", "application/json")
+
+			w := httptest.NewRecorder()
+			testRouter.ServeHTTP(w, req)
+
+			assert.Equal(t, http.StatusOK, w.Code)
+
+			var response models.{{.Model}}Response
+			err = json.Unmarshal(w.Body.Bytes(), &response)
+			assert.NoError(t, err)
+			assert.Equal(t, {{.ModelLower}}.Id, response.Id)
+			{{range .Fields}}{{if and (not .IsRelation) (ne .Type "*storage.Attachment")}}assert.Equal(t, {{.UpdateTestValue}}, response.{{.Name}})
+			{{end}}{{end}}
+		})
+
+		t.Run("Delete {{.Model}}", func(t *testing.T) {
+			// Create test {{.ModelLower}}
+			{{.ModelLower}} := &models.{{.Model}}{
+				{{range .Fields}}{{if and (not .IsRelation) (ne .Type "*storage.Attachment")}}{{.Name}}: {{.TestValue}},
+				{{end}}{{end}}
+			}
+			err := helper.DB.Create({{.ModelLower}}).Error
+			assert.NoError(t, err)
+
+			req, _ := http.NewRequest("DELETE", fmt.Sprintf("/api/{{ToKebabCase .PackageName}}/%d", {{.ModelLower}}.Id), nil)
+			w := httptest.NewRecorder()
+			testRouter.ServeHTTP(w, req)
+
+			assert.Equal(t, http.StatusNoContent, w.Code)
+
+			// Verify deletion
+			var found models.{{.Model}}
+			err = helper.DB.First(&found, {{.ModelLower}}.Id).Error
+			assert.Error(t, err) // Should not find deleted record
+		})
+
+		t.Run("List {{.Plural}} (paginated)", func(t *testing.T) {
+			// Create multiple test {{.PluralLower}}
+			for i := 0; i < 5; i++ {
+				{{.ModelLower}} := &models.{{.Model}}{
+					{{range .Fields}}{{if and (not .IsRelation) (ne .Type "*storage.Attachment")}}{{.Name}}: {{.TestValueWithIndex}},
+					{{end}}{{end}}
+				}
+				err := helper.DB.Create({{.ModelLower}}).Error
+				assert.NoError(t, err)
+			}
+
+			req, _ := http.NewRequest("GET", "/api/{{ToKebabCase .PackageName}}?page=1&limit=3", nil)
+			w := httptest.NewRecorder()
+			testRouter.ServeHTTP(w, req)
+
+			assert.Equal(t, http.StatusOK, w.Code)
+
+			var response struct {
+				Data       []models.{{.Model}}ListResponse `json:"data"`
+				Pagination struct {
+					Page     int `json:"page"`
+					PageSize int `json:"page_size"`
+					Total    int `json:"total"`
+				} `json:"pagination"`
+			}
+			err := json.Unmarshal(w.Body.Bytes(), &response)
+			assert.NoError(t, err)
+			assert.NotEmpty(t, response.Data)
+			assert.LessOrEqual(t, len(response.Data), 3)
+			assert.Equal(t, 1, response.Pagination.Page)
+			assert.Equal(t, 3, response.Pagination.PageSize)
+		})
+
+		t.Run("List All {{.Plural}} (unpaginated)", func(t *testing.T) {
+			req, _ := http.NewRequest("GET", "/api/{{ToKebabCase .PackageName}}/all", nil)
+			w := httptest.NewRecorder()
+			testRouter.ServeHTTP(w, req)
+
+			assert.Equal(t, http.StatusOK, w.Code)
+
+			var response []models.{{.Model}}ListResponse
+			err := json.Unmarshal(w.Body.Bytes(), &response)
+			assert.NoError(t, err)
+			assert.NotNil(t, response)
+		})
+
+		t.Run("Error cases", func(t *testing.T) {
+			// Test Get with invalid ID
+			req, _ := http.NewRequest("GET", "/api/{{ToKebabCase .PackageName}}/99999", nil)
+			w := httptest.NewRecorder()
+			testRouter.ServeHTTP(w, req)
+			assert.Equal(t, http.StatusNotFound, w.Code)
+
+			// Test Update with invalid ID
+			updateReq := models.Update{{.Model}}Request{
+				{{range .Fields}}{{if and (not .IsRelation) (ne .Type "*storage.Attachment")}}{{if eq .Type "bool"}}{{.Name}}: func() *bool { b := {{.UpdateTestValue}}; return &b }(),{{else}}{{.Name}}: {{.UpdateTestValue}},{{end}}
+				{{end}}{{end}}
+			}
+			jsonData, _ := json.Marshal(updateReq)
+			req, _ = http.NewRequest("PUT", "/api/{{ToKebabCase .PackageName}}/99999", bytes.NewBuffer(jsonData))
+			req.Header.Set("Content-Type", "application/json")
+			w = httptest.NewRecorder()
+			testRouter.ServeHTTP(w, req)
+			assert.Equal(t, http.StatusNotFound, w.Code)
+
+			// Test Delete with invalid ID
+			req, _ = http.NewRequest("DELETE", "/api/{{ToKebabCase .PackageName}}/99999", nil)
+			w = httptest.NewRecorder()
+			testRouter.ServeHTTP(w, req)
+			assert.Equal(t, http.StatusNotFound, w.Code)
+		})
+	})
+}

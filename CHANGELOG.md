@@ -5,16 +5,129 @@ All notable changes to the Base CLI tool will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [v1.2.3] - 2025-06-23
+## [v2.0.0] - 2025-08-13
 
 ### Added
-- Enhanced validator template to collect and return all validation errors instead of just the first one
-- Added custom ValidationErrors type that implements the error interface for better error handling
-- Improved validation error messages with field name, validation rule, and invalid value information
+- **🎯 SelectOption Support for Frontend Select Boxes** - Enhanced `/all` endpoints
+  - New `SelectOption` struct with just `id` and `name` fields for dropdowns
+  - Intelligent field detection (prioritizes `name`, falls back to `title`)
+  - Support for `translation.Field` types with automatic string extraction
+  - Optimized database queries - only selects necessary fields
+  - Alphabetically sorted results for better UX
 
 ### Changed
-- Updated service template to use centralized validation from validator template
-- Added validation calls in all CRUD operations (Create, Update, Delete, GetById)
+- **🔧 Template System Improvements**
+  - Merged "_clean" template files into main templates for cleaner organization
+  - Refactored `GenerateFileFromTemplate` to use `NamingConvention` struct
+  - Updated all templates to use consistent naming convention fields
+  - Fixed controller routes to be explicit (e.g., `/users` instead of `""`)
+
+### Fixed
+- **🛠️ GORM Field Optimization for MySQL**
+  - Added proper size tags: `email` gets `size:255;index`, `string` gets `size:255`
+  - Text fields use explicit `type:text` for longer content
+  - URLs get `size:512` for longer links
+  - Slugs get `size:255;uniqueIndex` for unique indexing
+  - Decimal fields get `type:decimal(10,2)` for proper money precision
+  - Foreign keys automatically get `index` for better performance
+- **🐛 Template Field Resolution**
+  - Fixed template errors with missing `.StructName` → `.Model` fields
+  - Corrected `.LowerName` → `.ModelLower` field references
+  - Resolved `.PluralName` → `.Plural` field mappings
+
+## [v2.1.0] - 2025-08-13
+
+### Added
+- **🎯 Enhanced Swagger Documentation System** - Complete overhaul of API documentation
+  - Auto-discovery of swagger annotations from controller files
+  - Enhanced `base docs` command to generate comprehensive documentation  
+  - Support for detailed @Param, @Success, @Failure, and @Security annotations
+  - Automatic parsing of parameter types, request bodies, and responses
+  - Integration with `base start -d` flag for automatic doc generation
+- **🔧 API Route Prefix Fix** - Unified API structure  
+  - All swagger routes now correctly prefixed with `/api`
+  - Updated controller templates to include `/api` prefix automatically
+  - Fixed swagger documentation to match actual API structure
+  - New modules automatically generate with correct API routes
+- **📋 Controller Template Improvements**
+  - Consolidated to single controller template (removed duplicate)
+  - Enhanced swagger annotations with detailed parameter information
+  - Better error handling and response schemas
+  - Auto-generation includes security requirements
+
+### Fixed
+- Template generation now uses correct `/api` prefixed routes
+- Swagger documentation matches actual server endpoints
+- Controller generation produces consistent API structure
+
+
+### Added
+- **🚀 MAJOR: Automatic Relationship Detection** - Revolutionary enhancement to code generation
+  - Fields ending with `_id` and type `uint` automatically generate GORM relationships
+  - Eliminates manual relationship specification - just use naming conventions!
+  - Auto-generates both foreign key fields AND relationship fields
+  - Includes proper GORM tags with `foreignKey` relationships
+  - Works seamlessly with existing manual relationship syntax
+- **Smart Field Processing**: Enhanced `ProcessField` function to detect relationship patterns
+- **Template Enhancements**: Updated all templates to handle auto-detected relationships
+- **Clean Code Generation**: Eliminated duplicate field generation issues
+- **Major Version Upgrade Safety**: Added `--major` flag to upgrade command for controlled major version upgrades
+- **Smart Upgrade Behavior**: Default `base upgrade` now only upgrades within the same major version (e.g., 1.x → 1.y)
+- **Major Version Upgrade Warning**: Added interactive warning for major version upgrades with breaking change information
+- **Enhanced Version Command**: Version command now shows specific information about major version upgrades
+- **Upgrade Command Documentation**: Enhanced help text with examples for both minor and major upgrades
+
+### Changed
+- **BREAKING**: Enhanced relationship detection changes code generation behavior
+- **Model Template**: Updated to handle both foreign key and relationship fields from auto-detection
+- **Service Template**: Fixed Create/Update methods to prevent duplicate field assignments
+- **Field Processing Logic**: `ProcessField` now returns multiple fields for `_id` patterns
+- **Template Consistency**: All templates now work with enhanced relationship detection
+
+### Fixed
+- **Duplicate Fields**: Resolved issue where foreign key fields were generated multiple times
+- **Service Layer**: Fixed Create and Update operations to properly handle relationship fields
+- **Template Logic**: Corrected template conditions to avoid conflicts between manual and auto relationships
+
+### Migration Guide
+- **Existing projects**: Continue to work without changes
+- **New projects**: Can use `_id` suffix convention for automatic relationships
+- **Mixed usage**: Manual relationship syntax still works alongside auto-detection
+
+### Examples
+
+**Code Generation - Before v2.0.0:**
+```bash
+base g article title:string content:text author:belongsTo:Author category:belongsTo:Category
+```
+
+**Code Generation - v2.0.0 and later:**
+```bash
+base g article title:string content:text author_id:uint category_id:uint
+```
+
+**Upgrade Commands:**
+```bash
+base upgrade         # Safe: only upgrades within current major version (1.x → 1.y)
+base upgrade --major # Allow major version upgrade (1.x → 2.x) with breaking changes warning
+```
+
+Both generate the same result, but v2.0.0 is much simpler!
+
+**Generated Model (both approaches):**
+```go
+type Article struct {
+    Id         uint     `json:"id" gorm:"primarykey"`
+    Title      string   `json:"title"`
+    Content    string   `json:"content"`
+    AuthorId   uint     `json:"author_id"`
+    Author     Author   `json:"author,omitempty" gorm:"foreignKey:AuthorId"`
+    CategoryId uint     `json:"category_id"`
+    Category   Category `json:"category,omitempty" gorm:"foreignKey:CategoryId"`
+}
+```
+
+---
 
 ## [v1.2.2] - 2025-03-18
 
@@ -201,7 +314,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Model layer with GORM integration
 - Basic project structure
 
-[v1.2.3]: https://github.com/BaseTechStack/basecmd/releases/tag/v1.2.3
+[v2.0.0]: https://github.com/BaseTechStack/basecmd/releases/tag/v2.0.0
 [v1.2.2]: https://github.com/BaseTechStack/basecmd/releases/tag/v1.2.2
 [v1.2.1]: https://github.com/BaseTechStack/basecmd/releases/tag/v1.2.1
 [v1.2.0]: https://github.com/BaseTechStack/basecmd/releases/tag/v1.2.0

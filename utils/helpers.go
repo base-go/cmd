@@ -23,18 +23,35 @@ func init() {
 
 func GetGoType(t string) string {
 	switch t {
-	case "int":
-		return "int"
-	case "string", "text":
+	// Exact Go types - pass through as-is
+	case "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64":
+		return t
+	case "float32", "float64":
+		return t
+	case "bool":
+		return t
+	case "string":
+		return t
+	case "byte", "rune":
+		return t
+		
+	// Base framework special types
+	case "translatedField", "translation":
+		return "translation.Field"
+		
+	// Convenience aliases
+	case "text", "email", "url", "slug":
 		return "string"
 	case "datetime", "time", "date":
 		return "types.DateTime"
-	case "float":
+	case "float", "decimal":
 		return "float64"
 	case "sort":
 		return "int"
-	case "bool":
-		return "bool"
+	case "image", "file":
+		return "*storage.Attachment"
+		
+	// Default: assume it's already a valid Go type or custom type
 	default:
 		return t
 	}
@@ -135,21 +152,26 @@ func UpdateInitFile(singularName, pluralName string) error {
 func AddModuleInitializer(content []byte, packageName, singularName string) ([]byte, bool) {
 	contentStr := string(content)
 
-	markerIndex := strings.Index(contentStr, "// MODULE_INITIALIZER_MARKER")
-	if markerIndex == -1 {
+	// Find the return modules line to add before it
+	returnIndex := strings.Index(contentStr, "return modules")
+	if returnIndex == -1 {
 		return content, false
 	}
 
-	if strings.Contains(contentStr[:markerIndex], fmt.Sprintf(`"%s":`, packageName)) {
+	if strings.Contains(contentStr[:returnIndex], fmt.Sprintf(`modules["%s"]`, packageName)) {
 		return content, false
 	}
 
 	structName := ToPascalCase(singularName)
 
-	newInitializer := fmt.Sprintf(`	"%s": func(db *gorm.DB, router *gin.RouterGroup, log logger.Logger, emitter *emitter.Emitter, storage *storage.ActiveStorage) module.Module { return %s.New%sModule(db, router, log, emitter, storage) },`,
+	newInitializer := fmt.Sprintf(`	modules["%s"] = %s.New%sModule(deps.DB)
+`,
 		packageName, packageName, structName)
 
-	updatedContent := contentStr[:markerIndex] + newInitializer + "\n        " + contentStr[markerIndex:]
+	// Find the line before return modules
+	lineStart := strings.LastIndex(contentStr[:returnIndex], "\n") + 1
+	
+	updatedContent := contentStr[:lineStart] + newInitializer + contentStr[lineStart:]
 
 	return []byte(updatedContent), true
 }
@@ -159,6 +181,10 @@ func UpdateInitFileForDestroy(singularName string) error {
 	dirName := ToSnakeCase(singularName)
 	pluralName := ToPlural(singularName)
 	packageName := ToSnakeCase(pluralName)
+	
+	// For module key lookup, try both singular and plural forms
+	// Prioritize plural since that's the new convention
+	moduleKeys := []string{packageName, singularName, dirName}
 
 	// Paths - use the same paths as generateModule
 	initFilePath := "app/init.go"
@@ -173,34 +199,70 @@ func UpdateInitFileForDestroy(singularName string) error {
 
 	contentStr := string(content)
 
-	// Check if module exists in init.go
-	modulePattern := fmt.Sprintf(`"%s":\s*func\(db \*gorm\.DB,`, packageName)
-	if !regexp.MustCompile(modulePattern).MatchString(contentStr) {
-		return fmt.Errorf("module '%s' not found in init.go", packageName)
+	// Check if module exists in init.go - try all possible module keys
+	var foundModuleKey string
+	for _, key := range moduleKeys {
+		simplePattern := fmt.Sprintf(`modules["%s"]`, key)
+		complexPattern := fmt.Sprintf(`"%s":\s*func\(db \*gorm\.DB,`, key)
+		
+		if strings.Contains(contentStr, simplePattern) || regexp.MustCompile(complexPattern).MatchString(contentStr) {
+			foundModuleKey = key
+			break
+		}
+	}
+	
+	if foundModuleKey == "" {
+		return fmt.Errorf("module '%s' not found in init.go (tried keys: %v)", singularName, moduleKeys)
 	}
 
-	// Remove import while preserving formatting
-	importPath := fmt.Sprintf(`"base/app/%s"`, packageName)
+	// Remove import while preserving formatting - try both directory patterns
+	// Prioritize plural form since that's the new convention
+	importPaths := []string{
+		fmt.Sprintf(`"base/app/%s"`, packageName),
+		fmt.Sprintf(`"base/app/%s"`, foundModuleKey),
+		fmt.Sprintf(`"base/app/%s"`, dirName),
+	}
 	importMarker := "// MODULE_IMPORT_MARKER"
 
-	// Find the marker and remove the import
-	markerIndex := strings.Index(contentStr, importMarker)
-	if markerIndex != -1 {
-		markerEnd := strings.Index(contentStr[markerIndex:], "\n") + markerIndex
-		if markerEnd != -1 {
-			// Look for the import line after the marker
-			remainingContent := contentStr[markerEnd:]
-			importPattern := regexp.MustCompile(`\n\s*` + regexp.QuoteMeta(importPath) + `\n`)
-			contentStr = contentStr[:markerEnd+1] + importPattern.ReplaceAllString(remainingContent, "\n")
+	// Remove any matching import
+	for _, importPath := range importPaths {
+		markerIndex := strings.Index(contentStr, importMarker)
+		if markerIndex != -1 {
+			markerEnd := strings.Index(contentStr[markerIndex:], "\n") + markerIndex
+			if markerEnd != -1 {
+				// Look for the import line after the marker
+				remainingContent := contentStr[markerEnd:]
+				importPattern := regexp.MustCompile(`\n\s*` + regexp.QuoteMeta(importPath) + `\s*\n`)
+				if importPattern.MatchString(remainingContent) {
+					contentStr = contentStr[:markerEnd+1] + importPattern.ReplaceAllString(remainingContent, "\n")
+					break
+				}
+			}
+		} else {
+			// Fallback: remove import anywhere in the import block
+			importPattern := regexp.MustCompile(`\s*` + regexp.QuoteMeta(importPath) + `\s*\n`)
+			if importPattern.MatchString(contentStr) {
+				contentStr = importPattern.ReplaceAllString(contentStr, "")
+				break
+			}
 		}
 	}
 
-	// Remove module initializer
-	initializerPattern := fmt.Sprintf(`\n\s*"%s":\s*func\(db \*gorm\.DB,\s*router \*gin\.RouterGroup,\s*log logger\.Logger,\s*emitter \*emitter\.Emitter,\s*activeStorage \*storage\.ActiveStorage\) module\.Module \{[^}]+\},\n`, packageName)
-	re := regexp.MustCompile(initializerPattern)
+	// Remove module initializer - handle both simple and complex patterns using the found key
+	// Simple pattern: modules["products"] = products.NewProductModule(deps.DB)
+	simplePattern := fmt.Sprintf(`\s*modules\["%s"\]\s*=\s*%s\.New[^(]+\(deps\.DB\)\s*\n`, foundModuleKey, foundModuleKey)
+	// Complex pattern: "products": func(db *gorm.DB, ...) { return products.NewProductModule(...) },
+	complexPattern := fmt.Sprintf(`\s*"%s":\s*func\(db \*gorm\.DB,\s*router \*gin\.RouterGroup,\s*log logger\.Logger,\s*emitter \*emitter\.Emitter,\s*activeStorage \*storage\.ActiveStorage\) module\.Module \{[^}]+\},\s*\n`, foundModuleKey)
+	
+	simpleRe := regexp.MustCompile(simplePattern)
+	complexRe := regexp.MustCompile(complexPattern)
 
-	// Find and remove the module initializer
-	contentStr = re.ReplaceAllString(contentStr, "\n")
+	// Try to remove simple pattern first
+	if simpleRe.MatchString(contentStr) {
+		contentStr = simpleRe.ReplaceAllString(contentStr, "")
+	} else if complexRe.MatchString(contentStr) {
+		contentStr = complexRe.ReplaceAllString(contentStr, "")
+	}
 
 	// Ensure proper formatting
 	contentStr = regexp.MustCompile(`\n{3,}`).ReplaceAllString(contentStr, "\n\n")
@@ -253,19 +315,26 @@ func RemoveImport(content []byte, importStr string) []byte {
 
 func RemoveModuleInitializer(content []byte, pluralName string) []byte {
 	contentStr := string(content)
-	// Look for the module initializer
-	moduleStr := fmt.Sprintf(`"%s":`, pluralName)
+	// Look for the module initializer pattern: modules["pluralName"] = pluralName.Init(deps)
+	moduleStr := fmt.Sprintf(`modules["%s"]`, pluralName)
 	initializerStart := strings.Index(contentStr, moduleStr)
 	if initializerStart != -1 {
-		// Find the start of the line
+		// Find the start of the line (including any comment above)
 		lineStart := strings.LastIndex(contentStr[:initializerStart], "\n") + 1
-		// Find the end of the module block (closing brace followed by comma)
-		initializerEnd := strings.Index(contentStr[initializerStart:], "},") + initializerStart + 2
-		if initializerEnd > initializerStart {
-			// Remove any trailing newline
-			if len(contentStr) > initializerEnd && contentStr[initializerEnd] == '\n' {
-				initializerEnd++
+		
+		// Check if there's a comment line above this module
+		if lineStart > 1 {
+			prevLineStart := strings.LastIndex(contentStr[:lineStart-1], "\n") + 1
+			prevLine := strings.TrimSpace(contentStr[prevLineStart:lineStart])
+			if strings.HasPrefix(prevLine, "//") && strings.Contains(prevLine, "module") {
+				lineStart = prevLineStart // Include the comment line
 			}
+		}
+		
+		// Find the end of the line
+		initializerEnd := strings.Index(contentStr[initializerStart:], "\n") + initializerStart
+		if initializerEnd != -1 {
+			initializerEnd++ // Include the newline
 			contentStr = contentStr[:lineStart] + contentStr[initializerEnd:]
 		}
 	}
