@@ -228,6 +228,7 @@ Relationship Types (both snake_case and camelCase accepted):
 - `belongs_to` (or `belongsTo`): one-to-one with FK on this model
 - `has_one` (or `hasOne`): one-to-one with FK on the other model
 - `has_many` (or `hasMany`): one-to-many
+- `to_many` (or `toMany`): many-to-many with join table
 
 Relationship auto-detection:
 - Defining a field as `<name>_id:uint` will also generate the corresponding `belongs_to` relationship for `<name>` automatically.
@@ -277,12 +278,14 @@ base g Post \
   published_at:datetime \
   author:belongsTo:users.User \
   category:belongsTo:Category \
-  comments:hasMany:Comment
+  comments:hasMany:Comment \
+  tags:toMany:Tag
 
 # Generate Tag model
 base g Tag \
   name:string \
-  slug:string
+  slug:string 
+ 
 
 # Generate Comment model
 base g Comment \
