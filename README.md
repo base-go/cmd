@@ -8,13 +8,13 @@ It offers scaffolding, module generation, and utilities to accelerate Go applica
 ### macOS and Linux
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/base-go/cmd/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/BaseTechStack/basecmd/main/install.sh | bash
 ```
 
 If you need to install in a protected directory (like `/usr/local/bin`), use:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/base-go/cmd/main/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/BaseTechStack/basecmd/main/install.sh | sudo bash
 ```
 
 ### Windows
@@ -24,13 +24,13 @@ curl -sSL https://raw.githubusercontent.com/base-go/cmd/main/install.sh | sudo b
 1. Open PowerShell as Administrator
 2. Run:
 ```powershell
-Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/base-go/cmd/main/install.ps1'))
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/BaseTechStack/basecmd/main/install.ps1'))
 ```
 
 #### Option 2: Using Git Bash
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/base-go/cmd/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/BaseTechStack/basecmd/main/install.sh | bash
 ```
 
 ## Commands
@@ -112,15 +112,38 @@ Notes:
 
 ### `base docs`
 
-Generate Swagger documentation by scanning controller annotations.
+Generate OpenAPI 3.0 documentation by scanning controller annotations and create static files.
 
 ```bash
-base docs
+base docs [flags]
 ```
 
+Options:
+- `-o, --output string`: Output directory for generated files (default "docs")
+- `-s, --static`: Generate static swagger files (JSON, YAML, docs.go) (default true)
+- `--no-static`: Skip generating static files
+
+Examples:
+```bash
+# Generate docs in default 'docs' directory
+base docs
+
+# Generate docs in custom directory
+base docs --output api-docs
+
+# Skip static file generation (legacy mode)
+base docs --no-static
+```
+
+Generated files:
+- `swagger.json`: OpenAPI 3.0 specification in JSON format
+- `swagger.yaml`: OpenAPI 3.0 specification in YAML format
+- `docs.go`: Go package with embedded OpenAPI spec for programmatic access
+
 Notes:
-- Outputs registration code to `core/swagger/auto_generated.go`.
-- You can also run `base start -d` to auto-generate docs before starting the server and serve Swagger UI at `/swagger/`.
+- Static files are served at `/docs/` when running the server
+- You can also run `base start -d` to auto-generate docs before starting the server and serve Swagger UI at `/swagger/`
+- All swagger info (title, version, description) is extracted from main.go annotations
 
 ### `base update`
 
