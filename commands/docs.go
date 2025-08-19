@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 var (
@@ -155,50 +157,51 @@ func parseSwaggerAnnotations(filename string) ([]SwaggerAnnotation, error) {
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 
-		if strings.HasPrefix(line, "// @Summary") {
+		if summary, found := strings.CutPrefix(line, "// @Summary "); found {
 			currentAnnotation = SwaggerAnnotation{} // Reset
-			currentAnnotation.Summary = strings.TrimPrefix(line, "// @Summary ")
+			currentAnnotation.Summary = summary
 			inAnnotationBlock = true
-		} else if inAnnotationBlock && strings.HasPrefix(line, "// @Description") {
-			currentAnnotation.Description = strings.TrimPrefix(line, "// @Description ")
-		} else if inAnnotationBlock && strings.HasPrefix(line, "// @Tags") {
-			currentAnnotation.Tags = strings.TrimPrefix(line, "// @Tags ")
-		} else if inAnnotationBlock && strings.HasPrefix(line, "// @Router") {
-			// Parse @Router /path [method]
-			routerRegex := regexp.MustCompile(`// @Router\s+(.+?)\s+\[(.+?)\]`)
-			matches := routerRegex.FindStringSubmatch(line)
-			if len(matches) == 3 {
-				currentAnnotation.Route = matches[1]
-				currentAnnotation.Method = strings.ToUpper(matches[2])
+		} else if inAnnotationBlock {
+			if description, found := strings.CutPrefix(line, "// @Description "); found {
+				currentAnnotation.Description = description
+			} else if tags, found := strings.CutPrefix(line, "// @Tags "); found {
+				currentAnnotation.Tags = tags
+			} else if strings.HasPrefix(line, "// @Router") {
+				// Parse @Router /path [method]
+				routerRegex := regexp.MustCompile(`// @Router\s+(.+?)\s+\[(.+?)\]`)
+				matches := routerRegex.FindStringSubmatch(line)
+				if len(matches) == 3 {
+					currentAnnotation.Route = matches[1]
+					currentAnnotation.Method = strings.ToUpper(matches[2])
+				}
+			} else if strings.HasPrefix(line, "// @Param") {
+				// Parse @Param name in type required description
+				param := parseParamAnnotation(line)
+				if param != nil {
+					currentAnnotation.Parameters = append(currentAnnotation.Parameters, *param)
+				}
+			} else if strings.HasPrefix(line, "// @Success") {
+				// Parse @Success code description
+				resp := parseResponseAnnotation(line, true)
+				if resp != nil {
+					currentAnnotation.Responses = append(currentAnnotation.Responses, *resp)
+				}
+			} else if strings.HasPrefix(line, "// @Failure") {
+				// Parse @Failure code description
+				resp := parseResponseAnnotation(line, false)
+				if resp != nil {
+					currentAnnotation.Responses = append(currentAnnotation.Responses, *resp)
+				}
+			} else if security, found := strings.CutPrefix(line, "// @Security "); found {
+				// Parse @Security scheme
+				currentAnnotation.Security = append(currentAnnotation.Security, security)
+			} else if strings.HasPrefix(line, "func ") {
+				// End of annotation block - we've reached the function
+				if currentAnnotation.Summary != "" && currentAnnotation.Route != "" {
+					annotations = append(annotations, currentAnnotation)
+				}
+				inAnnotationBlock = false
 			}
-		} else if inAnnotationBlock && strings.HasPrefix(line, "// @Param") {
-			// Parse @Param name in type required description
-			param := parseParamAnnotation(line)
-			if param != nil {
-				currentAnnotation.Parameters = append(currentAnnotation.Parameters, *param)
-			}
-		} else if inAnnotationBlock && strings.HasPrefix(line, "// @Success") {
-			// Parse @Success code description
-			resp := parseResponseAnnotation(line, true)
-			if resp != nil {
-				currentAnnotation.Responses = append(currentAnnotation.Responses, *resp)
-			}
-		} else if inAnnotationBlock && strings.HasPrefix(line, "// @Failure") {
-			// Parse @Failure code description
-			resp := parseResponseAnnotation(line, false)
-			if resp != nil {
-				currentAnnotation.Responses = append(currentAnnotation.Responses, *resp)
-			}
-		} else if inAnnotationBlock && strings.HasPrefix(line, "// @Security") {
-			// Parse @Security scheme
-			security := strings.TrimPrefix(line, "// @Security ")
-			currentAnnotation.Security = append(currentAnnotation.Security, security)
-		} else if inAnnotationBlock && strings.HasPrefix(line, "func ") {
-			// End of annotation block - we've reached the function
-			if currentAnnotation.Summary != "" && currentAnnotation.Route != "" {
-				annotations = append(annotations, currentAnnotation)
-			}
-			inAnnotationBlock = false
 		} else if !strings.HasPrefix(line, "//") && line != "" {
 			// Non-comment line - end annotation block
 			inAnnotationBlock = false
@@ -212,7 +215,7 @@ func parseSwaggerAnnotations(filename string) ([]SwaggerAnnotation, error) {
 // Format: @Param name in type required "description" example(optional)
 func parseParamAnnotation(line string) *ParamAnnotation {
 	// Remove @Param prefix
-	paramStr := strings.TrimPrefix(line, "// @Param ")
+	paramStr, _ := strings.CutPrefix(line, "// @Param ")
 
 	// Split by spaces but preserve quoted strings
 	parts := parseQuotedString(paramStr)
@@ -254,7 +257,7 @@ func parseResponseAnnotation(line string, isSuccess bool) *ResponseAnnotation {
 		prefix = "// @Failure "
 	}
 
-	respStr := strings.TrimPrefix(line, prefix)
+	respStr, _ := strings.CutPrefix(line, prefix)
 	parts := parseQuotedString(respStr)
 
 	if len(parts) < 2 {
@@ -503,6 +506,7 @@ func generateOperationID(method, route string) string {
 	// Convert /api/users/{id} -> getUsersById
 	parts := strings.Split(strings.Trim(route, "/"), "/")
 	var opID strings.Builder
+	caser := cases.Title(language.English)
 
 	opID.WriteString(strings.ToLower(method))
 
@@ -514,9 +518,9 @@ func generateOperationID(method, route string) string {
 			// Parameter like {id} -> ById
 			param := strings.Trim(part, "{}")
 			opID.WriteString("By")
-			opID.WriteString(strings.Title(param))
+			opID.WriteString(caser.String(param))
 		} else {
-			opID.WriteString(strings.Title(part))
+			opID.WriteString(caser.String(part))
 		}
 	}
 
@@ -653,23 +657,21 @@ func extractSwaggerInfoFromMainGo() (SwaggerMainInfo, error) {
 		}
 
 		// Parse swagger annotations
-		if strings.HasPrefix(line, "// @title ") {
-			info.Title = strings.TrimPrefix(line, "// @title ")
-		} else if strings.HasPrefix(line, "// @version ") {
-			info.Version = strings.TrimPrefix(line, "// @version ")
-		} else if strings.HasPrefix(line, "// @description ") {
-			info.Description = strings.TrimPrefix(line, "// @description ")
-		} else if strings.HasPrefix(line, "// @BasePath ") {
-			info.BasePath = strings.TrimPrefix(line, "// @BasePath ")
-		} else if strings.HasPrefix(line, "// @host ") {
+		if title, found := strings.CutPrefix(line, "// @title "); found {
+			info.Title = title
+		} else if version, found := strings.CutPrefix(line, "// @version "); found {
+			info.Version = version
+		} else if description, found := strings.CutPrefix(line, "// @description "); found {
+			info.Description = description
+		} else if basePath, found := strings.CutPrefix(line, "// @BasePath "); found {
+			info.BasePath = basePath
+		} else if host, found := strings.CutPrefix(line, "// @host "); found {
 			// Remove http:// or https:// prefix from host if present
-			host := strings.TrimPrefix(line, "// @host ")
 			host = strings.TrimPrefix(host, "http://")
 			host = strings.TrimPrefix(host, "https://")
 			info.Host = host
-		} else if strings.HasPrefix(line, "// @schemes ") {
-			schemesStr := strings.TrimPrefix(line, "// @schemes ")
-			info.Schemes = strings.Fields(schemesStr)
+		} else if schemes, found := strings.CutPrefix(line, "// @schemes "); found {
+			info.Schemes = strings.Fields(schemes)
 		}
 	}
 

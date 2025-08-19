@@ -9,6 +9,8 @@ import (
 
 	"github.com/BaseTechStack/basecmd/utils"
 	"github.com/spf13/cobra"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 var generateCmd = &cobra.Command{
@@ -222,7 +224,8 @@ func NewAppModules() *AppModules {
 
 	// Insert the module initialization before return
 	insertPoint := returnIndex - 1
-	moduleInitLine := fmt.Sprintf("\n\t// %s module\n\t%s\n", strings.Title(moduleName), moduleInit)
+	caser := cases.Title(language.English)
+	moduleInitLine := fmt.Sprintf("\n\t// %s module\n\t%s\n", caser.String(moduleName), moduleInit)
 	contentStr = contentStr[:insertPoint] + moduleInitLine + contentStr[insertPoint:]
 
 	// Write back to file
