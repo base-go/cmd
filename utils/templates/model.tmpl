@@ -40,7 +40,7 @@ type {{.Model}} struct {
     {{- if eq .Relationship "belongs_to" }}
     {{.Name}}Id uint `json:"{{.JSONName}}_id,omitempty"`
     {{.Name}} *{{.RelatedModel}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}Id"`
-    {{- else if or (eq .Relationship "has_many") (eq .Relationship "has_one") }}
+    {{- else if or (eq .Relationship "has_many") (eq .Relationship "has_one") (eq .Relationship "many_to_many") }}
     {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty"{{if .GORM}} gorm:"{{.GORM}}"{{end}}`
     {{- end}}
     {{- end}}
@@ -51,6 +51,23 @@ type {{.Model}} struct {
     {{- end }}
     {{- end}}
 }
+
+{{- /* Generate join table structs for many-to-many relationships */}}
+{{- range .Fields}}
+{{- if eq .Relationship "many_to_many" }}
+
+// {{$.Model}}{{.RelatedModel}} represents the join table between {{$.Model}} and {{.RelatedModel}}
+type {{$.Model}}{{.RelatedModel}} struct {
+    {{$.Model}}ID uint `json:"{{$.ModelSnake}}_id" gorm:"primaryKey"`
+    {{.RelatedModel}}ID uint `json:"{{ToSnakeCase .RelatedModel}}_id" gorm:"primaryKey"`
+}
+
+// TableName returns the table name for the join table
+func (m *{{$.Model}}{{.RelatedModel}}) TableName() string {
+    return "{{$.ModelSnake}}_{{ToSnakeCase (ToPlural .RelatedModel)}}"
+}
+{{- end}}
+{{- end}}
 
 // TableName returns the table name for the {{.Model}} model
 func (m *{{.Model}}) TableName() string {

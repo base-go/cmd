@@ -44,11 +44,12 @@ func (m *Module) Init() error {
 }
 
 func (m *Module) Migrate() error {
-    return m.DB.AutoMigrate(&models.{{.Model}}{})
+    return m.DB.AutoMigrate(&models.{{.Model}}{}{{range .Fields}}{{if eq .Relationship "many_to_many"}}, &models.{{$.Model}}{{.RelatedModel}}{}{{end}}{{end}})
 }
 
 func (m *Module) GetModels() []any {
     return []any{
-        &models.{{.Model}}{},
+        &models.{{.Model}}{},{{range .Fields}}{{if eq .Relationship "many_to_many"}}
+        &models.{{$.Model}}{{.RelatedModel}}{},{{end}}{{end}}
     }
 }

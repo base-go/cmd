@@ -35,7 +35,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Corrected `.LowerName` → `.ModelLower` field references
   - Resolved `.PluralName` → `.Plural` field mappings
 
-## [v2.1.0] - 2025-08-13
+## [v2.0.1] - 2025-08-19
+
+### Added
+- **🎯 Many-to-Many Relationships with `toMany` syntax** - Complete implementation of many-to-many relationships
+  - New relationship types: `toMany`, `manyToMany`, `to_many`, `many_to_many` 
+  - Automatic join table struct generation (e.g., `PostUser`, `PostTag`)
+  - GORM-compliant join table naming following `model_related_model_plural` convention
+  - Proper primary key constraints and table name methods for join tables
+  - Full compatibility with GORM Association Mode for relationship management
+  - Auto-migration includes join table structs in `Migrate()` and `GetModels()`
+
+### Enhanced
+- **🔧 Template System for Relationships**
+  - Updated model template to generate join table structs automatically
+  - Enhanced module template to include join tables in AutoMigrate
+  - Improved field parsing to handle relationship metadata correctly
+  - Fixed compatibility layer between clean and legacy template systems
+
+### Fixed
+- **🛠️ Service Layer Validation**
+  - Fixed validation function calls to pass correct parameter types (`req` instead of `item`)
+  - Resolved type mismatch errors in `ValidateUpdateRequest` calls
+  - Updated both service template and existing services for consistency
+
+### Examples
+
+**Many-to-Many Relationship Generation:**
+```bash
+# Generate model with many-to-many relationships
+base g Post title:string author:toMany:User tags:toMany:Tag categories:manyToMany:Category
+```
+
+**Generated Model Structure:**
+```go
+type Post struct {
+    Id       uint    `json:"id" gorm:"primarykey"`
+    Title    string  `json:"title"`
+    Author   []*User `json:"author,omitempty" gorm:"many2many:post_users"`
+    Tags     []*Tag  `json:"tags,omitempty" gorm:"many2many:post_tags"`
+}
+
+// PostUser represents the join table between Post and User  
+type PostUser struct {
+    PostID uint `json:"post_id" gorm:"primaryKey"`
+    UserID uint `json:"user_id" gorm:"primaryKey"`
+}
+
+// PostTag represents the join table between Post and Tag
+type PostTag struct {
+    PostID uint `json:"post_id" gorm:"primaryKey"`  
+    TagID  uint `json:"tag_id" gorm:"primaryKey"`
+}
+```
+
+**GORM Association Mode Usage:**
+```go
+// Add relationships
+db.Model(&post).Association("Author").Append(&user1, &user2)
+db.Model(&post).Association("Tags").Append(&tag1, &tag2)
+
+// Find relationships
+var authors []User
+db.Model(&post).Association("Author").Find(&authors)
+```
+
+## [v2.0.0] - 2025-08-13
 
 ### Added
 - **🎯 Enhanced Swagger Documentation System** - Complete overhaul of API documentation
@@ -314,6 +379,7 @@ type Article struct {
 - Model layer with GORM integration
 - Basic project structure
 
+[v2.0.1]: https://github.com/BaseTechStack/basecmd/releases/tag/v2.0.1
 [v2.0.0]: https://github.com/BaseTechStack/basecmd/releases/tag/v2.0.0
 [v1.2.2]: https://github.com/BaseTechStack/basecmd/releases/tag/v1.2.2
 [v1.2.1]: https://github.com/BaseTechStack/basecmd/releases/tag/v1.2.1

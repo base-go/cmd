@@ -117,7 +117,7 @@ func (s *{{.Model}}Service) Update(id uint, req *models.Update{{.Model}}Request)
     }
 
     // Validate request
-    if err := Validate{{.StructName}}UpdateRequest(item, id); err != nil {
+    if err := Validate{{.Model}}UpdateRequest(req, id); err != nil {
         return nil, err
     }
 

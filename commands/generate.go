@@ -130,6 +130,18 @@ func generateModule(cmd *cobra.Command, args []string) {
 	if err := exec.Command("goimports", "-w", modelPath).Run(); err != nil {
 		fmt.Printf("Error running goimports on %s: %v\n", modelPath, err)
 	}
+	
+	// Format all generated files with gofmt
+	fmt.Println("Formatting generated files...")
+	if err := exec.Command("gofmt", "-w", generatedPath).Run(); err != nil {
+		fmt.Printf("Warning: Failed to format generated files in %s: %v\n", generatedPath, err)
+	}
+	if err := exec.Command("gofmt", "-w", modelPath).Run(); err != nil {
+		fmt.Printf("Warning: Failed to format model file %s: %v\n", modelPath, err)
+	}
+	if err := exec.Command("gofmt", "-w", generatedPathTest).Run(); err != nil {
+		fmt.Printf("Warning: Failed to format test files in %s: %v\n", generatedPathTest, err)
+	}
 
 	// Add module to app/init.go
 	if err := addModuleToAppInit(naming.DirName); err != nil {
@@ -137,6 +149,14 @@ func generateModule(cmd *cobra.Command, args []string) {
 		fmt.Printf("Please manually add: _ \"base/app/%s\" to app/init.go\n", naming.DirName)
 	} else {
 		fmt.Printf("✅ Added module to app/init.go\n")
+		
+		// Format init.go after modification
+		initGoPath := filepath.Join("app", "init.go")
+		if err := exec.Command("gofmt", "-w", initGoPath).Run(); err != nil {
+			fmt.Printf("Warning: Failed to format app/init.go: %v\n", err)
+		} else {
+			fmt.Printf("✅ Formatted app/init.go\n")
+		}
 	}
 
 	// Run go mod tidy to ensure dependencies are up to date

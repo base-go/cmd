@@ -7,9 +7,6 @@ import (
 	"strings"
 	"unicode"
 
-	"path/filepath"
-	"regexp"
-
 	"github.com/gertd/go-pluralize"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -22,6 +19,44 @@ func init() {
 }
 
 func GetGoType(t string) string {
+	// Handle relationship types with colon syntax
+	if strings.Contains(t, ":") {
+		parts := strings.Split(t, ":")
+		if len(parts) >= 2 {
+			relationType := parts[1]
+			
+			// Handle relationship types
+			switch {
+			case strings.Contains(relationType, "belongsTo") || strings.Contains(relationType, "belongs_to"):
+				if len(parts) > 2 {
+					return ToPascalCase(parts[2]) // Use specified model
+				}
+				return "uint" // Foreign key field
+				
+			case strings.Contains(relationType, "hasMany") || strings.Contains(relationType, "has_many"):
+				if len(parts) > 2 {
+					return "[]" + ToPascalCase(parts[2])
+				}
+				// Infer model from field name (plural to singular)
+				return "[]" + ToPascalCase(Singularize(parts[0]))
+				
+			case strings.Contains(relationType, "hasOne") || strings.Contains(relationType, "has_one"):
+				if len(parts) > 2 {
+					return "*" + ToPascalCase(parts[2])
+				}
+				// Use field name as model name for hasOne
+				return "*" + ToPascalCase(parts[0])
+				
+			case strings.Contains(relationType, "toMany") || strings.Contains(relationType, "to_many") || 
+				 strings.Contains(relationType, "manyToMany") || strings.Contains(relationType, "many_to_many"):
+				if len(parts) > 2 {
+					return "[]*" + ToPascalCase(parts[2])
+				}
+				return "[]*" + ToPascalCase(Singularize(parts[0]))
+			}
+		}
+	}
+
 	switch t {
 	// Exact Go types - pass through as-is
 	case "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64":
@@ -34,11 +69,11 @@ func GetGoType(t string) string {
 		return t
 	case "byte", "rune":
 		return t
-		
+
 	// Base framework special types
 	case "translatedField", "translation":
 		return "translation.Field"
-		
+
 	// Convenience aliases
 	case "text", "email", "url", "slug":
 		return "string"
@@ -50,7 +85,7 @@ func GetGoType(t string) string {
 		return "int"
 	case "image", "file":
 		return "*storage.Attachment"
-		
+
 	// Default: assume it's already a valid Go type or custom type
 	default:
 		return t
@@ -170,130 +205,10 @@ func AddModuleInitializer(content []byte, packageName, singularName string) ([]b
 
 	// Find the line before return modules
 	lineStart := strings.LastIndex(contentStr[:returnIndex], "\n") + 1
-	
+
 	updatedContent := contentStr[:lineStart] + newInitializer + contentStr[lineStart:]
 
 	return []byte(updatedContent), true
-}
-
-func UpdateInitFileForDestroy(singularName string) error {
-	// Convert names consistently with generate function
-	dirName := ToSnakeCase(singularName)
-	pluralName := ToPlural(singularName)
-	packageName := ToSnakeCase(pluralName)
-	
-	// For module key lookup, try both singular and plural forms
-	// Prioritize plural since that's the new convention
-	moduleKeys := []string{packageName, singularName, dirName}
-
-	// Paths - use the same paths as generateModule
-	initFilePath := "app/init.go"
-	moduleDir := filepath.Join("app", packageName)
-	modelFile := filepath.Join("app", "models", fmt.Sprintf("%s.go", dirName))
-
-	// Read init.go first
-	content, err := os.ReadFile(initFilePath)
-	if err != nil {
-		return fmt.Errorf("error reading init.go: %v", err)
-	}
-
-	contentStr := string(content)
-
-	// Check if module exists in init.go - try all possible module keys
-	var foundModuleKey string
-	for _, key := range moduleKeys {
-		simplePattern := fmt.Sprintf(`modules["%s"]`, key)
-		complexPattern := fmt.Sprintf(`"%s":\s*func\(db \*gorm\.DB,`, key)
-		
-		if strings.Contains(contentStr, simplePattern) || regexp.MustCompile(complexPattern).MatchString(contentStr) {
-			foundModuleKey = key
-			break
-		}
-	}
-	
-	if foundModuleKey == "" {
-		return fmt.Errorf("module '%s' not found in init.go (tried keys: %v)", singularName, moduleKeys)
-	}
-
-	// Remove import while preserving formatting - try both directory patterns
-	// Prioritize plural form since that's the new convention
-	importPaths := []string{
-		fmt.Sprintf(`"base/app/%s"`, packageName),
-		fmt.Sprintf(`"base/app/%s"`, foundModuleKey),
-		fmt.Sprintf(`"base/app/%s"`, dirName),
-	}
-	importMarker := "// MODULE_IMPORT_MARKER"
-
-	// Remove any matching import
-	for _, importPath := range importPaths {
-		markerIndex := strings.Index(contentStr, importMarker)
-		if markerIndex != -1 {
-			markerEnd := strings.Index(contentStr[markerIndex:], "\n") + markerIndex
-			if markerEnd != -1 {
-				// Look for the import line after the marker
-				remainingContent := contentStr[markerEnd:]
-				importPattern := regexp.MustCompile(`\n\s*` + regexp.QuoteMeta(importPath) + `\s*\n`)
-				if importPattern.MatchString(remainingContent) {
-					contentStr = contentStr[:markerEnd+1] + importPattern.ReplaceAllString(remainingContent, "\n")
-					break
-				}
-			}
-		} else {
-			// Fallback: remove import anywhere in the import block
-			importPattern := regexp.MustCompile(`\s*` + regexp.QuoteMeta(importPath) + `\s*\n`)
-			if importPattern.MatchString(contentStr) {
-				contentStr = importPattern.ReplaceAllString(contentStr, "")
-				break
-			}
-		}
-	}
-
-	// Remove module initializer - handle both simple and complex patterns using the found key
-	// Simple pattern: modules["products"] = products.NewProductModule(deps.DB)
-	simplePattern := fmt.Sprintf(`\s*modules\["%s"\]\s*=\s*%s\.New[^(]+\(deps\.DB\)\s*\n`, foundModuleKey, foundModuleKey)
-	// Complex pattern: "products": func(db *gorm.DB, ...) { return products.NewProductModule(...) },
-	complexPattern := fmt.Sprintf(`\s*"%s":\s*func\(db \*gorm\.DB,\s*router \*gin\.RouterGroup,\s*log logger\.Logger,\s*emitter \*emitter\.Emitter,\s*activeStorage \*storage\.ActiveStorage\) module\.Module \{[^}]+\},\s*\n`, foundModuleKey)
-	
-	simpleRe := regexp.MustCompile(simplePattern)
-	complexRe := regexp.MustCompile(complexPattern)
-
-	// Try to remove simple pattern first
-	if simpleRe.MatchString(contentStr) {
-		contentStr = simpleRe.ReplaceAllString(contentStr, "")
-	} else if complexRe.MatchString(contentStr) {
-		contentStr = complexRe.ReplaceAllString(contentStr, "")
-	}
-
-	// Ensure proper formatting
-	contentStr = regexp.MustCompile(`\n{3,}`).ReplaceAllString(contentStr, "\n\n")
-	contentStr = regexp.MustCompile(`\{\n\n(\s*)//`).ReplaceAllString(contentStr, "{\n$1//")
-	contentStr = regexp.MustCompile(`\n\n(\s*)\}`).ReplaceAllString(contentStr, "\n$1}")
-
-	// Write updated init.go
-	if err := os.WriteFile(initFilePath, []byte(contentStr), 0644); err != nil {
-		return fmt.Errorf("error writing to init.go: %v", err)
-	}
-
-	// Try to remove module directory
-	if _, err := os.Stat(moduleDir); err == nil {
-		if err := os.RemoveAll(moduleDir); err != nil {
-			fmt.Printf("Warning: could not remove module directory %s: %v\n", moduleDir, err)
-		} else {
-			fmt.Printf("Removed module directory: %s\n", moduleDir)
-		}
-	}
-
-	// Try to remove model file
-	if _, err := os.Stat(modelFile); err == nil {
-		if err := os.Remove(modelFile); err != nil {
-			fmt.Printf("Warning: could not remove model file %s: %v\n", modelFile, err)
-		} else {
-			fmt.Printf("Removed model file: %s\n", modelFile)
-		}
-	}
-
-	fmt.Printf("Successfully removed module '%s'\n", packageName)
-	return nil
 }
 
 func RemoveImport(content []byte, importStr string) []byte {
@@ -321,7 +236,7 @@ func RemoveModuleInitializer(content []byte, pluralName string) []byte {
 	if initializerStart != -1 {
 		// Find the start of the line (including any comment above)
 		lineStart := strings.LastIndex(contentStr[:initializerStart], "\n") + 1
-		
+
 		// Check if there's a comment line above this module
 		if lineStart > 1 {
 			prevLineStart := strings.LastIndex(contentStr[:lineStart-1], "\n") + 1
@@ -330,7 +245,7 @@ func RemoveModuleInitializer(content []byte, pluralName string) []byte {
 				lineStart = prevLineStart // Include the comment line
 			}
 		}
-		
+
 		// Find the end of the line
 		initializerEnd := strings.Index(contentStr[initializerStart:], "\n") + initializerStart
 		if initializerEnd != -1 {
@@ -360,7 +275,7 @@ func AddImport(content []byte, importStr string) ([]byte, bool) {
 	return updatedContent, true
 }
 
-func GetRequiredImports(fields []FieldStruct) map[string][]string {
+func GetRequiredImports(fields []Field) map[string][]string {
 	modelImports := []string{
 		"time",
 		"github.com/google/uuid",
