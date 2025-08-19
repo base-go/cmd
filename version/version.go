@@ -12,7 +12,7 @@ import (
 // Version information
 var (
 	// Version is the current version of Base CLI
-	Version = "2.1.2"
+	Version = "2.0.0"
 
 	// CommitHash is the git commit hash at build time
 	CommitHash = "unknown"
