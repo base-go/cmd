@@ -77,14 +77,16 @@ func GetGoType(t string) string {
 	// Convenience aliases
 	case "text", "email", "url", "slug":
 		return "string"
-	case "datetime", "time", "date":
-		return "types.DateTime"
+	case "datetime", "time", "date", "timestamp":
+		return "time.Time"
 	case "float", "decimal":
 		return "float64"
 	case "sort":
 		return "int"
 	case "image", "file":
 		return "*storage.Attachment"
+	case "json", "jsonb":
+		return "datatypes.JSON"
 
 	// Default: assume it's already a valid Go type or custom type
 	default:

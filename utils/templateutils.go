@@ -138,15 +138,41 @@ func (td *TemplateData) parseField(fieldDef string) Field {
 
 	// Handle relationships
 	if strings.Contains(fieldType, "belongsTo") || strings.Contains(fieldType, "belongs_to") {
-		// Format: user:belongsTo:User or user_id:uint (auto-detect)
+		// Format: author:belongsTo:User or author:belongsTo:profile.User
 		field.IsRelation = true
 		field.RelationType = "belongs_to"
 
+		var relatedModel string
 		if len(parts) > 2 {
-			field.RelatedModel = ToPascalCase(parts[2])
+			// Handle module.Model syntax like profile.User - keep original case
+			if strings.Contains(parts[2], ".") {
+				// Keep the original case as provided: profile.User stays profile.User
+				relatedModel = strings.TrimSpace(parts[2])
+				
+				// Add import for cross-module reference
+				modelParts := strings.Split(parts[2], ".")
+				if len(modelParts) == 2 {
+					packageName := strings.ToLower(strings.TrimSpace(modelParts[0]))
+					importPackage := fmt.Sprintf("base/app/%s", packageName)
+					
+					// Check if import already exists to avoid duplicates
+					importExists := false
+					for _, existingImport := range td.Imports {
+						if existingImport == importPackage {
+							importExists = true
+							break
+						}
+					}
+					if !importExists {
+						td.Imports = append(td.Imports, importPackage)
+					}
+				}
+			} else {
+				relatedModel = ToPascalCase(parts[2])
+			}
 		} else {
 			// Auto-detect from field name
-			field.RelatedModel = ToPascalCase(strings.TrimSuffix(fieldName, "_id"))
+			relatedModel = ToPascalCase(strings.TrimSuffix(fieldName, "_id"))
 		}
 
 		// The actual field for foreign key
@@ -154,16 +180,17 @@ func (td *TemplateData) parseField(fieldDef string) Field {
 		field.Type = "uint"
 		field.JSONTag = ToSnakeCase(fieldName + "_id")
 		field.ForeignKey = field.Name
+		field.RelatedModel = relatedModel
 
 		// Also need to add the relation field
 		td.Fields = append(td.Fields, Field{
-			Name:         ToPascalCase(strings.TrimSuffix(fieldName, "_id")),
-			Type:         field.RelatedModel,
-			JSONTag:      ToSnakeCase(strings.TrimSuffix(fieldName, "_id")),
+			Name:         ToPascalCase(fieldName),
+			Type:         "*" + relatedModel, // belongsTo is a pointer
+			JSONTag:      ToSnakeCase(fieldName) + ",omitempty",
 			GORMTag:      fmt.Sprintf(`gorm:"foreignKey:%s"`, field.ForeignKey),
 			IsRelation:   true,
 			RelationType: "belongs_to",
-			RelatedModel: field.RelatedModel,
+			RelatedModel: relatedModel,
 		})
 
 	} else if strings.HasSuffix(fieldName, "_id") && fieldType == "uint" {
@@ -277,25 +304,26 @@ func (td *TemplateData) parseField(fieldDef string) Field {
 // mapFieldType maps simplified types to Go types
 func (td *TemplateData) mapFieldType(fieldType string) string {
 	typeMap := map[string]string{
-		"string":   "string",
-		"text":     "string",
-		"int":      "int",
-		"uint":     "uint",
-		"float":    "float64",
-		"decimal":  "float64",
-		"bool":     "bool",
-		"boolean":  "bool",
-		"date":     "time.Time",
-		"datetime": "time.Time",
-		"time":     "time.Time",
-		"json":     "datatypes.JSON",
-		"jsonb":    "datatypes.JSON",
-		"uuid":     "string",
-		"email":    "string",
-		"url":      "string",
-		"slug":     "string",
-		"image":    "*storage.Attachment",
-		"file":     "*storage.Attachment",
+		"string":     "string",
+		"text":       "string",
+		"int":        "int",
+		"uint":       "uint",
+		"float":      "float64",
+		"decimal":    "float64",
+		"bool":       "bool",
+		"boolean":    "bool",
+		"date":       "time.Time",
+		"datetime":   "time.Time",
+		"timestamp":  "time.Time",
+		"time":       "time.Time",
+		"json":       "datatypes.JSON",
+		"jsonb":      "datatypes.JSON",
+		"uuid":       "string",
+		"email":      "string",
+		"url":        "string",
+		"slug":       "string",
+		"image":      "*storage.Attachment",
+		"file":       "*storage.Attachment",
 	}
 
 	if goType, ok := typeMap[strings.ToLower(fieldType)]; ok {
@@ -340,12 +368,17 @@ func (td *TemplateData) inferFieldType(fieldName string) string {
 		}
 	}
 
-	// Date/time fields
-	dateFields := []string{"date", "time", "at", "on", "created_at", "updated_at", "deleted_at", "published_at"}
+	// Date/time fields - check for common date patterns
+	dateFields := []string{"date", "time", "created_at", "updated_at", "deleted_at", "published_at", "timestamp", "datetime"}
 	for _, df := range dateFields {
-		if strings.Contains(lower, df) || strings.HasSuffix(lower, "_at") || strings.HasSuffix(lower, "_on") {
+		if strings.Contains(lower, df) || strings.HasSuffix(lower, "_at") || strings.HasSuffix(lower, "_on") || strings.HasSuffix(lower, "_date") || strings.HasSuffix(lower, "_time") {
 			return "datetime"
 		}
+	}
+	
+	// Check for explicit date-like words
+	if strings.Contains(lower, "birth") || strings.Contains(lower, "born") || strings.Contains(lower, "expir") || strings.Contains(lower, "start") || strings.Contains(lower, "end") {
+		return "datetime"
 	}
 
 	// Email, URL fields
@@ -456,8 +489,14 @@ func (td *TemplateData) getTestValues(field Field) (testValue, updateValue strin
 		testValue = "123"
 		updateValue = "456"
 	case "uint":
-		testValue = "123"
-		updateValue = "456"
+		// For foreign key fields, use valid IDs
+		if strings.HasSuffix(strings.ToLower(field.Name), "id") {
+			testValue = "1"
+			updateValue = "2"
+		} else {
+			testValue = "123"
+			updateValue = "456"
+		}
 	case "float64":
 		testValue = "123.45"
 		updateValue = "678.90"
@@ -465,11 +504,15 @@ func (td *TemplateData) getTestValues(field Field) (testValue, updateValue strin
 		testValue = "true"
 		updateValue = "false"
 	case "time.Time":
-		testValue = "time.Now()"
-		updateValue = "time.Now().Add(time.Hour)"
+		// Use specific test dates that are realistic
+		testValue = "time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC)"
+		updateValue = "time.Date(2024, 2, 20, 14, 45, 0, 0, time.UTC)"
 	case "types.DateTime":
 		testValue = "types.Now()"
 		updateValue = "types.Now().Add(time.Hour)"
+	case "datatypes.JSON":
+		testValue = `datatypes.JSON([]byte("{\"key\":\"value\"}"))`
+		updateValue = `datatypes.JSON([]byte("{\"updated\":\"value\"}"))`
 	default:
 		if field.IsRelation {
 			testValue = "nil" // Relations are nil by default
@@ -490,15 +533,21 @@ func (td *TemplateData) getTestValueWithIndex(field Field, fieldName string) str
 	case "int":
 		return "int(100 + i)"
 	case "uint":
+		// For foreign key fields, use sequential IDs
+		if strings.HasSuffix(strings.ToLower(field.Name), "id") {
+			return "uint(1 + i)"
+		}
 		return "uint(100 + i)"
 	case "float64":
 		return "float64(100.5 + float64(i))"
 	case "bool":
 		return "(i%2 == 0)"
 	case "time.Time":
-		return "time.Now().Add(time.Duration(i) * time.Minute)"
+		return "time.Date(2024, 1, 15+i, 10, 30, 0, 0, time.UTC)"
 	case "types.DateTime":
 		return "types.Now().Add(time.Duration(i) * time.Minute)"
+	case "datatypes.JSON":
+		return fmt.Sprintf(`datatypes.JSON([]byte(fmt.Sprintf("{\"key\":\"value%%d\"}", i)))`)
 	default:
 		if field.IsRelation {
 			return "nil"
@@ -515,15 +564,21 @@ func (td *TemplateData) getTestValueUnique(field Field, fieldName string) string
 	case "int":
 		return "789"
 	case "uint":
+		// For foreign key fields, use a different unique ID
+		if strings.HasSuffix(strings.ToLower(field.Name), "id") {
+			return "999"
+		}
 		return "789"
 	case "float64":
 		return "999.99"
 	case "bool":
 		return "false"
 	case "time.Time":
-		return "time.Now().Add(time.Hour * 24)"
+		return "time.Date(2024, 12, 25, 15, 0, 0, 0, time.UTC)"
 	case "types.DateTime":
 		return "types.Now().Add(time.Hour * 24)"
+	case "datatypes.JSON":
+		return `datatypes.JSON([]byte("{\"unique\":\"data\"}"))`
 	default:
 		if field.IsRelation {
 			return "nil"
@@ -594,8 +649,7 @@ func (td *TemplateData) addStandardImports() {
 	imports := make(map[string]bool)
 
 	// Always needed
-	imports["base/app/models"] = true
-	imports["base/core/module"] = true
+	imports["time"] = true
 	imports["gorm.io/gorm"] = true
 
 	// Check fields for additional imports
@@ -607,6 +661,8 @@ func (td *TemplateData) addStandardImports() {
 			imports["gorm.io/datatypes"] = true
 		case "*storage.Attachment":
 			imports["base/core/storage"] = true
+		case "translation.Field":
+			imports["base/core/translation"] = true
 		}
 	}
 
@@ -706,7 +762,12 @@ func parseFieldDef(fieldDef string) Field {
 				field.IsRelation = true
 				field.RelationType = "belongs_to"
 				if len(parts) > 2 {
-					field.RelatedModel = ToPascalCase(parts[2])
+					// Handle module.Model syntax - keep original case
+					if strings.Contains(parts[2], ".") {
+						field.RelatedModel = strings.TrimSpace(parts[2])
+					} else {
+						field.RelatedModel = ToPascalCase(parts[2])
+					}
 				}
 			}
 		}
@@ -749,12 +810,22 @@ func getTestValuesCompat(fieldType, fieldName string) (string, string) {
 	switch fieldType {
 	case "string":
 		return fmt.Sprintf(`"Test %s"`, ToPascalCase(fieldName)), fmt.Sprintf(`"Updated %s"`, ToPascalCase(fieldName))
-	case "int", "uint":
+	case "int":
+		return "123", "456"
+	case "uint":
+		// For foreign key fields, use valid IDs
+		if strings.HasSuffix(strings.ToLower(fieldName), "id") {
+			return "1", "2"
+		}
 		return "123", "456"
 	case "float64":
 		return "123.45", "678.90"
 	case "bool":
 		return "true", "false"
+	case "time.Time":
+		return "time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC)", "time.Date(2024, 2, 20, 14, 45, 0, 0, time.UTC)"
+	case "datatypes.JSON":
+		return `datatypes.JSON([]byte("{\"key\":\"value\"}"))`, `datatypes.JSON([]byte("{\"updated\":\"value\"}"))`
 	default:
 		return `"test"`, `"updated"`
 	}
@@ -767,7 +838,15 @@ func getTestValueWithIndexCompat(fieldType, fieldName string) string {
 	case "int":
 		return "int(100 + i)"
 	case "uint":
+		// For foreign key fields, use sequential IDs
+		if strings.HasSuffix(strings.ToLower(fieldName), "id") {
+			return "uint(1 + i)"
+		}
 		return "uint(100 + i)"
+	case "time.Time":
+		return "time.Date(2024, 1, 15+i, 10, 30, 0, 0, time.UTC)"
+	case "datatypes.JSON":
+		return fmt.Sprintf(`datatypes.JSON([]byte(fmt.Sprintf("{\"key\":\"value%%d\"}", i)))`)
 	default:
 		return `fmt.Sprintf("test%%d", i)`
 	}
@@ -777,8 +856,18 @@ func getTestValueUniqueCompat(fieldType, fieldName string) string {
 	switch fieldType {
 	case "string":
 		return fmt.Sprintf(`"Unique %s"`, ToPascalCase(fieldName))
-	case "int", "uint":
+	case "int":
 		return "789"
+	case "uint":
+		// For foreign key fields, use a different unique ID
+		if strings.HasSuffix(strings.ToLower(fieldName), "id") {
+			return "999"
+		}
+		return "789"
+	case "time.Time":
+		return "time.Date(2024, 12, 25, 15, 0, 0, 0, time.UTC)"
+	case "datatypes.JSON":
+		return `datatypes.JSON([]byte("{\"unique\":\"data\"}"))`
 	default:
 		return `"unique"`
 	}

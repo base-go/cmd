@@ -474,28 +474,7 @@ func generateOpenAPISpec(annotations []SwaggerAnnotation) map[string]any {
 					"description":  "Enter the token with the `Bearer: ` prefix, e.g. \"Bearer abcde12345\"",
 				},
 			},
-			"schemas": map[string]any{
-				"Error": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"error": map[string]any{
-							"type":        "string",
-							"description": "Error message",
-						},
-					},
-					"required": []string{"error"},
-				},
-				"Success": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"message": map[string]any{
-							"type":        "string",
-							"description": "Success message",
-						},
-					},
-					"required": []string{"message"},
-				},
-			},
+			"schemas": generateSchemas(),
 		},
 		"paths": paths,
 	}
@@ -624,6 +603,191 @@ func GetOpenAPISpec() string {
 		swaggerInfo.Title,
 		swaggerInfo.Description,
 	)
+}
+
+// generateSchemas creates all the schema definitions for the OpenAPI spec
+func generateSchemas() map[string]any {
+	schemas := map[string]any{
+		"Error": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"error": map[string]any{
+					"type":        "string",
+					"description": "Error message",
+				},
+			},
+			"required": []string{"error"},
+		},
+		"Success": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"message": map[string]any{
+					"type":        "string",
+					"description": "Success message",
+				},
+			},
+			"required": []string{"message"},
+		},
+		"types.ErrorResponse": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"error": map[string]any{
+					"type":        "string",
+					"description": "Error message",
+				},
+			},
+			"required": []string{"error"},
+		},
+		"types.SuccessResponse": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"message": map[string]any{
+					"type":        "string",
+					"description": "Success message",
+				},
+			},
+			"required": []string{"message"},
+		},
+		"types.PaginatedResponse": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"data": map[string]any{
+					"type":        "array",
+					"description": "List of items",
+					"items": map[string]any{
+						"type": "object",
+					},
+				},
+				"pagination": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"total": map[string]any{
+							"type":        "integer",
+							"description": "Total number of items",
+						},
+						"page": map[string]any{
+							"type":        "integer",
+							"description": "Current page number",
+						},
+						"limit": map[string]any{
+							"type":        "integer",
+							"description": "Items per page",
+						},
+						"total_pages": map[string]any{
+							"type":        "integer",
+							"description": "Total number of pages",
+						},
+					},
+				},
+			},
+			"required": []string{"data", "pagination"},
+		},
+		// Post model schemas
+		"models.CreatePostRequest": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"tile": map[string]any{
+					"type":        "string",
+					"description": "Title of the post",
+					"example":     "My Blog Post",
+				},
+				"desc": map[string]any{
+					"type":        "string",
+					"description": "Description of the post",
+					"example":     "This is a sample blog post description",
+				},
+				"date": map[string]any{
+					"type":        "string",
+					"description": "Date of the post",
+					"example":     "2024-01-15",
+				},
+			},
+			"required": []string{"tile", "desc", "date"},
+		},
+		"models.UpdatePostRequest": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"tile": map[string]any{
+					"type":        "string",
+					"description": "Title of the post",
+					"example":     "Updated Blog Post",
+				},
+				"desc": map[string]any{
+					"type":        "string",
+					"description": "Description of the post",
+					"example":     "This is an updated blog post description",
+				},
+				"date": map[string]any{
+					"type":        "string",
+					"description": "Date of the post",
+					"example":     "2024-02-20",
+				},
+			},
+		},
+		"models.PostResponse": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"id": map[string]any{
+					"type":        "integer",
+					"description": "Unique identifier",
+					"example":     1,
+				},
+				"created_at": map[string]any{
+					"type":        "string",
+					"format":      "date-time",
+					"description": "Creation timestamp",
+					"example":     "2024-01-15T10:30:00Z",
+				},
+				"updated_at": map[string]any{
+					"type":        "string",
+					"format":      "date-time",
+					"description": "Last update timestamp",
+					"example":     "2024-01-15T10:30:00Z",
+				},
+				"deleted_at": map[string]any{
+					"type":        "string",
+					"format":      "date-time",
+					"description": "Deletion timestamp (null if not deleted)",
+					"example":     nil,
+					"nullable":    true,
+				},
+				"tile": map[string]any{
+					"type":        "string",
+					"description": "Title of the post",
+					"example":     "My Blog Post",
+				},
+				"desc": map[string]any{
+					"type":        "string",
+					"description": "Description of the post",
+					"example":     "This is a sample blog post description",
+				},
+				"date": map[string]any{
+					"type":        "string",
+					"description": "Date of the post",
+					"example":     "2024-01-15",
+				},
+			},
+			"required": []string{"id", "created_at", "updated_at", "tile", "desc", "date"},
+		},
+		"models.PostSelectOption": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"id": map[string]any{
+					"type":        "integer",
+					"description": "Unique identifier",
+					"example":     1,
+				},
+				"name": map[string]any{
+					"type":        "string",
+					"description": "Display name for select options",
+					"example":     "My Blog Post",
+				},
+			},
+			"required": []string{"id", "name"},
+		},
+	}
+	
+	return schemas
 }
 
 // extractSwaggerInfoFromMainGo parses swagger annotations from main.go

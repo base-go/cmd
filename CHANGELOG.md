@@ -5,6 +5,30 @@ All notable changes to the Base CLI tool will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.0.2] - 2025-08-20
+
+### Enhanced
+- **🎯 Enhanced Service Template Field Handling** - Comprehensive field type support
+  - Added support for pointer types (`*bool`, `*int`, `*string`, `*float64`, etc.)
+  - Enhanced numeric type handling for all variants (`int32`, `int64`, `uint32`, `uint64`)
+  - Improved time/date field processing with `.IsZero()` checks for `time.Time` and `*time.Time`
+  - Added slice/array field support with proper length validation
+  - Implemented generic fallback logic for custom struct types with zero-value comparisons
+  - Smart null safety with proper nil checks for all pointer types
+  - Better performance by only updating fields with actual values
+
+### Improved  
+- **🔧 Template System Robustness**
+  - More intelligent field type detection and handling
+  - Safer pointer dereferencing with nil checks
+  - Generic approach for handling any custom field types
+  - Collection type support for arrays and slices
+
+## [v2.0.1] - 2025-08-19
+
+### Added
+- **🎯 Many-to-Many Relationships with `toMany` syntax** - Complete implementation of many-to-many relationships
+
 ## [v2.0.0] - 2025-08-13
 
 ### Added
