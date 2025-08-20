@@ -21,15 +21,6 @@ var serviceTemplate string
 //go:embed templates/module.tmpl
 var moduleTemplate string
 
-//go:embed templates/model_test.tmpl
-var modelTestTemplate string
-
-//go:embed templates/service_test.tmpl
-var serviceTestTemplate string
-
-//go:embed templates/controller_test.tmpl
-var controllerTestTemplate string
-
 //go:embed templates/validator.tmpl
 var validatorTemplate string
 
@@ -55,7 +46,7 @@ type TemplateData struct {
 
 	// Import paths needed
 	Imports []string
-	
+
 	// Join tables for many-to-many relationships
 	JoinTables []string
 }
@@ -148,13 +139,13 @@ func (td *TemplateData) parseField(fieldDef string) Field {
 			if strings.Contains(parts[2], ".") {
 				// Keep the original case as provided: profile.User stays profile.User
 				relatedModel = strings.TrimSpace(parts[2])
-				
+
 				// Add import for cross-module reference
 				modelParts := strings.Split(parts[2], ".")
 				if len(modelParts) == 2 {
 					packageName := strings.ToLower(strings.TrimSpace(modelParts[0]))
 					importPackage := fmt.Sprintf("base/app/%s", packageName)
-					
+
 					// Check if import already exists to avoid duplicates
 					importExists := false
 					for _, existingImport := range td.Imports {
@@ -254,12 +245,12 @@ func (td *TemplateData) parseField(fieldDef string) Field {
 
 		field.Type = "[]*" + field.RelatedModel
 		field.JSONTag = ToSnakeCase(fieldName) + ",omitempty"
-		
+
 		// GORM many-to-many: automatically creates join table (e.g., post_users)
 		// Join table name: <current_model>_<related_model_plural> following GORM convention
 		joinTable := fmt.Sprintf("%s_%s", ToSnakeCase(td.Model), ToSnakeCase(ToPlural(field.RelatedModel)))
 		field.GORMTag = fmt.Sprintf(`gorm:"many2many:%s"`, joinTable)
-		
+
 		// Store join table name for migration
 		td.JoinTables = append(td.JoinTables, joinTable)
 
@@ -304,26 +295,26 @@ func (td *TemplateData) parseField(fieldDef string) Field {
 // mapFieldType maps simplified types to Go types
 func (td *TemplateData) mapFieldType(fieldType string) string {
 	typeMap := map[string]string{
-		"string":     "string",
-		"text":       "string",
-		"int":        "int",
-		"uint":       "uint",
-		"float":      "float64",
-		"decimal":    "float64",
-		"bool":       "bool",
-		"boolean":    "bool",
-		"date":       "time.Time",
-		"datetime":   "time.Time",
-		"timestamp":  "time.Time",
-		"time":       "time.Time",
-		"json":       "datatypes.JSON",
-		"jsonb":      "datatypes.JSON",
-		"uuid":       "string",
-		"email":      "string",
-		"url":        "string",
-		"slug":       "string",
-		"image":      "*storage.Attachment",
-		"file":       "*storage.Attachment",
+		"string":    "string",
+		"text":      "string",
+		"int":       "int",
+		"uint":      "uint",
+		"float":     "float64",
+		"decimal":   "float64",
+		"bool":      "bool",
+		"boolean":   "bool",
+		"date":      "time.Time",
+		"datetime":  "time.Time",
+		"timestamp": "time.Time",
+		"time":      "time.Time",
+		"json":      "datatypes.JSON",
+		"jsonb":     "datatypes.JSON",
+		"uuid":      "string",
+		"email":     "string",
+		"url":       "string",
+		"slug":      "string",
+		"image":     "*storage.Attachment",
+		"file":      "*storage.Attachment",
 	}
 
 	if goType, ok := typeMap[strings.ToLower(fieldType)]; ok {
@@ -375,7 +366,7 @@ func (td *TemplateData) inferFieldType(fieldName string) string {
 			return "datetime"
 		}
 	}
-	
+
 	// Check for explicit date-like words
 	if strings.Contains(lower, "birth") || strings.Contains(lower, "born") || strings.Contains(lower, "expir") || strings.Contains(lower, "start") || strings.Contains(lower, "end") {
 		return "datetime"
@@ -481,14 +472,75 @@ func (td *TemplateData) getGORMTag(fieldName, fieldType string) string {
 
 // getTestValues returns test and update values for a field
 func (td *TemplateData) getTestValues(field Field) (testValue, updateValue string) {
+	// Handle pointer types
+	if strings.HasPrefix(field.Type, "*") {
+		baseType := strings.TrimPrefix(field.Type, "*")
+		switch baseType {
+		case "string":
+			testValue = fmt.Sprintf(`func() *string { s := "Test %s"; return &s }()`, field.Name)
+			updateValue = fmt.Sprintf(`func() *string { s := "Updated %s"; return &s }()`, field.Name)
+		case "int", "int32", "int64":
+			testValue = `func() *int { i := 123; return &i }()`
+			updateValue = `func() *int { i := 456; return &i }()`
+		case "uint", "uint32", "uint64":
+			if strings.HasSuffix(strings.ToLower(field.Name), "id") {
+				testValue = `func() *uint { u := uint(1); return &u }()`
+				updateValue = `func() *uint { u := uint(2); return &u }()`
+			} else {
+				testValue = `func() *uint { u := uint(123); return &u }()`
+				updateValue = `func() *uint { u := uint(456); return &u }()`
+			}
+		case "float32":
+			testValue = `func() *float32 { f := float32(123.45); return &f }()`
+			updateValue = `func() *float32 { f := float32(678.90); return &f }()`
+		case "float64":
+			testValue = `func() *float64 { f := 123.45; return &f }()`
+			updateValue = `func() *float64 { f := 678.90; return &f }()`
+		case "bool":
+			testValue = `func() *bool { b := true; return &b }()`
+			updateValue = `func() *bool { b := false; return &b }()`
+		case "time.Time":
+			testValue = `func() *time.Time { t := time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC); return &t }()`
+			updateValue = `func() *time.Time { t := time.Date(2024, 2, 20, 14, 45, 0, 0, time.UTC); return &t }()`
+		default:
+			testValue = "nil"
+			updateValue = "nil"
+		}
+		return
+	}
+
+	// Handle slice/array types
+	if strings.HasPrefix(field.Type, "[]") {
+		elementType := strings.TrimPrefix(field.Type, "[]")
+		switch elementType {
+		case "string":
+			testValue = `[]string{"item1", "item2"}`
+			updateValue = `[]string{"updated1", "updated2"}`
+		case "int", "int32", "int64":
+			testValue = `[]int{1, 2, 3}`
+			updateValue = `[]int{4, 5, 6}`
+		case "uint", "uint32", "uint64":
+			testValue = `[]uint{1, 2, 3}`
+			updateValue = `[]uint{4, 5, 6}`
+		case "float32", "float64":
+			testValue = `[]float64{1.1, 2.2, 3.3}`
+			updateValue = `[]float64{4.4, 5.5, 6.6}`
+		default:
+			testValue = `[]` + elementType + `{}`
+			updateValue = `[]` + elementType + `{}`
+		}
+		return
+	}
+
+	// Handle non-pointer types
 	switch field.Type {
 	case "string":
 		testValue = fmt.Sprintf(`"Test %s"`, field.Name)
 		updateValue = fmt.Sprintf(`"Updated %s"`, field.Name)
-	case "int":
+	case "int", "int32", "int64":
 		testValue = "123"
 		updateValue = "456"
-	case "uint":
+	case "uint", "uint32", "uint64":
 		// For foreign key fields, use valid IDs
 		if strings.HasSuffix(strings.ToLower(field.Name), "id") {
 			testValue = "1"
@@ -497,6 +549,9 @@ func (td *TemplateData) getTestValues(field Field) (testValue, updateValue strin
 			testValue = "123"
 			updateValue = "456"
 		}
+	case "float32":
+		testValue = "float32(123.45)"
+		updateValue = "float32(678.90)"
 	case "float64":
 		testValue = "123.45"
 		updateValue = "678.90"
@@ -507,17 +562,24 @@ func (td *TemplateData) getTestValues(field Field) (testValue, updateValue strin
 		// Use specific test dates that are realistic
 		testValue = "time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC)"
 		updateValue = "time.Date(2024, 2, 20, 14, 45, 0, 0, time.UTC)"
+	case "*time.Time":
+		testValue = `func() *time.Time { t := time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC); return &t }()`
+		updateValue = `func() *time.Time { t := time.Date(2024, 2, 20, 14, 45, 0, 0, time.UTC); return &t }()`
 	case "types.DateTime":
 		testValue = "types.Now()"
 		updateValue = "types.Now().Add(time.Hour)"
 	case "datatypes.JSON":
 		testValue = `datatypes.JSON([]byte("{\"key\":\"value\"}"))`
 		updateValue = `datatypes.JSON([]byte("{\"updated\":\"value\"}"))`
+	case "translation.Field":
+		testValue = `translation.Field{Original: "Test Value", Translated: map[string]string{"en": "Test Value"}}`
+		updateValue = `translation.Field{Original: "Updated Value", Translated: map[string]string{"en": "Updated Value"}}`
 	default:
 		if field.IsRelation {
 			testValue = "nil" // Relations are nil by default
 			updateValue = "nil"
 		} else {
+			// Generic fallback for custom types
 			testValue = `"test"`
 			updateValue = `"updated"`
 		}
@@ -527,6 +589,49 @@ func (td *TemplateData) getTestValues(field Field) (testValue, updateValue strin
 
 // getTestValueWithIndex returns test value with index for loops
 func (td *TemplateData) getTestValueWithIndex(field Field, fieldName string) string {
+	// Handle pointer types
+	if strings.HasPrefix(field.Type, "*") {
+		baseType := strings.TrimPrefix(field.Type, "*")
+		switch baseType {
+		case "string":
+			return fmt.Sprintf(`func() *string { s := fmt.Sprintf("Test %s %%d", i); return &s }()`, ToPascalCase(fieldName))
+		case "int", "int32", "int64":
+			return `func() *int { i := int(100 + i); return &i }()`
+		case "uint", "uint32", "uint64":
+			if strings.HasSuffix(strings.ToLower(field.Name), "id") {
+				return `func() *uint { u := uint(1 + i); return &u }()`
+			}
+			return `func() *uint { u := uint(100 + i); return &u }()`
+		case "float32":
+			return `func() *float32 { f := float32(100.5 + float32(i)); return &f }()`
+		case "float64":
+			return `func() *float64 { f := float64(100.5 + float64(i)); return &f }()`
+		case "bool":
+			return `func() *bool { b := (i%2 == 0); return &b }()`
+		case "time.Time":
+			return `func() *time.Time { t := time.Date(2024, 1, 15+i, 10, 30, 0, 0, time.UTC); return &t }()`
+		default:
+			return `nil`
+		}
+	}
+
+	// Handle slice/array types
+	if strings.HasPrefix(field.Type, "[]") {
+		elementType := strings.TrimPrefix(field.Type, "[]")
+		switch elementType {
+		case "string":
+			return fmt.Sprintf(`[]string{fmt.Sprintf("item%%d", i)}`)
+		case "int":
+			return `[]int{int(100 + i)}`
+		case "uint":
+			return `[]uint{uint(100 + i)}`
+		case "float64":
+			return `[]float64{float64(100.5 + float64(i))}`
+		default:
+			return fmt.Sprintf(`[]%s{%s}`, elementType, fmt.Sprintf(`fmt.Sprintf("test%%d", i)`))
+		}
+	}
+
 	switch field.Type {
 	case "string":
 		return fmt.Sprintf(`fmt.Sprintf("Test %s %%d", i)`, ToPascalCase(fieldName))
@@ -734,8 +839,8 @@ func parseFieldDef(fieldDef string) Field {
 		parts := strings.Split(fieldType, ":")
 		if len(parts) >= 2 {
 			relationType := parts[1]
-			if strings.Contains(relationType, "toMany") || strings.Contains(relationType, "to_many") || 
-			   strings.Contains(relationType, "manyToMany") || strings.Contains(relationType, "many_to_many") {
+			if strings.Contains(relationType, "toMany") || strings.Contains(relationType, "to_many") ||
+				strings.Contains(relationType, "manyToMany") || strings.Contains(relationType, "many_to_many") {
 				field.IsRelation = true
 				field.RelationType = "many_to_many"
 				field.JSONTag = ToSnakeCase(fieldName) + ",omitempty"
@@ -843,6 +948,10 @@ func getTestValueWithIndexCompat(fieldType, fieldName string) string {
 			return "uint(1 + i)"
 		}
 		return "uint(100 + i)"
+	case "float64":
+		return "float64(100.5 + float64(i))"
+	case "bool":
+		return "(i%2 == 0)"
 	case "time.Time":
 		return "time.Date(2024, 1, 15+i, 10, 30, 0, 0, time.UTC)"
 	case "datatypes.JSON":
@@ -881,19 +990,13 @@ func GenerateFileFromTemplate(dir, filename, templateName string, naming *Naming
 	case "model.tmpl":
 		tmplContent = modelTemplate
 	case "controller.tmpl":
-		tmplContent = controllerTemplate  
+		tmplContent = controllerTemplate
 	case "service.tmpl":
 		tmplContent = serviceTemplate
 	case "module.tmpl":
 		tmplContent = moduleTemplate
 	case "validator.tmpl":
 		tmplContent = validatorTemplate
-	case "model_test.tmpl":
-		tmplContent = modelTestTemplate
-	case "service_test.tmpl":
-		tmplContent = serviceTestTemplate
-	case "controller_test.tmpl":
-		tmplContent = controllerTestTemplate
 	default:
 		fmt.Printf("Unknown template: %s\n", templateName)
 		return
@@ -908,7 +1011,9 @@ func GenerateFileFromTemplate(dir, filename, templateName string, naming *Naming
 		"ToKebabCase":  ToKebabCase,
 		"ToPlural":     ToPlural,
 		"hasPrefix":    strings.HasPrefix,
+		"hasSuffix":    strings.HasSuffix,
 		"contains":     strings.Contains,
+		"eq":           func(a, b interface{}) bool { return a == b },
 		"slice": func(s string, start, end int) string {
 			if start >= len(s) {
 				return ""

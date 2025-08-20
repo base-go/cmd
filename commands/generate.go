@@ -94,11 +94,11 @@ func generateModule(cmd *cobra.Command, args []string) {
 		fieldStructs,
 	)
 
-	// Generate tests
-	if err := utils.GenerateTests(naming, fieldStructs); err != nil {
-		fmt.Printf("Error generating tests: %v\n", err)
-		return
-	}
+	// Generate tests - disabled for now, will be added in future
+	// if err := utils.GenerateTests(naming, fieldStructs); err != nil {
+	// 	fmt.Printf("Error generating tests: %v\n", err)
+	// 	return
+	// }
 
 	// Check if goimports is installed
 	if _, err := exec.LookPath("goimports"); err != nil {
@@ -113,16 +113,11 @@ func generateModule(cmd *cobra.Command, args []string) {
 
 	// Run goimports on generated files
 	generatedPath := filepath.Join("app", naming.DirName)
-	generatedPathTest := filepath.Join("test", "app_test", naming.DirName+"_test")
 
 	fmt.Println("Running goimports on generated files...")
 	// Run goimports on the generated directory
 	if err := exec.Command("find", generatedPath, "-name", "*.go", "-exec", "goimports", "-w", "{}", ";").Run(); err != nil {
 		fmt.Printf("Error running goimports on %s: %v\n", generatedPath, err)
-	}
-	// Run goimports on the test directory
-	if err := exec.Command("find", generatedPathTest, "-name", "*.go", "-exec", "goimports", "-w", "{}", ";").Run(); err != nil {
-		fmt.Printf("Error running goimports on %s: %v\n", generatedPathTest, err)
 	}
 
 	// Run goimports on the model file
@@ -138,9 +133,6 @@ func generateModule(cmd *cobra.Command, args []string) {
 	}
 	if err := exec.Command("gofmt", "-w", modelPath).Run(); err != nil {
 		fmt.Printf("Warning: Failed to format model file %s: %v\n", modelPath, err)
-	}
-	if err := exec.Command("gofmt", "-w", generatedPathTest).Run(); err != nil {
-		fmt.Printf("Warning: Failed to format test files in %s: %v\n", generatedPathTest, err)
 	}
 
 	// Add module to app/init.go

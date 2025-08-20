@@ -137,25 +137,37 @@ func (s *{{.Model}}Service) Update(id uint, req *models.Update{{.Model}}Request)
     if req.{{.Name}} != nil {
         updates["{{.DBName}}"] = *req.{{.Name}}
     }
-    {{- else if or (eq .Type "*int") (eq .Type "int") (eq .Type "int32") (eq .Type "int64")}}
-    // For integer fields
+    {{- else if hasPrefix .Type "*"}}
+    {{- if or (contains .Type "int") (contains .Type "uint") (contains .Type "float")}}
+    // For pointer numeric fields
     if req.{{.Name}} != nil && *req.{{.Name}} != 0 {
         updates["{{.DBName}}"] = *req.{{.Name}}
     }
-    {{- else if or (eq .Type "*uint") (eq .Type "uint") (eq .Type "uint32") (eq .Type "uint64")}}
-    // For unsigned integer fields
-    if req.{{.Name}} != nil && *req.{{.Name}} != 0 {
+    {{- else}}
+    // For other pointer fields
+    if req.{{.Name}} != nil {
         updates["{{.DBName}}"] = *req.{{.Name}}
     }
-    {{- else if or (eq .Type "*float32") (eq .Type "float32") (eq .Type "*float64") (eq .Type "float64")}}
-    // For float fields
-    if req.{{.Name}} != nil && *req.{{.Name}} != 0 {
-        updates["{{.DBName}}"] = *req.{{.Name}}
+    {{- end}}
+    {{- else if or (eq .Type "int") (eq .Type "int32") (eq .Type "int64")}}
+    // For non-pointer integer fields
+    if req.{{.Name}} != 0 {
+        updates["{{.DBName}}"] = req.{{.Name}}
     }
-    {{- else if or (eq .Type "time.Time") (eq .Type "*time.Time")}}
-    // For time.Time fields
-    if req.{{.Name}} != nil && !req.{{.Name}}.IsZero() {
-        updates["{{.DBName}}"] = *req.{{.Name}}
+    {{- else if or (eq .Type "uint") (eq .Type "uint32") (eq .Type "uint64")}}
+    // For non-pointer unsigned integer fields
+    if req.{{.Name}} != 0 {
+        updates["{{.DBName}}"] = req.{{.Name}}
+    }
+    {{- else if or (eq .Type "float32") (eq .Type "float64")}}
+    // For non-pointer float fields
+    if req.{{.Name}} != 0 {
+        updates["{{.DBName}}"] = req.{{.Name}}
+    }
+    {{- else if eq .Type "time.Time"}}
+    // For non-pointer time.Time fields
+    if !req.{{.Name}}.IsZero() {
+        updates["{{.DBName}}"] = req.{{.Name}}
     }
     {{- else if eq .Type "types.DateTime"}}
     // For custom DateTime fields
@@ -167,17 +179,11 @@ func (s *{{.Model}}Service) Update(id uint, req *models.Update{{.Model}}Request)
     if req.{{.Name}}.Original != "" {
         updates["{{.DBName}}"] = req.{{.Name}}.Original
     }
-    {{- else if or (eq .Type "*string") (eq .Type "string")}}
-    // For string fields - always check for non-empty values
-    {{- if eq .Type "*string"}}
-    if req.{{.Name}} != nil && *req.{{.Name}} != "" {
-        updates["{{.DBName}}"] = *req.{{.Name}}
-    }
-    {{- else}}
+    {{- else if eq .Type "string"}}
+    // For non-pointer string fields
     if req.{{.Name}} != "" {
         updates["{{.DBName}}"] = req.{{.Name}}
     }
-    {{- end}}
     {{- else if hasPrefix .Type "[]"}}
     // For slice/array fields
     if len(req.{{.Name}}) > 0 {
