@@ -907,6 +907,17 @@ func GenerateFileFromTemplate(dir, filename, templateName string, naming *Naming
 		"ToPascalCase": ToPascalCase,
 		"ToKebabCase":  ToKebabCase,
 		"ToPlural":     ToPlural,
+		"hasPrefix":    strings.HasPrefix,
+		"contains":     strings.Contains,
+		"slice": func(s string, start, end int) string {
+			if start >= len(s) {
+				return ""
+			}
+			if end > len(s) {
+				end = len(s)
+			}
+			return s[start:end]
+		},
 		"hasField": func(fields []Field, fieldType string) bool {
 			return HasFieldType(fields, fieldType)
 		},
