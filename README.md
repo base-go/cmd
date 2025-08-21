@@ -74,41 +74,6 @@ base start -d
 base start -r -d
 ```
 
-### `base test [module]` and `base test coverage [module]`
-
-Run tests for the application with optional coverage reporting.
-
-Modules:
-- `app`
-- `core`
-- omit to run all tests
-
-Options:
-- `--html`: Generate HTML coverage report (only valid with `coverage`)
-
-Examples:
-```bash
-# Run all tests
-base test
-
-# Run tests for a specific module
-base test app
-base test core
-
-# Run with coverage
-base test coverage
-base test coverage app
-base test coverage core
-
-# Generate HTML coverage report
-base test coverage --html
-base test coverage app --html
-```
-
-Notes:
-- Text coverage summary is printed to the console.
-- Coverage files are written as `coverage.out` (all modules) or `<module>_coverage.out`.
-- HTML reports are written to `test/coverage/coverage.html` or `test/coverage/<module>_coverage.html`.
 
 ### `base docs`
 
@@ -168,7 +133,6 @@ base destroy user customer
 What gets removed:
 - Module directory (`app/modulename/`)
 - Model file (`app/models/modulename.go`)
-- Test directory (`test/app_test/modulename_test/`)
 - Import and registration from `app/init.go`
 
 Notes:

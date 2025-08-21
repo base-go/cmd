@@ -125,9 +125,7 @@ type {{.Model}}Response struct {
     DeletedAt gorm.DeletedAt `json:"deleted_at"`
     {{- range .Fields}}
     {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") }}
-    {{- if not (and (eq .Type "uint") (or (eq .Name "ParentId") (eq .Name "CategoryId") (eq .Name "UserId") (eq .Name "AuthorId"))) }}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
-    {{- end }}
     {{- end }}
     {{- end}}
     {{- /* Include relationship objects in response */}}
