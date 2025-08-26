@@ -24,7 +24,7 @@ func GetGoType(t string) string {
 		parts := strings.Split(t, ":")
 		if len(parts) >= 2 {
 			relationType := parts[1]
-			
+
 			// Handle relationship types
 			switch {
 			case strings.Contains(relationType, "belongsTo") || strings.Contains(relationType, "belongs_to"):
@@ -32,23 +32,23 @@ func GetGoType(t string) string {
 					return ToPascalCase(parts[2]) // Use specified model
 				}
 				return "uint" // Foreign key field
-				
+
 			case strings.Contains(relationType, "hasMany") || strings.Contains(relationType, "has_many"):
 				if len(parts) > 2 {
 					return "[]" + ToPascalCase(parts[2])
 				}
 				// Infer model from field name (plural to singular)
 				return "[]" + ToPascalCase(Singularize(parts[0]))
-				
+
 			case strings.Contains(relationType, "hasOne") || strings.Contains(relationType, "has_one"):
 				if len(parts) > 2 {
 					return "*" + ToPascalCase(parts[2])
 				}
 				// Use field name as model name for hasOne
 				return "*" + ToPascalCase(parts[0])
-				
-			case strings.Contains(relationType, "toMany") || strings.Contains(relationType, "to_many") || 
-				 strings.Contains(relationType, "manyToMany") || strings.Contains(relationType, "many_to_many"):
+
+			case strings.Contains(relationType, "toMany") || strings.Contains(relationType, "to_many") ||
+				strings.Contains(relationType, "manyToMany") || strings.Contains(relationType, "many_to_many"):
 				if len(parts) > 2 {
 					return "[]*" + ToPascalCase(parts[2])
 				}
@@ -83,7 +83,7 @@ func GetGoType(t string) string {
 		return "float64"
 	case "sort":
 		return "int"
-	case "image", "file":
+	case "image", "file", "attachment":
 		return "*storage.Attachment"
 	case "json", "jsonb":
 		return "datatypes.JSON"

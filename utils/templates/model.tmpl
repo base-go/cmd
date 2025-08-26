@@ -23,7 +23,7 @@ type {{.Model}} struct {
     DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index"`
     {{- range .Fields}}
     {{- if and (not .IsRelation) (eq .Relationship "") }}
-    {{- if and (not (eq .Type "file")) (not (eq .Type "image")) (ne .Type "*storage.Attachment") }}
+    {{- if and (not (eq .Type "file")) (not (eq .Type "image")) (ne .Type "*storage.Attachment") (ne .Type "attachment") }}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"{{if .GORM}} gorm:"{{.GORM}}"{{end}}`
     {{- end }}
     {{- end }}
@@ -31,7 +31,7 @@ type {{.Model}} struct {
     {{- /* Foreign key IDs are now handled by ProcessField function when _id fields are detected */}}
     {{- /* Add file attachment IDs */}}
     {{- range .Fields}}
-    {{- if or (eq .Type "file") (eq .Type "image") }}
+    {{- if or (eq .Type "file") (eq .Type "image") (eq .Type "*storage.Attachment") (eq .Type "attachment") }}
     {{.Name}}Id uint `json:"{{.JSONName}}_id,omitempty"`
     {{- end }}
     {{- end}}
@@ -46,7 +46,7 @@ type {{.Model}} struct {
     {{- end}}
     {{- /* Add file attachments */}}
     {{- range .Fields}}
-    {{- if eq .Type "*storage.Attachment" }}
+    {{- if eq .Type "*storage.Attachment" || eq .Type "attachment" }}
     {{.Name}} *storage.Attachment `json:"{{.JSONName}},omitempty"`
     {{- end }}
     {{- end}}
@@ -87,7 +87,7 @@ func (m *{{.Model}}) GetModelName() string {
 // Create{{.Model}}Request represents the request payload for creating a {{.Model}}
 type Create{{.Model}}Request struct {
     {{- range .Fields}}
-    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") }}
+    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") || (ne .Type "attachment") || (ne .Type "file") || (ne .Type "image") }}
     {{- if .IsRequired }}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}" binding:"required"`
     {{- else }}
@@ -104,7 +104,7 @@ type Create{{.Model}}Request struct {
 // Update{{.Model}}Request represents the request payload for updating a {{.Model}}
 type Update{{.Model}}Request struct {
     {{- range .Fields}}
-    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") }}
+    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") || (ne .Type "attachment") || (ne .Type "file") || (ne .Type "image") }}
     {{- if eq .Type "bool" }}
     {{.Name}} *{{.Type}} `json:"{{.JSONName}},omitempty"`
     {{- else }}
@@ -124,7 +124,7 @@ type {{.Model}}Response struct {
     UpdatedAt time.Time      `json:"updated_at"`
     DeletedAt gorm.DeletedAt `json:"deleted_at"`
     {{- range .Fields}}
-    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") }}
+    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") || (ne .Type "attachment") || (ne .Type "file") || (ne .Type "image") }}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end }}
     {{- end}}
@@ -181,7 +181,7 @@ type {{.Model}}ListResponse struct {
     UpdatedAt time.Time      `json:"updated_at"`
     DeletedAt gorm.DeletedAt `json:"deleted_at"`
     {{- range .Fields}}
-    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") }}
+    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") || (ne .Type "attachment") || (ne .Type "file") || (ne .Type "image") }}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end }}
     {{- end}}
@@ -200,7 +200,7 @@ func (m *{{.Model}}) ToResponse() *{{.Model}}Response {
         UpdatedAt: m.UpdatedAt,
         DeletedAt: m.DeletedAt,
         {{- range .Fields}}
-        {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") }}
+        {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") || (ne .Type "attachment") || (ne .Type "file") || (ne .Type "image") }}
         {{.Name}}: m.{{.Name}},
         {{- end }}
         {{- end}}
@@ -217,7 +217,7 @@ func (m *{{.Model}}) ToResponse() *{{.Model}}Response {
     
     {{- /* Convert file attachments to response types */}}
     {{- range .Fields}}
-    {{- if eq .Type "*storage.Attachment" }}
+    {{- if eq .Type "*storage.Attachment" || eq .Type "attachment" || eq .Type "file" || eq .Type "image" }}
     if m.{{.Name}} != nil {
         response.{{.Name}} = m.{{.Name}}
     }
@@ -334,7 +334,7 @@ func (m *{{.Model}}) Preload(db *gorm.DB) *gorm.DB {
     {{- end}}
     {{- end}}
     {{- range .Fields}}
-    {{- if or (eq .Type "file") (eq .Type "image") (eq .Type "*storage.Attachment") }}
+    {{- if or (eq .Type "file") (eq .Type "image") (eq .Type "*storage.Attachment") || (eq .Type "attachment") }}
     query = query.Preload("{{.Name}}")
     {{- end }}
     {{- end}}
