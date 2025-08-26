@@ -13,7 +13,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/BaseTechStack/basecmd/version"
+	"github.com/base-go/cmd/version"
 	"github.com/spf13/cobra"
 )
 
@@ -208,7 +208,7 @@ Examples:
 					fmt.Println("   • Fields ending with '_id' now auto-generate GORM relationships")
 				}
 				fmt.Println("⚠️  To upgrade to the major version, use: base upgrade --major")
-				fmt.Printf("📚 Major version changelog: https://github.com/BaseTechStack/basecmd/releases/tag/v%s\n", latestVersion)
+				fmt.Printf("📚 Major version changelog: https://github.com/base-go/cmd/releases/tag/v%s\n", latestVersion)
 				fmt.Println()
 			}
 		}
@@ -231,7 +231,7 @@ Examples:
 				fmt.Println("")
 			}
 			
-			fmt.Println("📚 Full changelog: https://github.com/BaseTechStack/basecmd/releases/tag/v" + targetVersion)
+			fmt.Println("📚 Full changelog: https://github.com/base-go/cmd/releases/tag/v" + targetVersion)
 			fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 			fmt.Print("\nDo you want to proceed with the upgrade? [y/N]: ")
 			

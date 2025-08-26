@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/BaseTechStack/basecmd/utils"
-	"github.com/BaseTechStack/basecmd/version"
+	"github.com/base-go/cmd/utils"
+	"github.com/base-go/cmd/version"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +40,7 @@ func createNewProject(cmd *cobra.Command, args []string) {
 	rawVersion := version.Version
 	normalized := strings.TrimPrefix(rawVersion, "v")
 	tag := "v" + normalized
-	archiveURL := fmt.Sprintf("https://github.com/BaseTechStack/base/archive/refs/tags/%s.zip", tag)
+	archiveURL := fmt.Sprintf("https://github.com/base-go/base-core/archive/refs/tags/%s.zip", tag)
 
 	// Create the project directory
 	err := os.Mkdir(projectName, 0755)
@@ -100,8 +100,8 @@ func createNewProject(cmd *cobra.Command, args []string) {
 	// Move contents from the version-specific subdirectory to the project root
 	// GitHub archives may produce either base-vX.Y.Z or base-X.Y.Z
 	candidateDirs := []string{
-		fmt.Sprintf("base-%s", tag),          // e.g., base-v2.1.3
-		fmt.Sprintf("base-%s", normalized),   // e.g., base-2.1.3
+		fmt.Sprintf("base-%s", tag),        // e.g., base-v2.1.3
+		fmt.Sprintf("base-%s", normalized), // e.g., base-2.1.3
 	}
 
 	var extractedDir string

@@ -8,13 +8,13 @@ It offers scaffolding, module generation, and utilities to accelerate Go applica
 ### macOS and Linux
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/BaseTechStack/basecmd/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/base-go/cmd/main/install.sh | bash
 ```
 
 If you need to install in a protected directory (like `/usr/local/bin`), use:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/BaseTechStack/basecmd/main/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/base-go/cmd/main/install.sh | sudo bash
 ```
 
 ### Windows
@@ -24,13 +24,13 @@ curl -sSL https://raw.githubusercontent.com/BaseTechStack/basecmd/main/install.s
 1. Open PowerShell as Administrator
 2. Run:
 ```powershell
-Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/BaseTechStack/basecmd/main/install.ps1'))
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/base-go/cmd/main/install.ps1'))
 ```
 
 #### Option 2: Using Git Bash
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/BaseTechStack/basecmd/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/base-go/cmd/main/install.sh | bash
 ```
 
 ## Commands

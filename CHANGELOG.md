@@ -403,17 +403,17 @@ type Article struct {
 - Model layer with GORM integration
 - Basic project structure
 
-[v2.0.1]: https://github.com/BaseTechStack/basecmd/releases/tag/v2.0.1
-[v2.0.0]: https://github.com/BaseTechStack/basecmd/releases/tag/v2.0.0
-[v1.2.2]: https://github.com/BaseTechStack/basecmd/releases/tag/v1.2.2
-[v1.2.1]: https://github.com/BaseTechStack/basecmd/releases/tag/v1.2.1
-[v1.2.0]: https://github.com/BaseTechStack/basecmd/releases/tag/v1.2.0
-[v1.1.9]: https://github.com/BaseTechStack/basecmd/releases/tag/v1.1.9
-[v1.1.8]: https://github.com/BaseTechStack/basecmd/releases/tag/v1.1.8
-[v1.1.7]: https://github.com/BaseTechStack/basecmd/releases/tag/v1.1.7
-[v1.1.6]: https://github.com/BaseTechStack/basecmd/releases/tag/v1.1.6
-[v1.1.5]: https://github.com/BaseTechStack/basecmd/releases/tag/v1.1.5
-[v1.1.4]: https://github.com/BaseTechStack/basecmd/releases/tag/v1.1.4
+[v2.0.1]: https://github.com/base-go/cmd/releases/tag/v2.0.1
+[v2.0.0]: https://github.com/base-go/cmd/releases/tag/v2.0.0
+[v1.2.2]: https://github.com/base-go/cmd/releases/tag/v1.2.2
+[v1.2.1]: https://github.com/base-go/cmd/releases/tag/v1.2.1
+[v1.2.0]: https://github.com/base-go/cmd/releases/tag/v1.2.0
+[v1.1.9]: https://github.com/base-go/cmd/releases/tag/v1.1.9
+[v1.1.8]: https://github.com/base-go/cmd/releases/tag/v1.1.8
+[v1.1.7]: https://github.com/base-go/cmd/releases/tag/v1.1.7
+[v1.1.6]: https://github.com/base-go/cmd/releases/tag/v1.1.6
+[v1.1.5]: https://github.com/base-go/cmd/releases/tag/v1.1.5
+[v1.1.4]: https://github.com/base-go/cmd/releases/tag/v1.1.4
 [v1.1.3]: https://github.com/base-go/cmd/releases/tag/v1.1.3
 [v1.1.2]: https://github.com/base-go/cmd/releases/tag/v1.1.2
 [v1.1.1]: https://github.com/base-go/cmd/releases/tag/v1.1.1

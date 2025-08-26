@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/BaseTechStack/basecmd/utils"
-	"github.com/BaseTechStack/basecmd/version"
+	"github.com/base-go/cmd/utils"
+	"github.com/base-go/cmd/version"
 	"github.com/spf13/cobra"
 )
 
@@ -39,7 +39,7 @@ func updateCore() error {
 	rawVersion := version.Version
 	normalized := strings.TrimPrefix(rawVersion, "v")
 	tag := "v" + normalized
-	archiveURL := fmt.Sprintf("https://github.com/BaseTechStack/base/archive/refs/tags/%s.zip", tag)
+	archiveURL := fmt.Sprintf("https://github.com/base-go/base-core/archive/refs/tags/%s.zip", tag)
 
 	// Create a temporary working directory
 	tempDir, err := os.MkdirTemp("", "base-core-update-")

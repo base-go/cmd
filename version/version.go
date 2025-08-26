@@ -65,7 +65,7 @@ func (bi BuildInfo) String() string {
 
 // CheckLatestVersion checks GitHub for newer releases
 func CheckLatestVersion() (*Release, error) {
-	url := "https://api.github.com/repos/BaseTechStack/basecmd/releases/latest"
+	url := "https://api.github.com/repos/base-go/cmd/releases/latest"
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err

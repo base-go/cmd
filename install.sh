@@ -43,7 +43,7 @@ fi
 mkdir -p "$INSTALL_DIR"
 mkdir -p "$BIN_DIR" 2>/dev/null || {
     echo "Error: Unable to create $BIN_DIR directory. Please run with sudo:"
-    echo "curl -sSL https://raw.githubusercontent.com/BaseTechStack/basecmd/main/install.sh | sudo bash"
+    echo "curl -sSL https://raw.githubusercontent.com/base-go/cmd/main/install.sh | sudo bash"
     exit 1
 }
 
@@ -53,7 +53,7 @@ echo "Architecture: $ARCH"
 
 # Get the latest release version
 echo "Fetching latest release information..."
-API_RESPONSE=$(curl -s https://api.github.com/repos/BaseTechStack/basecmd/releases/latest)
+API_RESPONSE=$(curl -s https://api.github.com/repos/base-go/cmd/releases/latest)
 if [ $? -ne 0 ]; then
     echo "Error: Failed to fetch release information"
     exit 1
@@ -65,16 +65,16 @@ if [ -z "$LATEST_RELEASE" ]; then
     echo "API Response debug info:"
     echo "$API_RESPONSE" | head -n 10
     echo "Please check if the repository exists and has releases"
-    echo "Repository: https://github.com/BaseTechStack/basecmd"
+    echo "Repository: https://github.com/base-go/cmd"
     exit 1
 fi
 
 echo "Latest version: $LATEST_RELEASE"
 
 # Download the appropriate binary
-DOWNLOAD_URL="https://github.com/BaseTechStack/basecmd/releases/download/$LATEST_RELEASE/base_${OS}_${ARCH}.tar.gz"
+DOWNLOAD_URL="https://github.com/base-go/cmd/releases/download/$LATEST_RELEASE/base_${OS}_${ARCH}.tar.gz"
 if [ "$OS" = "windows" ]; then
-    DOWNLOAD_URL="https://github.com/BaseTechStack/basecmd/releases/download/$LATEST_RELEASE/base_${OS}_${ARCH}.zip"
+    DOWNLOAD_URL="https://github.com/base-go/cmd/releases/download/$LATEST_RELEASE/base_${OS}_${ARCH}.zip"
 fi
 
 echo "Downloading from: $DOWNLOAD_URL"
@@ -101,7 +101,7 @@ else
     echo "Creating symlink in $BIN_DIR (requires sudo)..."
     if ! sudo ln -sf "$INSTALL_DIR/$BINARY_NAME" "$BIN_DIR/$BINARY_NAME"; then
         echo "Error: Failed to create symlink. Please run the install script with sudo:"
-        echo "curl -sSL https://raw.githubusercontent.com/BaseTechStack/basecmd/main/install.sh | sudo bash"
+        echo "curl -sSL https://raw.githubusercontent.com/base-go/cmd/main/install.sh | sudo bash"
         exit 1
     fi
 fi
@@ -126,13 +126,6 @@ if command -v go >/dev/null 2>&1; then
         echo "✓ Air installed successfully"
     fi
     
-    echo "Installing Swag (Swagger documentation generator)..."
-    if ! go install github.com/swaggo/swag/cmd/swag@latest 2>/dev/null; then
-        echo "Warning: Failed to install Swag. You can install it manually later with:"
-        echo "  go install github.com/swaggo/swag/cmd/swag@latest"
-    else
-        echo "✓ Swag installed successfully"
-    fi
 else
     echo "Warning: Go is not installed or not in PATH."
     echo "Base CLI dependencies (Air and Swag) will be installed automatically when needed."

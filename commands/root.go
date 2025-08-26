@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/BaseTechStack/basecmd/version"
+	"github.com/base-go/cmd/version"
 	"github.com/spf13/cobra"
 )
 

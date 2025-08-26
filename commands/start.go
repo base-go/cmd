@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/BaseTechStack/basecmd/utils"
+	"github.com/base-go/cmd/utils"
 	"github.com/spf13/cobra"
 )
 
