@@ -10,7 +10,10 @@ import (
     "base/core/emitter"
     "base/core/storage"
     "base/core/logger"
-    "base/app/models"
+    "base/app/models"{{if .HasTranslatableFields}}
+    "base/core/translation"
+    "reflect"
+    "strings"{{end}}
     "{{.PackageName}}/validators"
 )
 
@@ -24,17 +27,20 @@ type {{.Service}} struct {
     DB      *gorm.DB
     Emitter *emitter.Emitter
     Storage *storage.ActiveStorage
-    Logger  logger.Logger
+    Logger  logger.Logger{{if .HasTranslatableFields}}
+    TranslationHelper *translation.Helper{{end}}
 }
 
-func New{{.Service}}(db *gorm.DB, emitter *emitter.Emitter, storage *storage.ActiveStorage, logger logger.Logger) *{{.Service}} {
+func New{{.Service}}(db *gorm.DB, emitter *emitter.Emitter, storage *storage.ActiveStorage, logger logger.Logger{{if .HasTranslatableFields}}, translationHelper *translation.Helper{{end}}) *{{.Service}} {
     return &{{.Service}}{
         DB:      db,
-        Emitter: emitter,
-        Storage: storage,
         Logger:  logger,
+        Emitter: emitter,
+        Storage: storage,{{if .HasTranslatableFields}}
+        TranslationHelper: translationHelper,{{end}}
     }
 }
+
 
 // applySorting applies sorting to the query based on the sort and order parameters
 func (s *{{.Service}}) applySorting(query *gorm.DB, sortBy *string, sortOrder *string) {
@@ -86,11 +92,13 @@ func (s *{{.Service}}) applySorting(query *gorm.DB, sortBy *string, sortOrder *s
 func (s *{{.Model}}Service) Create(req *models.Create{{.Model}}Request) (*models.{{.Model}}, error) {
     item := &models.{{.Model}}{
         {{- range .Fields}}
-        {{- if eq .Type "*storage.Attachment" }}
-        // {{.Name}} attachment is handled via separate endpoint
-        {{- else if eq .Relationship "belongs_to" }}
+        {{- if eq .Type "translation.Field" }}
+        {{.Name}}: translation.NewField(req.{{.Name}}),
+        {{- else if eq .Type "*storage.Attachment"}}
+        // handled separately
+        {{- else if eq .Relationship "belongs_to"}}
         {{.Name}}Id: req.{{.Name}}Id,
-        {{- else if not .IsRelation }}
+        {{- else}}
         {{.Name}}: req.{{.Name}},
         {{- end}}
         {{- end}}
@@ -124,6 +132,7 @@ func (s *{{.Model}}Service) Update(id uint, req *models.Update{{.Model}}Request)
     // Build updates map
     updates := make(map[string]any)
     {{- range .Fields}}
+    
     {{- if eq .Type "*storage.Attachment" }}
     // {{.Name}} attachment is handled via separate endpoint
     {{- else if eq .Relationship "belongs_to" }}
@@ -175,9 +184,9 @@ func (s *{{.Model}}Service) Update(id uint, req *models.Update{{.Model}}Request)
         updates["{{.DBName}}"] = req.{{.Name}}
     }
     {{- else if eq .Type "translation.Field"}}
-    // For translation fields
-    if req.{{.Name}}.Original != "" {
-        updates["{{.DBName}}"] = req.{{.Name}}.Original
+    if req.{{.Name}} != "" {
+        item.{{.Name}} = translation.NewField(req.{{.Name}})
+        updates["{{.DBName}}"] = item.{{.Name}}.Original
     }
     {{- else if eq .Type "string"}}
     // For non-pointer string fields
@@ -269,11 +278,12 @@ func (s *{{.Model}}Service) Delete(id uint) error {
     return nil
 }
 
-func (s *{{.Model}}Service) GetById(id uint) (*models.{{.Model}}, error) {
+
+
+func (s *{{.Service}}) GetById(id uint) (*models.{{.Model}}, error) {
     item := &models.{{.Model}}{}
     
     query := item.Preload(s.DB)
-    
     if err := query.First(item, id).Error; err != nil {
         s.Logger.Error("failed to get {{toLower .Model}}", 
             logger.String("error", err.Error()),
@@ -281,8 +291,15 @@ func (s *{{.Model}}Service) GetById(id uint) (*models.{{.Model}}, error) {
         return nil, err
     }
 
+    {{if .HasTranslatableFields}}// Load translations for all translatable fields
+    if err := s.loadTranslationsForItem(item); err != nil {
+        s.Logger.Error("Failed to load translations", logger.String("error", err.Error()))
+        // Continue without translations rather than failing
+    }{{end}}
+
     return item, nil
 }
+
 
 func (s *{{.Model}}Service) GetAll(page *int, limit *int, sortBy *string, sortOrder *string) (*types.PaginatedResponse, error) {
     var items []*models.{{.Model}}
@@ -324,6 +341,12 @@ func (s *{{.Model}}Service) GetAll(page *int, limit *int, sortBy *string, sortOr
             logger.String("error", err.Error()))
         return nil, err
     }
+
+    {{if .HasTranslatableFields}}// Load translations for all items
+    if err := s.loadTranslationsForItems(items); err != nil {
+        s.Logger.Error("Failed to load translations for items", logger.String("error", err.Error()))
+        // Continue without translations rather than failing
+    }{{end}}
 
     // Convert to response type
     responses := make([]*models.{{.Model}}ListResponse, len(items))
@@ -390,8 +413,50 @@ func (s *{{.Model}}Service) GetAllForSelect() ([]*models.{{.Model}}, error) {
         return nil, err
     }
     
+    {{if .HasTranslatableFields}}// Load translations for all items
+    if err := s.loadTranslationsForItems(items); err != nil {
+        s.Logger.Error("Failed to load translations for items", logger.String("error", err.Error()))
+        // Continue without translations rather than failing
+    }{{end}}
+    
     return items, nil
 }
+
+{{- /* Add translation loading helper methods */}}
+{{- if .HasTranslatableFields }}
+
+// loadTranslationsForItem loads translations for all translatable fields in a single item
+func (s *{{.Service}}) loadTranslationsForItem(item *models.{{.Model}}) error {
+    if item == nil {
+        return nil
+    }
+    
+    modelName := item.GetModelName()
+    modelId := item.GetId()
+    
+    // Load translations for each translatable field
+    {{- range .Fields}}
+    {{- if eq .Type "translation.Field" }}
+    if err := s.TranslationHelper.Service.LoadTranslationsForField(&item.{{.Name}}, modelName, modelId, "{{ToSnakeCase .Name}}"); err != nil {
+        s.Logger.Error("Failed to load translations for {{.Name}}", logger.String("error", err.Error()))
+        // Don't fail the request, just log the error
+    }
+    {{- end }}
+    {{- end}}
+    
+    return nil
+}
+
+// loadTranslationsForItems loads translations for all translatable fields in multiple items
+func (s *{{.Service}}) loadTranslationsForItems(items []*models.{{.Model}}) error {
+    for _, item := range items {
+        if err := s.loadTranslationsForItem(item); err != nil {
+            return err
+        }
+    }
+    return nil
+}
+{{- end }}
 
 {{- range .Fields}}
 {{- if eq .Type "*storage.Attachment"}}

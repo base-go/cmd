@@ -82,19 +82,19 @@ try {
             Write-Host "  go install github.com/air-verse/air@latest"
         }
         
-        Write-Host "Installing Swag (Swagger documentation generator)..."
+        Write-Host "Installing go-swagger (API documentation generator)..."
         try {
-            $null = & go install github.com/swaggo/swag/cmd/swag@latest 2>$null
-            Write-Host "✓ Swag installed successfully" -ForegroundColor Green
+            $null = & go install github.com/go-swagger/go-swagger/cmd/swagger@latest 2>$null
+            Write-Host "✓ go-swagger installed successfully" -ForegroundColor Green
         }
         catch {
-            Write-Host "Warning: Failed to install Swag. You can install it manually later with:" -ForegroundColor Yellow
-            Write-Host "  go install github.com/swaggo/swag/cmd/swag@latest"
+            Write-Host "Warning: Failed to install go-swagger. You can install it manually later with:" -ForegroundColor Yellow
+            Write-Host "  go install github.com/go-swagger/go-swagger/cmd/swagger@latest"
         }
     }
     else {
         Write-Host "Warning: Go is not installed or not in PATH." -ForegroundColor Yellow
-        Write-Host "Base CLI dependencies (Air and Swag) will be installed automatically when needed."
+        Write-Host "Base CLI dependencies (Air and go-swagger) will be installed automatically when needed."
         Write-Host "To install Go, visit: https://golang.org/dl/"
     }
     

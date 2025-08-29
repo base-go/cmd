@@ -118,17 +118,16 @@ echo "Installing Base CLI dependencies..."
 
 # Check if Go is installed
 if command -v go >/dev/null 2>&1; then
-    echo "Installing Air (hot reloading tool)..."
-    if ! go install github.com/air-verse/air@latest 2>/dev/null; then
-        echo "Warning: Failed to install Air. You can install it manually later with:"
-        echo "  go install github.com/air-verse/air@latest"
+    echo "Installing go-swagger (API documentation generator)..."
+    if ! go install github.com/go-swagger/go-swagger/cmd/swagger@latest 2>/dev/null; then
+        echo "Warning: Failed to install go-swagger. You can install it manually later with:"
+        echo "   go install github.com/go-swagger/go-swagger/cmd/swagger@latest"
     else
-        echo "✓ Air installed successfully"
+        echo "✓ go-swagger installed successfully"
     fi
-    
 else
     echo "Warning: Go is not installed or not in PATH."
-    echo "Base CLI dependencies (Air and Swag) will be installed automatically when needed."
+    echo "Base CLI dependencies (go-swagger) will be installed automatically when needed."
     echo "To install Go, visit: https://golang.org/dl/"
 fi
 

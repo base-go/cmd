@@ -24,7 +24,7 @@ type {{.Model}} struct {
     {{- range .Fields}}
     {{- if and (not .IsRelation) (eq .Relationship "") }}
     {{- if and (not (eq .Type "file")) (not (eq .Type "image")) (ne .Type "*storage.Attachment") (ne .Type "attachment") }}
-    {{.Name}} {{.Type}} `json:"{{.JSONName}}"{{if .GORM}} gorm:"{{.GORM}}"{{end}}`
+    {{.Name}} {{if eq .Type "text"}}string{{else}}{{.Type}}{{end}} `json:"{{.JSONName}}"{{if .GORM}} gorm:"{{.GORM}}"{{end}}`
     {{- end }}
     {{- end }}
     {{- end}}
@@ -41,12 +41,12 @@ type {{.Model}} struct {
     {{.Name}}Id uint `json:"{{.JSONName}}_id,omitempty"`
     {{.Name}} *{{.RelatedModel}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}Id"`
     {{- else if or (eq .Relationship "has_many") (eq .Relationship "has_one") (eq .Relationship "many_to_many") }}
-    {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty"{{if .GORM}} gorm:"{{.GORM}}"{{end}}`
+    {{.Name}} {{if eq .Type "text"}}string{{else}}{{.Type}}{{end}} `json:"{{.JSONName}}"{{if .GORM}} gorm:"{{.GORM}}"{{end}}`
     {{- end}}
     {{- end}}
     {{- /* Add file attachments */}}
     {{- range .Fields}}
-    {{- if eq .Type "*storage.Attachment" || eq .Type "attachment" }}
+    {{- if eq .Type "*storage.Attachment" }}
     {{.Name}} *storage.Attachment `json:"{{.JSONName}},omitempty"`
     {{- end }}
     {{- end}}
@@ -87,28 +87,32 @@ func (m *{{.Model}}) GetModelName() string {
 // Create{{.Model}}Request represents the request payload for creating a {{.Model}}
 type Create{{.Model}}Request struct {
     {{- range .Fields}}
-    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") || (ne .Type "attachment") || (ne .Type "file") || (ne .Type "image") }}
-    {{- if .IsRequired }}
-    {{.Name}} {{.Type}} `json:"{{.JSONName}}" binding:"required"`
-    {{- else }}
-    {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
+    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") }}
+    {{- $fieldType := .Type }}
+    {{- if eq .Type "translation.Field" }}
+    {{- $fieldType = "string" }}  // Convert translation fields to string in requests
     {{- end }}
-    {{- else if eq .Relationship "belongs_to" }}
-    {{- /* For belongsTo relationships, only include the ID field */}}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id" binding:"required"`
+    {{- if .IsRequired }}
+    {{.Name}} {{$fieldType}} `json:"{{.JSONName}}" binding:"required"`
+    {{- else }}
+    {{.Name}} {{$fieldType}} `json:"{{.JSONName}}"`
+    {{- end }}
+    {{- end }}
     {{- end}}
-    {{- end}}
-    {{- /* File fields are handled via separate upload endpoints, not in create request */}}
 }
 
 // Update{{.Model}}Request represents the request payload for updating a {{.Model}}
 type Update{{.Model}}Request struct {
     {{- range .Fields}}
-    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") || (ne .Type "attachment") || (ne .Type "file") || (ne .Type "image") }}
+    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") }}
+    {{- $fieldType := .Type }}
+    {{- if eq .Type "translation.Field" }}
+    {{- $fieldType = "string" }}  // Convert translation fields to string in requests
+    {{- end }}
     {{- if eq .Type "bool" }}
     {{.Name}} *{{.Type}} `json:"{{.JSONName}},omitempty"`
     {{- else }}
-    {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty"`
+    {{.Name}} {{$fieldType}} `json:"{{.JSONName}},omitempty"`
     {{- end }}
     {{- else if eq .Relationship "belongs_to" }}
     {{- /* For belongsTo relationships, only include the ID field */}}
@@ -124,7 +128,7 @@ type {{.Model}}Response struct {
     UpdatedAt time.Time      `json:"updated_at"`
     DeletedAt gorm.DeletedAt `json:"deleted_at"`
     {{- range .Fields}}
-    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") || (ne .Type "attachment") || (ne .Type "file") || (ne .Type "image") }}
+    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") }}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end }}
     {{- end}}
@@ -181,7 +185,7 @@ type {{.Model}}ListResponse struct {
     UpdatedAt time.Time      `json:"updated_at"`
     DeletedAt gorm.DeletedAt `json:"deleted_at"`
     {{- range .Fields}}
-    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") || (ne .Type "attachment") || (ne .Type "file") || (ne .Type "image") }}
+    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") }}
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end }}
     {{- end}}
@@ -200,7 +204,7 @@ func (m *{{.Model}}) ToResponse() *{{.Model}}Response {
         UpdatedAt: m.UpdatedAt,
         DeletedAt: m.DeletedAt,
         {{- range .Fields}}
-        {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") || (ne .Type "attachment") || (ne .Type "file") || (ne .Type "image") }}
+        {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") }}
         {{.Name}}: m.{{.Name}},
         {{- end }}
         {{- end}}
@@ -217,7 +221,7 @@ func (m *{{.Model}}) ToResponse() *{{.Model}}Response {
     
     {{- /* Convert file attachments to response types */}}
     {{- range .Fields}}
-    {{- if eq .Type "*storage.Attachment" || eq .Type "attachment" || eq .Type "file" || eq .Type "image" }}
+    {{- if eq .Type "*storage.Attachment" }}
     if m.{{.Name}} != nil {
         response.{{.Name}} = m.{{.Name}}
     }
@@ -333,10 +337,11 @@ func (m *{{.Model}}) Preload(db *gorm.DB) *gorm.DB {
     query = query.Preload("{{.Name}}")
     {{- end}}
     {{- end}}
-    {{- range .Fields}}
-    {{- if or (eq .Type "file") (eq .Type "image") (eq .Type "*storage.Attachment") || (eq .Type "attachment") }}
+    {{- /* Storage attachments are handled separately by ActiveStorage, don't preload them */}}
+    {{- /* range .Fields}}
+    {{- if or (eq .Type "file") (eq .Type "image") (eq .Type "*storage.Attachment")}}
     query = query.Preload("{{.Name}}")
     {{- end }}
-    {{- end}}
+    {{- end */}}
     return query
 }

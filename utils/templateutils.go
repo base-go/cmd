@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"text/template"
 )
@@ -33,16 +34,17 @@ type TemplateData struct {
 	Fields []Field
 
 	// Computed properties
-	HasRelations   bool
-	HasBelongsTo   bool
-	HasHasMany     bool
-	HasHasOne      bool
-	HasManyToMany  bool
-	HasImages      bool
-	HasFiles       bool
-	HasAttachments bool
-	HasTimestamps  bool
-	HasSoftDelete  bool
+	HasRelations          bool
+	HasBelongsTo          bool
+	HasHasMany            bool
+	HasHasOne             bool
+	HasManyToMany         bool
+	HasImages             bool
+	HasFiles              bool
+	HasAttachments        bool
+	HasTimestamps         bool
+	HasSoftDelete         bool
+	HasTranslatableFields bool
 
 	// Import paths needed
 	Imports []string
@@ -259,6 +261,9 @@ func (td *TemplateData) parseField(fieldDef string) Field {
 		field.Type = td.mapFieldType(fieldType)
 		field.GORMTag = td.getGORMTag(fieldName, field.Type)
 
+		if field.Type == "translation.Field" {
+			field.GORMTag = ``
+		}
 		// Check for special types
 		switch fieldType {
 		case "image":
@@ -273,11 +278,6 @@ func (td *TemplateData) parseField(fieldDef string) Field {
 			field.GORMTag = `gorm:"polymorphic:Model"`
 		}
 	}
-
-	// Set test values
-	field.TestValue, field.UpdateTestValue = td.getTestValues(field)
-	field.TestValueWithIndex = td.getTestValueWithIndex(field, fieldName)
-	field.TestValueUnique = td.getTestValueUnique(field, fieldName)
 
 	// Set compatibility fields for templates
 	field.JSONName = field.JSONTag
@@ -295,26 +295,27 @@ func (td *TemplateData) parseField(fieldDef string) Field {
 // mapFieldType maps simplified types to Go types
 func (td *TemplateData) mapFieldType(fieldType string) string {
 	typeMap := map[string]string{
-		"string":    "string",
-		"text":      "string",
-		"int":       "int",
-		"uint":      "uint",
-		"float":     "float64",
-		"decimal":   "float64",
-		"bool":      "bool",
-		"boolean":   "bool",
-		"date":      "time.Time",
-		"datetime":  "time.Time",
-		"timestamp": "time.Time",
-		"time":      "time.Time",
-		"json":      "datatypes.JSON",
-		"jsonb":     "datatypes.JSON",
-		"uuid":      "string",
-		"email":     "string",
-		"url":       "string",
-		"slug":      "string",
-		"image":     "*storage.Attachment",
-		"file":      "*storage.Attachment",
+		"string":      "string",
+		"text":        "string",
+		"int":         "int",
+		"uint":        "uint",
+		"float":       "float64",
+		"decimal":     "float64",
+		"bool":        "bool",
+		"boolean":     "bool",
+		"date":        "time.Time",
+		"datetime":    "time.Time",
+		"timestamp":   "time.Time",
+		"time":        "time.Time",
+		"json":        "datatypes.JSON",
+		"jsonb":       "datatypes.JSON",
+		"uuid":        "string",
+		"email":       "string",
+		"url":         "string",
+		"slug":        "string",
+		"image":       "*storage.Attachment",
+		"file":        "*storage.Attachment",
+		"translation": "translation.Field",
 	}
 
 	if goType, ok := typeMap[strings.ToLower(fieldType)]; ok {
@@ -333,7 +334,7 @@ func (td *TemplateData) inferFieldType(fieldName string) string {
 	}
 
 	// Text fields (should be TEXT in database)
-	textFields := []string{"description", "content", "body", "notes", "comment", "summary", "bio", "about"}
+	textFields := []string{"description", "content", "body", "notes", "comment", "summary", "bio", "text", "desc"}
 	for _, tf := range textFields {
 		if strings.Contains(lower, tf) {
 			return "text"
@@ -371,7 +372,6 @@ func (td *TemplateData) inferFieldType(fieldName string) string {
 	if strings.Contains(lower, "birth") || strings.Contains(lower, "born") || strings.Contains(lower, "expir") || strings.Contains(lower, "start") || strings.Contains(lower, "end") {
 		return "datetime"
 	}
-
 	// Email, URL fields
 	if strings.Contains(lower, "email") {
 		return "email"
@@ -454,242 +454,16 @@ func (td *TemplateData) getGORMTag(fieldName, fieldType string) string {
 			tags = append(tags, "index") // Foreign keys should be indexed
 		}
 	}
-
 	// Required fields
 	requiredFields := []string{"name", "title", "email", "username"}
-	for _, rf := range requiredFields {
-		if lower == rf {
-			tags = append(tags, "not null")
-			break
-		}
+	if slices.Contains(requiredFields, lower) {
+		tags = append(tags, "not null")
 	}
 
 	if len(tags) > 0 {
-		return fmt.Sprintf(`gorm:"%s"`, strings.Join(tags, ";"))
+		return strings.Join(tags, ";")
 	}
-	return ""
-}
-
-// getTestValues returns test and update values for a field
-func (td *TemplateData) getTestValues(field Field) (testValue, updateValue string) {
-	// Handle pointer types
-	if strings.HasPrefix(field.Type, "*") {
-		baseType := strings.TrimPrefix(field.Type, "*")
-		switch baseType {
-		case "string":
-			testValue = fmt.Sprintf(`func() *string { s := "Test %s"; return &s }()`, field.Name)
-			updateValue = fmt.Sprintf(`func() *string { s := "Updated %s"; return &s }()`, field.Name)
-		case "int", "int32", "int64":
-			testValue = `func() *int { i := 123; return &i }()`
-			updateValue = `func() *int { i := 456; return &i }()`
-		case "uint", "uint32", "uint64":
-			if strings.HasSuffix(strings.ToLower(field.Name), "id") {
-				testValue = `func() *uint { u := uint(1); return &u }()`
-				updateValue = `func() *uint { u := uint(2); return &u }()`
-			} else {
-				testValue = `func() *uint { u := uint(123); return &u }()`
-				updateValue = `func() *uint { u := uint(456); return &u }()`
-			}
-		case "float32":
-			testValue = `func() *float32 { f := float32(123.45); return &f }()`
-			updateValue = `func() *float32 { f := float32(678.90); return &f }()`
-		case "float64":
-			testValue = `func() *float64 { f := 123.45; return &f }()`
-			updateValue = `func() *float64 { f := 678.90; return &f }()`
-		case "bool":
-			testValue = `func() *bool { b := true; return &b }()`
-			updateValue = `func() *bool { b := false; return &b }()`
-		case "time.Time":
-			testValue = `func() *time.Time { t := time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC); return &t }()`
-			updateValue = `func() *time.Time { t := time.Date(2024, 2, 20, 14, 45, 0, 0, time.UTC); return &t }()`
-		default:
-			testValue = "nil"
-			updateValue = "nil"
-		}
-		return
-	}
-
-	// Handle slice/array types
-	if strings.HasPrefix(field.Type, "[]") {
-		elementType := strings.TrimPrefix(field.Type, "[]")
-		switch elementType {
-		case "string":
-			testValue = `[]string{"item1", "item2"}`
-			updateValue = `[]string{"updated1", "updated2"}`
-		case "int", "int32", "int64":
-			testValue = `[]int{1, 2, 3}`
-			updateValue = `[]int{4, 5, 6}`
-		case "uint", "uint32", "uint64":
-			testValue = `[]uint{1, 2, 3}`
-			updateValue = `[]uint{4, 5, 6}`
-		case "float32", "float64":
-			testValue = `[]float64{1.1, 2.2, 3.3}`
-			updateValue = `[]float64{4.4, 5.5, 6.6}`
-		default:
-			testValue = `[]` + elementType + `{}`
-			updateValue = `[]` + elementType + `{}`
-		}
-		return
-	}
-
-	// Handle non-pointer types
-	switch field.Type {
-	case "string":
-		testValue = fmt.Sprintf(`"Test %s"`, field.Name)
-		updateValue = fmt.Sprintf(`"Updated %s"`, field.Name)
-	case "int", "int32", "int64":
-		testValue = "123"
-		updateValue = "456"
-	case "uint", "uint32", "uint64":
-		// For foreign key fields, use valid IDs
-		if strings.HasSuffix(strings.ToLower(field.Name), "id") {
-			testValue = "1"
-			updateValue = "2"
-		} else {
-			testValue = "123"
-			updateValue = "456"
-		}
-	case "float32":
-		testValue = "float32(123.45)"
-		updateValue = "float32(678.90)"
-	case "float64":
-		testValue = "123.45"
-		updateValue = "678.90"
-	case "bool":
-		testValue = "true"
-		updateValue = "false"
-	case "time.Time":
-		// Use specific test dates that are realistic
-		testValue = "time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC)"
-		updateValue = "time.Date(2024, 2, 20, 14, 45, 0, 0, time.UTC)"
-	case "*time.Time":
-		testValue = `func() *time.Time { t := time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC); return &t }()`
-		updateValue = `func() *time.Time { t := time.Date(2024, 2, 20, 14, 45, 0, 0, time.UTC); return &t }()`
-	case "types.DateTime":
-		testValue = "types.Now()"
-		updateValue = "types.Now().Add(time.Hour)"
-	case "datatypes.JSON":
-		testValue = `datatypes.JSON([]byte("{\"key\":\"value\"}"))`
-		updateValue = `datatypes.JSON([]byte("{\"updated\":\"value\"}"))`
-	case "translation.Field":
-		testValue = `translation.Field{Original: "Test Value", Translated: map[string]string{"en": "Test Value"}}`
-		updateValue = `translation.Field{Original: "Updated Value", Translated: map[string]string{"en": "Updated Value"}}`
-	default:
-		if field.IsRelation {
-			testValue = "nil" // Relations are nil by default
-			updateValue = "nil"
-		} else {
-			// Generic fallback for custom types
-			testValue = `"test"`
-			updateValue = `"updated"`
-		}
-	}
-	return
-}
-
-// getTestValueWithIndex returns test value with index for loops
-func (td *TemplateData) getTestValueWithIndex(field Field, fieldName string) string {
-	// Handle pointer types
-	if strings.HasPrefix(field.Type, "*") {
-		baseType := strings.TrimPrefix(field.Type, "*")
-		switch baseType {
-		case "string":
-			return fmt.Sprintf(`func() *string { s := fmt.Sprintf("Test %s %%d", i); return &s }()`, ToPascalCase(fieldName))
-		case "int", "int32", "int64":
-			return `func() *int { i := int(100 + i); return &i }()`
-		case "uint", "uint32", "uint64":
-			if strings.HasSuffix(strings.ToLower(field.Name), "id") {
-				return `func() *uint { u := uint(1 + i); return &u }()`
-			}
-			return `func() *uint { u := uint(100 + i); return &u }()`
-		case "float32":
-			return `func() *float32 { f := float32(100.5 + float32(i)); return &f }()`
-		case "float64":
-			return `func() *float64 { f := float64(100.5 + float64(i)); return &f }()`
-		case "bool":
-			return `func() *bool { b := (i%2 == 0); return &b }()`
-		case "time.Time":
-			return `func() *time.Time { t := time.Date(2024, 1, 15+i, 10, 30, 0, 0, time.UTC); return &t }()`
-		default:
-			return `nil`
-		}
-	}
-
-	// Handle slice/array types
-	if strings.HasPrefix(field.Type, "[]") {
-		elementType := strings.TrimPrefix(field.Type, "[]")
-		switch elementType {
-		case "string":
-			return fmt.Sprintf(`[]string{fmt.Sprintf("item%%d", i)}`)
-		case "int":
-			return `[]int{int(100 + i)}`
-		case "uint":
-			return `[]uint{uint(100 + i)}`
-		case "float64":
-			return `[]float64{float64(100.5 + float64(i))}`
-		default:
-			return fmt.Sprintf(`[]%s{%s}`, elementType, fmt.Sprintf(`fmt.Sprintf("test%%d", i)`))
-		}
-	}
-
-	switch field.Type {
-	case "string":
-		return fmt.Sprintf(`fmt.Sprintf("Test %s %%d", i)`, ToPascalCase(fieldName))
-	case "int":
-		return "int(100 + i)"
-	case "uint":
-		// For foreign key fields, use sequential IDs
-		if strings.HasSuffix(strings.ToLower(field.Name), "id") {
-			return "uint(1 + i)"
-		}
-		return "uint(100 + i)"
-	case "float64":
-		return "float64(100.5 + float64(i))"
-	case "bool":
-		return "(i%2 == 0)"
-	case "time.Time":
-		return "time.Date(2024, 1, 15+i, 10, 30, 0, 0, time.UTC)"
-	case "types.DateTime":
-		return "types.Now().Add(time.Duration(i) * time.Minute)"
-	case "datatypes.JSON":
-		return fmt.Sprintf(`datatypes.JSON([]byte(fmt.Sprintf("{\"key\":\"value%%d\"}", i)))`)
-	default:
-		if field.IsRelation {
-			return "nil"
-		}
-		return fmt.Sprintf(`fmt.Sprintf("test%%d", i)`)
-	}
-}
-
-// getTestValueUnique returns unique test value for constraint tests
-func (td *TemplateData) getTestValueUnique(field Field, fieldName string) string {
-	switch field.Type {
-	case "string":
-		return fmt.Sprintf(`"Unique %s"`, ToPascalCase(fieldName))
-	case "int":
-		return "789"
-	case "uint":
-		// For foreign key fields, use a different unique ID
-		if strings.HasSuffix(strings.ToLower(field.Name), "id") {
-			return "999"
-		}
-		return "789"
-	case "float64":
-		return "999.99"
-	case "bool":
-		return "false"
-	case "time.Time":
-		return "time.Date(2024, 12, 25, 15, 0, 0, 0, time.UTC)"
-	case "types.DateTime":
-		return "types.Now().Add(time.Hour * 24)"
-	case "datatypes.JSON":
-		return `datatypes.JSON([]byte("{\"unique\":\"data\"}"))`
-	default:
-		if field.IsRelation {
-			return "nil"
-		}
-		return `"unique"`
-	}
+	return strings.Join(tags, ";") // 👈 just inner tags, no gorm:""
 }
 
 // isRequired checks if a field should be required
@@ -738,7 +512,10 @@ func (td *TemplateData) updateComputedProperties(field Field) {
 		td.HasFiles = true
 		td.HasAttachments = true
 	}
-
+	// Check for translatable fields
+	if field.Type == "translation.Field" {
+		td.HasTranslatableFields = true
+	}
 	if field.Type == "time.Time" {
 		switch field.Name {
 		case "DeletedAt":
@@ -887,11 +664,6 @@ func parseFieldDef(fieldDef string) Field {
 		field.GORM = getGORMTagCompat(fieldName, field.Type)
 	}
 
-	// Set test values
-	field.TestValue, field.UpdateTestValue = getTestValuesCompat(field.Type, fieldName)
-	field.TestValueWithIndex = getTestValueWithIndexCompat(field.Type, fieldName)
-	field.TestValueUnique = getTestValueUniqueCompat(field.Type, fieldName)
-
 	return field
 }
 
@@ -909,77 +681,6 @@ func getGORMTagCompat(fieldName, fieldType string) string {
 		return "index"
 	}
 	return ""
-}
-
-func getTestValuesCompat(fieldType, fieldName string) (string, string) {
-	switch fieldType {
-	case "string":
-		return fmt.Sprintf(`"Test %s"`, ToPascalCase(fieldName)), fmt.Sprintf(`"Updated %s"`, ToPascalCase(fieldName))
-	case "int":
-		return "123", "456"
-	case "uint":
-		// For foreign key fields, use valid IDs
-		if strings.HasSuffix(strings.ToLower(fieldName), "id") {
-			return "1", "2"
-		}
-		return "123", "456"
-	case "float64":
-		return "123.45", "678.90"
-	case "bool":
-		return "true", "false"
-	case "time.Time":
-		return "time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC)", "time.Date(2024, 2, 20, 14, 45, 0, 0, time.UTC)"
-	case "datatypes.JSON":
-		return `datatypes.JSON([]byte("{\"key\":\"value\"}"))`, `datatypes.JSON([]byte("{\"updated\":\"value\"}"))`
-	default:
-		return `"test"`, `"updated"`
-	}
-}
-
-func getTestValueWithIndexCompat(fieldType, fieldName string) string {
-	switch fieldType {
-	case "string":
-		return fmt.Sprintf(`fmt.Sprintf("Test %s %%d", i)`, ToPascalCase(fieldName))
-	case "int":
-		return "int(100 + i)"
-	case "uint":
-		// For foreign key fields, use sequential IDs
-		if strings.HasSuffix(strings.ToLower(fieldName), "id") {
-			return "uint(1 + i)"
-		}
-		return "uint(100 + i)"
-	case "float64":
-		return "float64(100.5 + float64(i))"
-	case "bool":
-		return "(i%2 == 0)"
-	case "time.Time":
-		return "time.Date(2024, 1, 15+i, 10, 30, 0, 0, time.UTC)"
-	case "datatypes.JSON":
-		return fmt.Sprintf(`datatypes.JSON([]byte(fmt.Sprintf("{\"key\":\"value%%d\"}", i)))`)
-	default:
-		return `fmt.Sprintf("test%%d", i)`
-	}
-}
-
-func getTestValueUniqueCompat(fieldType, fieldName string) string {
-	switch fieldType {
-	case "string":
-		return fmt.Sprintf(`"Unique %s"`, ToPascalCase(fieldName))
-	case "int":
-		return "789"
-	case "uint":
-		// For foreign key fields, use a different unique ID
-		if strings.HasSuffix(strings.ToLower(fieldName), "id") {
-			return "999"
-		}
-		return "789"
-	case "time.Time":
-		return "time.Date(2024, 12, 25, 15, 0, 0, 0, time.UTC)"
-	case "datatypes.JSON":
-		return `datatypes.JSON([]byte("{\"unique\":\"data\"}"))`
-	default:
-		return `"unique"`
-	}
 }
 
 // GenerateFileFromTemplate generates a file from embedded template (for backward compatibility)
@@ -1053,12 +754,30 @@ func GenerateFileFromTemplate(dir, filename, templateName string, naming *Naming
 	// Execute template with data structure
 	data := struct {
 		*NamingConvention
-		Fields        []Field
-		HasImageField bool
+		Fields                []Field
+		HasImageField         bool
+		HasTranslatableFields bool
+		HasSoftDelete         bool
+		HasTimestamps         bool
+		HasAttachments        bool
+		HasRelations          bool
+		HasBelongsTo          bool
+		HasHasMany            bool
+		HasHasOne             bool
+		HasManyToMany         bool
 	}{
-		NamingConvention: naming,
-		Fields:           fields,
-		HasImageField:    HasImageField(fields),
+		NamingConvention:      naming,
+		Fields:                fields,
+		HasImageField:         HasImageField(fields),
+		HasTranslatableFields: HasFieldType(fields, "translation.Field"),
+		HasSoftDelete:         HasFieldType(fields, "gorm.DeletedAt"),
+		HasTimestamps:         HasFieldType(fields, "time.Time"),
+		HasAttachments:        HasFieldType(fields, "*storage.Attachment"),
+		HasRelations:          HasFieldType(fields, "*models."),
+		HasBelongsTo:          HasFieldType(fields, "belongsTo"),
+		HasHasMany:            HasFieldType(fields, "hasMany"),
+		HasHasOne:             HasFieldType(fields, "hasOne"),
+		HasManyToMany:         HasFieldType(fields, "manyToMany"),
 	}
 
 	if err := tmpl.Execute(f, data); err != nil {
@@ -1067,22 +786,6 @@ func GenerateFileFromTemplate(dir, filename, templateName string, naming *Naming
 	}
 
 	fmt.Printf("Generated %s\n", outputFile)
-}
-
-// GenerateTests generates test files (for backward compatibility)
-func GenerateTests(naming *NamingConvention, fields []Field) error {
-	testDir := filepath.Join("test", "app_test", fmt.Sprintf("%s_test", naming.PackageName))
-	if err := os.MkdirAll(testDir, 0755); err != nil {
-		return fmt.Errorf("failed to create test directory: %w", err)
-	}
-
-	// Generate test files
-	GenerateFileFromTemplate(testDir, "model_test.go", "model_test.tmpl", naming, fields)
-	GenerateFileFromTemplate(testDir, "service_test.go", "service_test.tmpl", naming, fields)
-	GenerateFileFromTemplate(testDir, "controller_test.go", "controller_test.tmpl", naming, fields)
-
-	fmt.Printf("Generated Rails-style tests in %s\n", testDir)
-	return nil
 }
 
 // HasImageField checks if any field has image type

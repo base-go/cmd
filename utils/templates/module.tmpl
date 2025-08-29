@@ -6,7 +6,8 @@ import (
     "base/core/logger"
     "base/core/router"
     "base/core/storage"
-    "base/core/emitter"
+    "base/core/emitter"{{if .HasTranslatableFields}}
+    "base/core/translation"{{end}}
 
     "gorm.io/gorm"
 )
@@ -15,20 +16,27 @@ type Module struct {
     module.DefaultModule
     DB         *gorm.DB
     Service    *{{.Service}}
-    Controller *{{.Controller}}
+    Controller *{{.Controller}}{{if .HasTranslatableFields}}
+    TranslationHelper *translation.Helper{{end}}
 }
 
 // Init creates and initializes the {{.Model}} module with all dependencies
 func Init(deps module.Dependencies) module.Module {
-    // Initialize service and controller
-    service := New{{.Service}}(deps.DB, deps.Emitter, deps.Storage, deps.Logger)
+    {{if .HasTranslatableFields}}// Create translation service and helper
+    translationService := translation.NewTranslationService(deps.DB, deps.Emitter, deps.Storage, deps.Logger)
+    translationHelper := translation.NewHelper(translationService)
+    
+    // Initialize service with translation helper
+    service := New{{.Service}}(deps.DB, deps.Emitter, deps.Storage, deps.Logger, translationHelper){{else}}// Initialize service and controller
+    service := New{{.Service}}(deps.DB, deps.Emitter, deps.Storage, deps.Logger){{end}}
     controller := New{{.Controller}}(service, deps.Storage)
     
     // Create module
     mod := &Module{
         DB:         deps.DB,
         Service:    service,
-        Controller: controller,
+        Controller: controller,{{if .HasTranslatableFields}}
+        TranslationHelper: translationHelper,{{end}}
     }
     
     return mod

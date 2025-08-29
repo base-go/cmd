@@ -47,7 +47,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 	}
 
 	// Generate field structs
-	fieldStructs := utils.GenerateFieldStructs(fields)
+	fieldStructs := utils.NewTemplateData(naming.Model, fields)
 
 	// Generate model
 	utils.GenerateFileFromTemplate(
@@ -55,7 +55,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 		naming.ModelSnake+".go",
 		"model.tmpl",
 		naming,
-		fieldStructs,
+		fieldStructs.Fields,
 	)
 
 	// Generate service
@@ -64,7 +64,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 		"service.go",
 		"service.tmpl",
 		naming,
-		fieldStructs,
+		fieldStructs.Fields,
 	)
 
 	// Generate controller
@@ -73,7 +73,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 		"controller.go",
 		"controller.tmpl",
 		naming,
-		fieldStructs,
+		fieldStructs.Fields,
 	)
 
 	// Generate module
@@ -82,7 +82,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 		"module.go",
 		"module.tmpl",
 		naming,
-		fieldStructs,
+		fieldStructs.Fields,
 	)
 
 	// Generate validator
@@ -91,7 +91,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 		"validator.go",
 		"validator.tmpl",
 		naming,
-		fieldStructs,
+		fieldStructs.Fields,
 	)
 
 	// Generate tests - disabled for now, will be added in future
@@ -125,7 +125,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 	if err := exec.Command("goimports", "-w", modelPath).Run(); err != nil {
 		fmt.Printf("Error running goimports on %s: %v\n", modelPath, err)
 	}
-	
+
 	// Format all generated files with gofmt
 	fmt.Println("Formatting generated files...")
 	if err := exec.Command("gofmt", "-w", generatedPath).Run(); err != nil {
@@ -141,7 +141,7 @@ func generateModule(cmd *cobra.Command, args []string) {
 		fmt.Printf("Please manually add: _ \"base/app/%s\" to app/init.go\n", naming.DirName)
 	} else {
 		fmt.Printf("✅ Added module to app/init.go\n")
-		
+
 		// Format init.go after modification
 		initGoPath := filepath.Join("app", "init.go")
 		if err := exec.Command("gofmt", "-w", initGoPath).Run(); err != nil {

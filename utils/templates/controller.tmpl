@@ -53,7 +53,7 @@ func (c *{{.Controller}}) Routes(router *router.RouterGroup) {
 // @Success 201 {object} models.{{.Model}}Response
 // @Failure 400 {object} types.ErrorResponse
 // @Failure 500 {object} types.ErrorResponse
-// @Router /api/{{ToKebabCase $.PackageName}} [post]
+// @Router /{{ToKebabCase $.PackageName}} [post]
 func (c *{{.Model}}Controller) Create(ctx *router.Context) error {
     var req models.Create{{.Model}}Request
     if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -80,7 +80,7 @@ func (c *{{.Model}}Controller) Create(ctx *router.Context) error {
 // @Success 200 {object} models.{{.Model}}Response
 // @Failure 400 {object} types.ErrorResponse
 // @Failure 404 {object} types.ErrorResponse
-// @Router /api/{{ToKebabCase $.PackageName}}/{id} [get]
+// @Router /{{ToKebabCase $.PackageName}}/{id} [get]
 func (c *{{.Model}}Controller) Get(ctx *router.Context) error {
     id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
     if err != nil {
@@ -110,7 +110,7 @@ func (c *{{.Model}}Controller) Get(ctx *router.Context) error {
 // @Success 200 {object} types.PaginatedResponse
 // @Failure 400 {object} types.ErrorResponse
 // @Failure 500 {object} types.ErrorResponse
-// @Router /api/{{ToKebabCase $.PackageName}} [get]
+// @Router /{{ToKebabCase $.PackageName}} [get]
 func (c *{{.Model}}Controller) List(ctx *router.Context) error {
     var page, limit *int
     var sortBy, sortOrder *string
@@ -164,7 +164,7 @@ func (c *{{.Model}}Controller) List(ctx *router.Context) error {
 // @Produce json
 // @Success 200 {array} models.{{.Model}}SelectOption
 // @Failure 500 {object} types.ErrorResponse
-// @Router /api/{{ToKebabCase $.PackageName}}/all [get]
+// @Router /{{ToKebabCase $.PackageName}}/all [get]
 func (c *{{.Model}}Controller) ListAll(ctx *router.Context) error {
     items, err := c.Service.GetAllForSelect()
     if err != nil {
@@ -194,7 +194,7 @@ func (c *{{.Model}}Controller) ListAll(ctx *router.Context) error {
 // @Failure 400 {object} types.ErrorResponse
 // @Failure 404 {object} types.ErrorResponse
 // @Failure 500 {object} types.ErrorResponse
-// @Router /api/{{ToKebabCase $.PackageName}}/{id} [put]
+// @Router /{{ToKebabCase $.PackageName}}/{id} [put]
 func (c *{{.Model}}Controller) Update(ctx *router.Context) error {
     id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
     if err != nil {
@@ -229,7 +229,7 @@ func (c *{{.Model}}Controller) Update(ctx *router.Context) error {
 // @Success 200 {object} types.SuccessResponse
 // @Failure 400 {object} types.ErrorResponse
 // @Failure 500 {object} types.ErrorResponse
-// @Router /api/{{ToKebabCase $.PackageName}}/{id} [delete]
+// @Router /{{ToKebabCase $.PackageName}}/{id} [delete]
 func (c *{{.Model}}Controller) Delete(ctx *router.Context) error {
     id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
     if err != nil {
@@ -263,7 +263,7 @@ func (c *{{.Model}}Controller) Delete(ctx *router.Context) error {
 // @Success 200 {object} models.{{$.Model}}Response
 // @Failure 400 {object} types.ErrorResponse
 // @Failure 500 {object} types.ErrorResponse
-// @Router /api/{{ToKebabCase $.PackageName}}/{id}/{{ToSnakeCase .Name}} [post]
+// @Router /{{ToKebabCase $.PackageName}}/{id}/{{ToSnakeCase .Name}} [post]
 func (c *{{$.Model}}Controller) Upload{{.Name}}(ctx *router.Context) error {
     id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
     if err != nil {
@@ -295,7 +295,7 @@ func (c *{{$.Model}}Controller) Upload{{.Name}}(ctx *router.Context) error {
 // @Success 200 {object} models.{{$.Model}}Response
 // @Failure 400 {object} types.ErrorResponse
 // @Failure 500 {object} types.ErrorResponse
-// @Router /api/{{ToKebabCase $.PackageName}}/{id}/{{ToSnakeCase .Name}} [delete]
+// @Router /{{ToKebabCase $.PackageName}}/{id}/{{ToSnakeCase .Name}} [delete]
 func (c *{{$.Model}}Controller) Remove{{.Name}}(ctx *router.Context) error {
     id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
     if err != nil {

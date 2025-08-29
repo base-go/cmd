@@ -77,7 +77,7 @@ base start -r -d
 
 ### `base docs`
 
-Generate OpenAPI 3.0 documentation by scanning controller annotations and create static files.
+Generate Swagger 2.0 documentation using go-swagger by scanning controller annotations and create static files.
 
 ```bash
 base docs [flags]
@@ -85,8 +85,6 @@ base docs [flags]
 
 Options:
 - `-o, --output string`: Output directory for generated files (default "docs")
-- `-s, --static`: Generate static swagger files (JSON, YAML, docs.go) (default true)
-- `--no-static`: Skip generating static files
 
 Examples:
 ```bash
@@ -95,14 +93,11 @@ base docs
 
 # Generate docs in custom directory
 base docs --output api-docs
-
-# Skip static file generation (legacy mode)
-base docs --no-static
 ```
 
 Generated files:
-- `swagger.json`: OpenAPI 3.0 specification in JSON format
-- `swagger.yaml`: OpenAPI 3.0 specification in YAML format
+- `swagger.json`: Swagger 2.0 specification in JSON format
+- `swagger.yaml`: Swagger 2.0 specification in YAML format
 - `docs.go`: Go package with embedded OpenAPI spec for programmatic access
 
 Notes:
