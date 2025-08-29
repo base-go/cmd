@@ -72,16 +72,6 @@ try {
     
     # Check if Go is installed
     if (Get-Command go -ErrorAction SilentlyContinue) {
-        Write-Host "Installing Air (hot reloading tool)..."
-        try {
-            $null = & go install github.com/air-verse/air@latest 2>$null
-            Write-Host "✓ Air installed successfully" -ForegroundColor Green
-        }
-        catch {
-            Write-Host "Warning: Failed to install Air. You can install it manually later with:" -ForegroundColor Yellow
-            Write-Host "  go install github.com/air-verse/air@latest"
-        }
-        
         Write-Host "Installing go-swagger (API documentation generator)..."
         try {
             $null = & go install github.com/go-swagger/go-swagger/cmd/swagger@latest 2>$null
@@ -94,7 +84,7 @@ try {
     }
     else {
         Write-Host "Warning: Go is not installed or not in PATH." -ForegroundColor Yellow
-        Write-Host "Base CLI dependencies (Air and go-swagger) will be installed automatically when needed."
+        Write-Host "Base CLI dependencies (go-swagger) will be installed automatically when needed."
         Write-Host "To install Go, visit: https://golang.org/dl/"
     }
     

@@ -56,7 +56,6 @@ base g <module-name> [field:type ...] [options]
 Start the Base application server.
 
 Options:
-- `--hot-reload`, `-r`: Enable hot reloading using air
 - `--docs`, `-d`: Generate Swagger documentation
 
 Examples:
@@ -64,14 +63,8 @@ Examples:
 # Start the server normally
 base start
 
-# Start with hot reloading
-base start -r
-
 # Start with Swagger documentation
-base start -d
-
-# Start with both hot reloading and Swagger docs
-base start -r -d
+base s -d
 ```
 
 
@@ -104,6 +97,48 @@ Notes:
 - Static files are served at `/docs/` when running the server
 - You can also run `base start -d` to auto-generate docs before starting the server and serve Swagger UI at `/swagger/`
 - All swagger info (title, version, description) is extracted from main.go annotations
+
+### `base scheduler` or `base sc`
+
+Manage scheduled tasks in your Base Framework application.
+
+Subcommands:
+- `generate`, `g`: Generate a new scheduled task
+- `list`, `ls`: List all registered tasks  
+- `run`: Run a specific task immediately
+- `enable`: Enable a specific task
+- `disable`: Disable a specific task
+- `status`: Get scheduler status
+
+Options:
+- `--api-key`: API key for authentication
+- `--url`: Base URL of the application (default: http://localhost:8100)
+
+Examples:
+```bash
+# Generate a new task (smart module detection)
+base scheduler generate posts cleanup-old-posts
+base scheduler g users send-weekly-digest
+base scheduler g Post publish    # Finds 'posts' module
+base scheduler g User reminder   # Finds 'users' module
+
+# List all tasks (requires API key)
+base scheduler list --api-key=your-key
+
+# Run a task immediately
+base scheduler run cleanup-old-posts --api-key=your-key
+
+# Enable/disable tasks
+base scheduler enable cleanup-old-posts --api-key=your-key
+base scheduler disable cleanup-old-posts --api-key=your-key
+
+# Get scheduler status
+base scheduler status --api-key=your-key
+
+# Alternative short commands
+base sched g posts cleanup
+base sched list --api-key=your-key
+```
 
 ### `base d` or `base destroy`
 
