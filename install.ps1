@@ -74,12 +74,12 @@ try {
     if (Get-Command go -ErrorAction SilentlyContinue) {
         Write-Host "Installing go-swagger (API documentation generator)..."
         try {
-            $null = & go install github.com/go-swagger/go-swagger/cmd/swagger@latest 2>$null
+            $null = & go install github.com/swaggo/swag/cmd/swag@latest 2>$null
             Write-Host "✓ go-swagger installed successfully" -ForegroundColor Green
         }
         catch {
             Write-Host "Warning: Failed to install go-swagger. You can install it manually later with:" -ForegroundColor Yellow
-            Write-Host "  go install github.com/go-swagger/go-swagger/cmd/swagger@latest"
+            Write-Host "  go install github.com/swaggo/swag/cmd/swag@latest"
         }
     }
     else {

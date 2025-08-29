@@ -17,7 +17,7 @@ var (
 var docsCmd = &cobra.Command{
 	Use:   "docs",
 	Short: "Generate Swagger documentation",
-	Long:  `Generate Swagger documentation using go-swagger by scanning controller annotations and create static files (JSON, YAML, docs.go).`,
+	Long:  `Generate Swagger documentation using swag by scanning controller annotations and create static files (JSON, YAML, docs.go).`,
 	Run:   generateDocs,
 }
 
@@ -52,54 +52,43 @@ func generateDocs(cmd *cobra.Command, args []string) {
 	}
 	goPath := strings.TrimSpace(string(goPathBytes))
 
-	// Ensure go-swagger is installed
-	if _, err := exec.LookPath("swagger"); err != nil {
-		fmt.Println("Installing go-swagger...")
-		installCmd := exec.Command(goPath, "install", "github.com/go-swagger/go-swagger/cmd/swagger@latest")
+	// Ensure swag is installed
+	if _, err := exec.LookPath("swag"); err != nil {
+		fmt.Println("Installing swag...")
+		installCmd := exec.Command(goPath, "install", "github.com/swaggo/swag/cmd/swag@latest")
 		installCmd.Stdout = os.Stdout
 		installCmd.Stderr = os.Stderr
 		if err := installCmd.Run(); err != nil {
-			fmt.Printf("Error installing go-swagger: %v\n", err)
+			fmt.Printf("Error installing swag: %v\n", err)
 			return
 		}
 	}
 
-	fmt.Println("📚 Generating go-swagger documentation from annotations...")
+	fmt.Println("📚 Generating swagger documentation from annotations...")
 
-	swaggerCmd := exec.Command(
-		"swagger",
-		"generate",
-		"spec",
-		"-m",
-		"-o", filepath.Join(outputDir, "swagger.json"),
+	swagCmd := exec.Command(
+		"swag",
+		"init",
+		"--dir", "./",
+		"--output", "./"+outputDir,
+		"--parseDependency",
+		"--parseInternal",
+		"--parseVendor",
+		"--parseDepth", "1",
+		"--generatedTime", "false",
 	)
 
-	swaggerCmd.Dir = cwd
-	swaggerCmd.Stdout = os.Stdout
-	swaggerCmd.Stderr = os.Stderr
+	swagCmd.Dir = cwd
+	swagCmd.Stdout = os.Stdout
+	swagCmd.Stderr = os.Stderr
 
-	if err := swaggerCmd.Run(); err != nil {
+	if err := swagCmd.Run(); err != nil {
 		fmt.Printf("Error generating docs: %v\n", err)
 		return
 	}
 
-	// Also generate YAML version
-	yamlCmd := exec.Command(
-		"swagger",
-		"generate",
-		"spec",
-		"-m",
-		"-o", filepath.Join(outputDir, "swagger.yaml"),
-	)
-	yamlCmd.Dir = cwd
-	yamlCmd.Stdout = os.Stdout
-	yamlCmd.Stderr = os.Stderr
-	
-	if err := yamlCmd.Run(); err != nil {
-		fmt.Printf("Warning: Could not generate YAML version: %v\n", err)
-	}
-
-	fmt.Println("✅ go-swagger documentation generated successfully!")
+	fmt.Println("✅ Swagger documentation generated successfully!")
 	fmt.Printf("   - %s/swagger.json\n", outputDir)
 	fmt.Printf("   - %s/swagger.yaml\n", outputDir)
+	fmt.Printf("   - %s/docs.go\n", outputDir)
 }
