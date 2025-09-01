@@ -7,7 +7,7 @@ import (
     {{- if .HasImageField }}
     "base/core/storage"
     {{- end }}
-    {{- if hasField .Fields "time.Time" }}
+    {{- if or (hasField .Fields "time.Time") (hasField .Fields "types.DateTime") }}
     "base/core/types"
     {{- end }}
     {{- if hasField .Fields "translation.Field" }}
@@ -22,33 +22,38 @@ type {{.Model}} struct {
     UpdatedAt time.Time      `json:"updated_at"`
     DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index"`
     {{- range .Fields}}
-    {{- if and (not .IsRelation) (eq .Relationship "") }}
-    {{- if and (not (eq .Type "file")) (not (eq .Type "image")) (ne .Type "*storage.Attachment") (ne .Type "attachment") }}
-    {{.Name}} {{if eq .Type "text"}}string{{else}}{{.Type}}{{end}} `json:"{{.JSONName}}"{{if .GORM}} gorm:"{{.GORM}}"{{end}}`
-    {{- end }}
+    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") (ne .Type "translation.Field") }}
+    {{.Name}} {{if eq .Type "text"}}string{{else if eq .Type "email"}}string{{else}}{{.Type}}{{end}} `json:"{{.JSONName}}"{{if .GORMTag}} gorm:"{{.GORMTag}}"{{end}}`
     {{- end }}
     {{- end}}
     {{- /* Add foreign key IDs for belongsTo relationships */}}
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to" }}
+    {{- if hasSuffix .Name "Id" }}
+    {{.Name}} uint `json:"{{.JSONName}},omitempty"`
+    {{- else }}
     {{.Name}}Id uint `json:"{{.JSONName}}_id,omitempty"`
+    {{- end }}
     {{- end}}
     {{- end}}
     {{- /* Add relationship objects */}}
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to" }}
-    {{.Name}} *{{.RelatedModel}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}Id"`
-    {{- else if eq .Relationship "has_many" }}
+    {{- $objectName := TrimIdSuffix .Name }}
+    {{$objectName}} *{{.RelatedModel}} `json:"{{ToSnakeCase $objectName}},omitempty" gorm:"foreignKey:{{.Name}}"`
+    {{- else if eq .Relationship "has_many"}}
     {{.Name}} []*{{.RelatedModel}} `json:"{{.JSONName}},omitempty"`
     {{- else if eq .Relationship "has_one" }}
     {{.Name}} *{{.RelatedModel}} `json:"{{.JSONName}},omitempty"`
     {{- else if eq .Relationship "many_to_many" }}
-    {{.Name}} []*{{.RelatedModel}} `json:"{{.JSONName}},omitempty" gorm:"many2many:{{$.ModelSnake}}_{{ToSnakeCase (ToPlural .RelatedModel)}}"`
+    {{.Name}} []*{{.RelatedModel}} `json:"{{.JSONName}}" gorm:"many2many:{{$.ModelSnake}}_{{ToSnakeCase (ToPlural .RelatedModel)}}"`
+    {{- end }}
     {{- end}}
-    {{- end}}
-    {{- /* Add file attachments */}}
+    {{- /* Add translation fields and file attachments */}}
     {{- range .Fields}}
-    {{- if or (eq .Type "file") (eq .Type "image") (eq .Type "*storage.Attachment") (eq .Type "attachment") }}
+    {{- if eq .Type "translation.Field" }}
+    {{.Name}} translation.Field `json:"{{.JSONName}}" gorm:"foreignKey:ModelId;references:Id"`
+    {{- else if eq .Type "*storage.Attachment" }}
     {{.Name}} *storage.Attachment `json:"{{.JSONName}},omitempty" gorm:"foreignKey:ModelId;references:Id"`
     {{- end }}
     {{- end}}
@@ -60,8 +65,8 @@ type {{.Model}} struct {
 
 // {{$.Model}}{{.RelatedModel}} represents the join table between {{$.Model}} and {{.RelatedModel}}
 type {{$.Model}}{{.RelatedModel}} struct {
-    {{$.Model}}ID uint `json:"{{$.ModelSnake}}_id" gorm:"primaryKey"`
-    {{.RelatedModel}}ID uint `json:"{{ToSnakeCase .RelatedModel}}_id" gorm:"primaryKey"`
+    {{$.Model}}Id uint `json:"{{$.ModelSnake}}_id" gorm:"primaryKey"`
+    {{.RelatedModel}}Id uint `json:"{{ToSnakeCase .RelatedModel}}_id" gorm:"primaryKey"`
 }
 
 // TableName returns the table name for the join table
@@ -89,20 +94,37 @@ func (m *{{.Model}}) GetModelName() string {
 // Create{{.Model}}Request represents the request payload for creating a {{.Model}}
 type Create{{.Model}}Request struct {
     {{- range .Fields}}
-    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") (and (ne .Type "file") (ne .Type "image") (ne .Type "attachment")) }}
+    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") }}
     {{- $fieldType := .Type }}
     {{- if eq .Type "translation.Field" }}
     {{- $fieldType = "string" }}  // Convert translation fields to string in requests
     {{- else if eq .Type "text" }}
     {{- $fieldType = "string" }}
+    {{- else if eq .Type "email" }}
+    {{- $fieldType = "string" }}
+    {{- else if eq .Type "types.DateTime" }}
+    {{- $fieldType = "types.DateTime" }}
     {{- end }}
     {{- if .IsRequired }}
+    {{- if eq .Type "types.DateTime" }}
+    {{.Name}} {{$fieldType}} `json:"{{.JSONName}}" swaggertype:"string" binding:"required"`
+    {{- else }}
     {{.Name}} {{$fieldType}} `json:"{{.JSONName}}" binding:"required"`
+    {{- end }}
+    {{- else }}
+    {{- if eq .Type "types.DateTime" }}
+    {{.Name}} {{$fieldType}} `json:"{{.JSONName}}" swaggertype:"string"`
     {{- else }}
     {{.Name}} {{$fieldType}} `json:"{{.JSONName}}"`
     {{- end }}
+    {{- end }}
+    {{- /* Skip many-to-many fields in CreateRequest - they need PostId which doesn't exist yet */}}
     {{- else if eq .Relationship "belongs_to" }}
+    {{- if hasSuffix .Name "Id" }}
+    {{.Name}} uint `json:"{{.JSONName}},omitempty"`
+    {{- else }}
     {{.Name}}Id uint `json:"{{.JSONName}}_id,omitempty"`
+    {{- end }}
     {{- end }}
     {{- end}}
 }
@@ -110,20 +132,36 @@ type Create{{.Model}}Request struct {
 // Update{{.Model}}Request represents the request payload for updating a {{.Model}}
 type Update{{.Model}}Request struct {
     {{- range .Fields}}
-    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") (and (ne .Type "file") (ne .Type "image") (ne .Type "attachment")) }}
+    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") }}
     {{- $fieldType := .Type }}
     {{- if eq .Type "translation.Field" }}
     {{- $fieldType = "string" }}  // Convert translation fields to string in requests
     {{- else if eq .Type "text" }}
     {{- $fieldType = "string" }}
+    {{- else if eq .Type "email" }}
+    {{- $fieldType = "string" }}
+    {{- else if eq .Type "types.DateTime" }}
+    {{- $fieldType = "types.DateTime" }}
     {{- end }}
     {{- if eq .Type "bool" }}
     {{.Name}} *{{.Type}} `json:"{{.JSONName}},omitempty"`
+    {{- else if eq .Type "types.DateTime" }}
+    {{.Name}} {{$fieldType}} `json:"{{.JSONName}},omitempty" swaggertype:"string"`
     {{- else }}
     {{.Name}} {{$fieldType}} `json:"{{.JSONName}},omitempty"`
     {{- end }}
+    {{- else if eq .Relationship "many_to_many" }}
+    {{- if .RelatedModel }}
+    {{.Name}}Ids []uint `json:"{{.JSONName}}_ids,omitempty"`
+    {{- else }}
+    {{.Name}}Ids []uint `json:"{{.JSONName}}_ids,omitempty"`
+    {{- end }}
     {{- else if eq .Relationship "belongs_to" }}
+    {{- if hasSuffix .Name "Id" }}
+    {{.Name}} uint `json:"{{.JSONName}},omitempty"`
+    {{- else }}
     {{.Name}}Id uint `json:"{{.JSONName}}_id,omitempty"`
+    {{- end }}
     {{- end}}
     {{- end}}
     {{- /* File fields are handled via separate upload endpoints, not in update request */}}
@@ -139,12 +177,26 @@ type {{.Model}}Response struct {
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end }}
     {{- end}}
+    {{- /* Include toMany relationships in response */}}
+    {{- range .Fields}}
+    {{- if eq .Relationship "many_to_many" }}
+    {{- if .RelatedModel }}
+    {{.Name}} []*{{.RelatedModel}} `json:"{{.JSONName}}"`
+    {{- else }}
+    {{.Name}} []string `json:"{{.JSONName}}"`
+    {{- end }}
+    {{- end }}
+    {{- end}}
     {{- /* Include relationship objects in response */}}
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to" }}
     {{.Name}} *{{.RelatedModel}}ModelResponse `json:"{{.JSONName}},omitempty"`
     {{- else if or (eq .Relationship "has_many") (eq .Relationship "has_one") }}
+    {{- if eq .Type "*storage.Attachment" }}
+    {{.Name}} *storage.Attachment `json:"{{.JSONName}},omitempty"`
+    {{- else }}
     {{.Name}} {{.Type}} `json:"{{.JSONName}},omitempty"`
+    {{- end }}
     {{- end}}
     {{- end}}
     {{- /* Include file attachments in response */}}
@@ -196,6 +248,22 @@ type {{.Model}}ListResponse struct {
     {{.Name}} {{.Type}} `json:"{{.JSONName}}"`
     {{- end }}
     {{- end}}
+    {{- /* Include toMany relationships in list response */}}
+    {{- range .Fields}}
+    {{- if eq .Relationship "many_to_many" }}
+    {{- if .RelatedModel }}
+    {{.Name}} []*{{.RelatedModel}} `json:"{{.JSONName}}"`
+    {{- else }}
+    {{.Name}} []string `json:"{{.JSONName}}"`
+    {{- end }}
+    {{- end }}
+    {{- end}}
+    {{- /* Include file attachments in list response */}}
+    {{- range .Fields}}
+    {{- if eq .Type "*storage.Attachment" }}
+    {{.Name}} *storage.Attachment `json:"{{.JSONName}},omitempty"`
+    {{- end }}
+    {{- end}}
     {{- /* Foreign key IDs are included as regular fields above when they exist */}}
 }
 
@@ -220,9 +288,16 @@ func (m *{{.Model}}) ToResponse() *{{.Model}}Response {
     {{- /* Convert relationship objects to response types */}}
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to" }}
-    if m.{{.Name}} != nil {
-        response.{{.Name}} = m.{{.Name}}.ToModelResponse()
+    {{- if hasSuffix .Name "Id" }}
+    {{- $objectName := TrimIdSuffix .Name }}
+    if m.{{.Name}} != 0 {
+        response.{{.Name}} = m.{{$objectName}}.ToModelResponse()
     }
+    {{- else }}
+    if m.{{.Name}}Id != 0 {
+        response.{{.Name}}Id = m.{{.Name}}.ToModelResponse()
+    }
+    {{- end }}
     {{- end}}
     {{- end}}
     
@@ -341,7 +416,12 @@ func (m *{{.Model}}) Preload(db *gorm.DB) *gorm.DB {
     query := db
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to" }}
+    {{- if hasSuffix .Name "Id" }}
+    {{- $objectName := TrimIdSuffix .Name }}
+    query = query.Preload("{{$objectName}}")
+    {{- else }}
     query = query.Preload("{{.Name}}")
+    {{- end }}
     {{- end}}
     {{- end}}
     {{- /* Storage attachments are handled separately by ActiveStorage, don't preload them */}}

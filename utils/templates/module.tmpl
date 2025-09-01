@@ -52,12 +52,12 @@ func (m *Module) Init() error {
 }
 
 func (m *Module) Migrate() error {
-    return m.DB.AutoMigrate(&models.{{.Model}}{}{{range .Fields}}{{if eq .Relationship "many_to_many"}}, &models.{{$.Model}}{{.RelatedModel}}{}{{end}}{{end}})
+    return m.DB.AutoMigrate(&models.{{.Model}}{}{{range .Fields}}{{if or (eq .Relationship "many_to_many") (eq .Relationship "manyToMany") (eq .Relationship "toMany") (eq .Relationship "to_many") (eq .Type "to_many") }}, &models.{{$.Model}}{{.RelatedModel}}{}{{end}}{{end}})
 }
 
 func (m *Module) GetModels() []any {
     return []any{
-        &models.{{.Model}}{},{{range .Fields}}{{if eq .Relationship "many_to_many"}}
+        &models.{{.Model}}{},{{range .Fields}}{{if or (eq .Relationship "many_to_many") (eq .Relationship "manyToMany") (eq .Relationship "toMany") (eq .Relationship "to_many") (eq .Type "to_many")}}
         &models.{{$.Model}}{{.RelatedModel}}{},{{end}}{{end}}
     }
 }

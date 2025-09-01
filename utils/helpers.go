@@ -167,6 +167,13 @@ func ToPlural(s string) string {
 	return PluralizeClient.Plural(s)
 }
 
+func TrimIdSuffix(s string) string {
+	if strings.HasSuffix(s, "Id") && len(s) > 2 {
+		return s[:len(s)-2]
+	}
+	return s
+}
+
 func UpdateInitFile(singularName, pluralName string) error {
 	initFilePath := "app/init.go"
 

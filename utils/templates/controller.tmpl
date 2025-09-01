@@ -35,8 +35,8 @@ func (c *{{.Controller}}) Routes(router *router.RouterGroup) {
     //Upload endpoints for each file field
     {{- range .Fields}}
     {{- if eq .Type "*storage.Attachment"}}
-    router.POST("{{$.RoutePath}}/:id/{{ToSnakeCase .Name}}", c.Upload{{.Name}})
-    router.DELETE("{{$.RoutePath}}/:id/{{ToSnakeCase .Name}}", c.Remove{{.Name}})
+    router.POST("{{$.RoutePath}}/:id/{{ToKebabCase .Name}}", c.Upload{{.Name}})
+    router.DELETE("{{$.RoutePath}}/:id/{{ToKebabCase .Name}}", c.Remove{{.Name}})
     {{- end}}
     {{- end}}
 }

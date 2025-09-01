@@ -94,10 +94,14 @@ func (s *{{.Model}}Service) Create(req *models.Create{{.Model}}Request) (*models
         {{- range .Fields}}
         {{- if eq .Type "translation.Field" }}
         {{.Name}}: translation.NewField(req.{{.Name}}),
-        {{- else if or (eq .Type "*storage.Attachment") (eq .Type "file") (eq .Type "image") (eq .Type "attachment")}}
+        {{- else if eq .Type "*storage.Attachment"}}
         // handled separately
         {{- else if eq .Relationship "belongs_to"}}
+        {{- if hasSuffix .Name "Id" }}
+        {{.Name}}: req.{{.Name}},
+        {{- else }}
         {{.Name}}Id: req.{{.Name}}Id,
+        {{- end }}
         {{- else if and .IsRelation (ne .Relationship "")}}
         {{- /* Skip all other relationship objects, only use foreign key IDs */}}
         {{- else}}
@@ -133,104 +137,109 @@ func (s *{{.Model}}Service) Update(id uint, req *models.Update{{.Model}}Request)
         return nil, err
     }
 
-    // Build updates map
-    updates := make(map[string]any)
+    // Update fields directly on the model
     {{- range .Fields}}
     
     {{- if eq .Type "*storage.Attachment" }}
     // {{.Name}} attachment is handled via separate endpoint
     {{- else if eq .Relationship "belongs_to" }}
     // For foreign key relationships
-    if req.{{.Name}}Id != 0 {
-        updates["{{.JSONName}}_id"] = req.{{.Name}}Id
+    if req.{{.Name}} != 0 {
+        item.{{.Name}} = req.{{.Name}}
     }
     {{- else if not .IsRelation}}
     {{- if or (eq .Type "*bool") (eq .Type "bool")}}
     // For boolean fields, check if it's included in the request (pointer would be non-nil)
     if req.{{.Name}} != nil {
-        updates["{{.DBName}}"] = *req.{{.Name}}
+        item.{{.Name}} = *req.{{.Name}}
     }
     {{- else if hasPrefix .Type "*"}}
     {{- if or (contains .Type "int") (contains .Type "uint") (contains .Type "float")}}
     // For pointer numeric fields
     if req.{{.Name}} != nil && *req.{{.Name}} != 0 {
-        updates["{{.DBName}}"] = *req.{{.Name}}
+        item.{{.Name}} = *req.{{.Name}}
     }
     {{- else}}
     // For other pointer fields
     if req.{{.Name}} != nil {
-        updates["{{.DBName}}"] = *req.{{.Name}}
+        item.{{.Name}} = *req.{{.Name}}
     }
     {{- end}}
     {{- else if or (eq .Type "int") (eq .Type "int32") (eq .Type "int64")}}
     // For non-pointer integer fields
     if req.{{.Name}} != 0 {
-        updates["{{.DBName}}"] = req.{{.Name}}
+        item.{{.Name}} = req.{{.Name}}
     }
     {{- else if or (eq .Type "uint") (eq .Type "uint32") (eq .Type "uint64")}}
     // For non-pointer unsigned integer fields
     if req.{{.Name}} != 0 {
-        updates["{{.DBName}}"] = req.{{.Name}}
+        item.{{.Name}} = req.{{.Name}}
     }
     {{- else if or (eq .Type "float32") (eq .Type "float64")}}
     // For non-pointer float fields
     if req.{{.Name}} != 0 {
-        updates["{{.DBName}}"] = req.{{.Name}}
+        item.{{.Name}} = req.{{.Name}}
     }
     {{- else if eq .Type "time.Time"}}
     // For non-pointer time.Time fields
     if !req.{{.Name}}.IsZero() {
-        updates["{{.DBName}}"] = req.{{.Name}}
+        item.{{.Name}} = req.{{.Name}}
     }
     {{- else if eq .Type "types.DateTime"}}
     // For custom DateTime fields
     if !req.{{.Name}}.IsZero() {
-        updates["{{.DBName}}"] = req.{{.Name}}
+        item.{{.Name}} = req.{{.Name}}
     }
     {{- else if eq .Type "translation.Field"}}
     if req.{{.Name}} != "" {
         item.{{.Name}} = translation.NewField(req.{{.Name}})
-        updates["{{.DBName}}"] = item.{{.Name}}.Original
     }
-    {{- else if eq .Type "string"}}
+    {{- else if or (eq .Type "string") (eq .Type "email")}}
     // For non-pointer string fields
     if req.{{.Name}} != "" {
-        updates["{{.DBName}}"] = req.{{.Name}}
+        item.{{.Name}} = req.{{.Name}}
     }
-    {{- else if hasPrefix .Type "[]"}}
-    // For slice/array fields
-    if len(req.{{.Name}}) > 0 {
-        updates["{{.DBName}}"] = req.{{.Name}}
+    {{- else if eq .Type "text"}}
+    // For non-pointer text fields
+    if req.{{.Name}} != "" {
+        item.{{.Name}} = req.{{.Name}}
     }
-    {{- else}}
-    // For other field types - use generic approach
-    {{- if hasPrefix .Type "*"}}
-    if req.{{.Name}} != nil {
-        updates["{{.DBName}}"] = *req.{{.Name}}
-    }
-    {{- else}}
-    // Non-pointer field, apply field-specific logic
-    {{- if or (contains .Type "int") (contains .Type "uint") (contains .Type "float")}}
-    if req.{{.Name}} != 0 {
-        updates["{{.DBName}}"] = req.{{.Name}}
-    }
-    {{- else}}
-    // For custom types and other fields
-    if req.{{.Name}} != ({{.Type}}{}) {
-        updates["{{.DBName}}"] = req.{{.Name}}
-    }
-    {{- end}}
-    {{- end}}
     {{- end}}
     {{- end}}
     {{- end}}
 
-    if err := s.DB.Model(item).Updates(updates).Error; err != nil {
+    if err := s.DB.Save(item).Error; err != nil {
         s.Logger.Error("failed to update {{toLower .Model}}", 
             logger.String("error", err.Error()),
             logger.Int("id", int(id)))
         return nil, err
     }
+
+    // Handle many-to-many relationships
+    {{- range .Fields}}
+    {{- if eq .Relationship "many_to_many" }}
+    if req.{{.Name}}Ids != nil {
+        // Find the {{toLower .RelatedModel}}s by IDs
+        var {{toLower .Name}} []*models.{{.RelatedModel}}
+        if len(req.{{.Name}}Ids) > 0 {
+            if err := s.DB.Where("id IN ?", req.{{.Name}}Ids).Find(&{{toLower .Name}}).Error; err != nil {
+                s.Logger.Error("failed to find {{toLower .Name}} for {{toLower $.Model}} update",
+                    logger.String("error", err.Error()),
+                    logger.Int("id", int(id)))
+                return nil, err
+            }
+        }
+
+        // Replace the {{toLower .Name}} associations
+        if err := s.DB.Model(item).Association("{{.Name}}").Replace({{toLower .Name}}); err != nil {
+            s.Logger.Error("failed to update {{toLower $.Model}} {{toLower .Name}}",
+                logger.String("error", err.Error()),
+                logger.Int("id", int(id)))
+            return nil, err
+        }
+    }
+    {{- end}}
+    {{- end}}
 
     result, err := s.GetById(item.Id)
     if err != nil {

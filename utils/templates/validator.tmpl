@@ -49,8 +49,8 @@ func Validate{{ .Model }}UpdateRequest(req *models.Update{{ .Model }}Request, id
 		}
 	}
 
-	// Use Base core validator
-	return validate.Validate(req)
+	// Skip validation for update requests - all fields are optional
+	return nil
 }
 
 // Validate{{ .Model }}DeleteRequest validates the delete request
