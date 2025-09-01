@@ -5,6 +5,41 @@ All notable changes to the Base CLI tool will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v2.1.0] - 2025-09-01
+
+### Enhanced
+- **🔧 Version Checking & Upgrade System** - Complete overhaul of version management
+  - Fixed version comparison logic with proper semantic versioning support
+  - Added `GetAllReleases()` function to query all GitHub releases
+  - Implemented numeric version comparison instead of string comparison
+  - Enhanced major version detection with user confirmation prompts
+  - Fixed empty version string issues in upgrade command
+  - Added proper handling of minor/patch vs major version upgrades
+
+### Improved
+- **⚡ Service Template Error Handling** - Better update endpoint reliability
+  - Changed from `Updates()` to `Save()` method for cleaner error messages
+  - Implemented direct field assignment instead of updates map approach
+  - Fixed 500 errors in update endpoints across all generated modules
+  - Removed strict validation for update requests (all fields optional)
+  - Enhanced template generation with proper field ordering
+
+### Added
+- **🌐 Translation System Integration** - Verified multilingual field support
+  - Confirmed `translation.Field` integration with proper JSON serialization
+  - Added bulk translation API testing (`/api/translations/bulk`)
+  - Verified translation loading via `LoadTranslationsForField()` method
+  - Enhanced test script with translation verification endpoints
+  - Documented translation response format: `{"original": "value", "lang": "translation"}`
+
+### Fixed
+- **🐛 Blog System Stability** - Resolved update endpoint failures
+  - Fixed Category, Post, and Comment update operations
+  - Added proper error handling in service layer
+  - Enhanced validator templates to skip validation on updates
+  - Improved DateTime parsing with `types.DateTime` support
+  - Added comprehensive API test coverage with 89% success rate
+
 ## [v2.0.2] - 2025-08-20
 
 ### Enhanced
