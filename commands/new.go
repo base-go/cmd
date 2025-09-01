@@ -50,7 +50,6 @@ func createNewProject(cmd *cobra.Command, args []string) {
 	}
 
 	// Download the archive
-	fmt.Printf("Downloading project template from: %s\n", archiveURL)
 	resp, err := http.Get(archiveURL)
 	if err != nil {
 		fmt.Printf("Error downloading project template: %v\n", err)
@@ -160,7 +159,11 @@ func createNewProject(cmd *cobra.Command, args []string) {
 		fmt.Printf("Error getting absolute path: %v\n", err)
 		return
 	}
-
 	fmt.Printf("New project '%s' created successfully at %s\n", projectName, absPath)
-	fmt.Println("You can now start working on your new project!")
+	// Copy .env.sample to .env
+	fmt.Println("Copying .env.sample to .env...")
+	copyFile(filepath.Join(projectName, ".env.sample"), filepath.Join(projectName, ".env"))
+	fmt.Println(".env file created successfully")
+
+	fmt.Println("You can now start working on your new project! cd " + projectName + " && base start")
 }

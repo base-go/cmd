@@ -8,13 +8,13 @@ It offers scaffolding, module generation, and utilities to accelerate Go applica
 ### macOS and Linux
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/base-go/cmd/main/install.sh | bash
+curl -fsSL https://get.base.al | bash
 ```
 
 If you need to install in a protected directory (like `/usr/local/bin`), use:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/base-go/cmd/main/install.sh | sudo bash
+curl -fsSL https://get.base.al | sudo bash
 ```
 
 ### Windows
@@ -30,7 +30,7 @@ Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManage
 #### Option 2: Using Git Bash
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/base-go/cmd/main/install.sh | bash
+curl -fsSL https://get.base.al | bash
 ```
 
 ## Commands
@@ -70,7 +70,7 @@ base s -d
 
 ### `base docs`
 
-Generate Swagger 2.0 documentation using go-swagger by scanning controller annotations and create static files.
+Generate OpenAPI 3.0 documentation using swag by scanning controller annotations and create static files.
 
 ```bash
 base docs [flags]
@@ -89,14 +89,16 @@ base docs --output api-docs
 ```
 
 Generated files:
-- `swagger.json`: Swagger 2.0 specification in JSON format
-- `swagger.yaml`: Swagger 2.0 specification in YAML format
+- `swagger.json`: OpenAPI 3.0 specification in JSON format
+- `swagger.yaml`: OpenAPI 3.0 specification in YAML format
 - `docs.go`: Go package with embedded OpenAPI spec for programmatic access
+- `index.html`: Lightweight Swagger UI served from CDN
 
 Notes:
-- Static files are served at `/docs/` when running the server
-- You can also run `base start -d` to auto-generate docs before starting the server and serve Swagger UI at `/swagger/`
+- Documentation is served at `/docs/` when running the server
+- You can also run `base start -d` to auto-generate docs before starting the server
 - All swagger info (title, version, description) is extracted from main.go annotations
+- Uses swag for modern OpenAPI 3.0 support with better performance
 
 ### `base scheduler` or `base sc`
 

@@ -196,7 +196,7 @@ func (td *TemplateData) parseField(fieldDef string) Field {
 		// Also add the relation field
 		td.Fields = append(td.Fields, Field{
 			Name:         ToPascalCase(relatedName),
-			Type:         field.RelatedModel,
+			Type:         "*" + field.RelatedModel,
 			JSONTag:      ToSnakeCase(relatedName) + ",omitempty",
 			GORMTag:      fmt.Sprintf(`gorm:"foreignKey:%s"`, field.ForeignKey),
 			IsRelation:   true,
@@ -270,12 +270,15 @@ func (td *TemplateData) parseField(fieldDef string) Field {
 			field.IsImage = true
 			field.IsAttachment = true
 			field.Type = "*storage.Attachment"
-			field.GORMTag = `gorm:"polymorphic:Model"`
+			field.GORMTag = `gorm:"foreignKey:ModelId;references:Id"`
 		case "file":
 			field.IsFile = true
 			field.IsAttachment = true
 			field.Type = "*storage.Attachment"
-			field.GORMTag = `gorm:"polymorphic:Model"`
+			field.GORMTag = `gorm:"foreignKey:ModelId;references:Id"`
+		case "text":
+			field.Type = "string"
+			field.GORMTag = `type:text`
 		}
 	}
 

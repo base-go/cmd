@@ -94,11 +94,15 @@ func (s *{{.Model}}Service) Create(req *models.Create{{.Model}}Request) (*models
         {{- range .Fields}}
         {{- if eq .Type "translation.Field" }}
         {{.Name}}: translation.NewField(req.{{.Name}}),
-        {{- else if eq .Type "*storage.Attachment"}}
+        {{- else if or (eq .Type "*storage.Attachment") (eq .Type "file") (eq .Type "image") (eq .Type "attachment")}}
         // handled separately
         {{- else if eq .Relationship "belongs_to"}}
         {{.Name}}Id: req.{{.Name}}Id,
+        {{- else if and .IsRelation (ne .Relationship "")}}
+        {{- /* Skip all other relationship objects, only use foreign key IDs */}}
         {{- else}}
+        {{- $fieldType := .Type }}
+        {{- if eq .Type "text" }}{{$fieldType = "string"}}{{end}}
         {{.Name}}: req.{{.Name}},
         {{- end}}
         {{- end}}

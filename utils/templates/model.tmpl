@@ -28,26 +28,28 @@ type {{.Model}} struct {
     {{- end }}
     {{- end }}
     {{- end}}
-    {{- /* Foreign key IDs are now handled by ProcessField function when _id fields are detected */}}
-    {{- /* Add file attachment IDs */}}
+    {{- /* Add foreign key IDs for belongsTo relationships */}}
     {{- range .Fields}}
-    {{- if or (eq .Type "file") (eq .Type "image") (eq .Type "*storage.Attachment") (eq .Type "attachment") }}
+    {{- if eq .Relationship "belongs_to" }}
     {{.Name}}Id uint `json:"{{.JSONName}}_id,omitempty"`
-    {{- end }}
+    {{- end}}
     {{- end}}
     {{- /* Add relationship objects */}}
     {{- range .Fields}}
     {{- if eq .Relationship "belongs_to" }}
-    {{.Name}}Id uint `json:"{{.JSONName}}_id,omitempty"`
     {{.Name}} *{{.RelatedModel}} `json:"{{.JSONName}},omitempty" gorm:"foreignKey:{{.Name}}Id"`
-    {{- else if or (eq .Relationship "has_many") (eq .Relationship "has_one") (eq .Relationship "many_to_many") }}
-    {{.Name}} {{if eq .Type "text"}}string{{else}}{{.Type}}{{end}} `json:"{{.JSONName}}"{{if .GORM}} gorm:"{{.GORM}}"{{end}}`
+    {{- else if eq .Relationship "has_many" }}
+    {{.Name}} []*{{.RelatedModel}} `json:"{{.JSONName}},omitempty"`
+    {{- else if eq .Relationship "has_one" }}
+    {{.Name}} *{{.RelatedModel}} `json:"{{.JSONName}},omitempty"`
+    {{- else if eq .Relationship "many_to_many" }}
+    {{.Name}} []*{{.RelatedModel}} `json:"{{.JSONName}},omitempty" gorm:"many2many:{{$.ModelSnake}}_{{ToSnakeCase (ToPlural .RelatedModel)}}"`
     {{- end}}
     {{- end}}
     {{- /* Add file attachments */}}
     {{- range .Fields}}
-    {{- if eq .Type "*storage.Attachment" }}
-    {{.Name}} *storage.Attachment `json:"{{.JSONName}},omitempty"`
+    {{- if or (eq .Type "file") (eq .Type "image") (eq .Type "*storage.Attachment") (eq .Type "attachment") }}
+    {{.Name}} *storage.Attachment `json:"{{.JSONName}},omitempty" gorm:"foreignKey:ModelId;references:Id"`
     {{- end }}
     {{- end}}
 }
@@ -87,16 +89,20 @@ func (m *{{.Model}}) GetModelName() string {
 // Create{{.Model}}Request represents the request payload for creating a {{.Model}}
 type Create{{.Model}}Request struct {
     {{- range .Fields}}
-    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") }}
+    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") (and (ne .Type "file") (ne .Type "image") (ne .Type "attachment")) }}
     {{- $fieldType := .Type }}
     {{- if eq .Type "translation.Field" }}
     {{- $fieldType = "string" }}  // Convert translation fields to string in requests
+    {{- else if eq .Type "text" }}
+    {{- $fieldType = "string" }}
     {{- end }}
     {{- if .IsRequired }}
     {{.Name}} {{$fieldType}} `json:"{{.JSONName}}" binding:"required"`
     {{- else }}
     {{.Name}} {{$fieldType}} `json:"{{.JSONName}}"`
     {{- end }}
+    {{- else if eq .Relationship "belongs_to" }}
+    {{.Name}}Id uint `json:"{{.JSONName}}_id,omitempty"`
     {{- end }}
     {{- end}}
 }
@@ -104,10 +110,12 @@ type Create{{.Model}}Request struct {
 // Update{{.Model}}Request represents the request payload for updating a {{.Model}}
 type Update{{.Model}}Request struct {
     {{- range .Fields}}
-    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") }}
+    {{- if and (not .IsRelation) (eq .Relationship "") (ne .Type "*storage.Attachment") (and (ne .Type "file") (ne .Type "image") (ne .Type "attachment")) }}
     {{- $fieldType := .Type }}
     {{- if eq .Type "translation.Field" }}
     {{- $fieldType = "string" }}  // Convert translation fields to string in requests
+    {{- else if eq .Type "text" }}
+    {{- $fieldType = "string" }}
     {{- end }}
     {{- if eq .Type "bool" }}
     {{.Name}} *{{.Type}} `json:"{{.JSONName}},omitempty"`
@@ -115,7 +123,6 @@ type Update{{.Model}}Request struct {
     {{.Name}} {{$fieldType}} `json:"{{.JSONName}},omitempty"`
     {{- end }}
     {{- else if eq .Relationship "belongs_to" }}
-    {{- /* For belongsTo relationships, only include the ID field */}}
     {{.Name}}Id uint `json:"{{.JSONName}}_id,omitempty"`
     {{- end}}
     {{- end}}
