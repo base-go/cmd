@@ -396,17 +396,33 @@ func getTargetVersion(allowMajor bool) (*version.Release, string, error) {
 	if !allowMajor {
 		// Get current version info to determine what major version to stay within
 		info := version.GetBuildInfo()
-		currentMajor := strings.Split(strings.TrimPrefix(info.Version, "v"), ".")[0]
+		currentVersion := strings.TrimPrefix(info.Version, "v")
+		currentMajor := strings.Split(currentVersion, ".")[0]
 		
 		// If the latest version is in the same major version, use it
 		if strings.HasPrefix(latestVersion, currentMajor+".") {
 			return release, latestVersion, nil
 		}
 		
-		// Otherwise, we need to find the latest version within the current major version
-		// For now, return the current version (no upgrade available within major version)
-		// In a full implementation, you'd query all releases and find the latest within the major version
-		return release, info.Version, nil
+		// Otherwise, find the latest version within the current major version
+		// Query all releases to find the latest patch/minor within current major
+		allReleases, err := version.GetAllReleases()
+		if err != nil {
+			// Fallback: return current version if we can't get all releases
+			return release, currentVersion, nil
+		}
+		
+		latestInMajor := currentVersion
+		for _, r := range allReleases {
+			releaseVersion := strings.TrimPrefix(r.TagName, "v")
+			if strings.HasPrefix(releaseVersion, currentMajor+".") {
+				if version.CompareVersions(releaseVersion, latestInMajor) > 0 {
+					latestInMajor = releaseVersion
+				}
+			}
+		}
+		
+		return release, latestInMajor, nil
 	}
 	
 	return release, latestVersion, nil
